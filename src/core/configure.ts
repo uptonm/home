@@ -1,7 +1,7 @@
 import { consola } from 'consola'
 import { CURRENT_MODULE_SCHEMA, loadModuleConfig, saveModuleConfig, type ModuleConfigData } from './config'
 import { getSecret, setSecret } from './secrets'
-import type { ConfigField, ModuleConfig, ModuleManifest } from './types'
+import type { ConfigField, DynamicEnumOption, ModuleConfig, ModuleManifest } from './types'
 import { UserError } from './errors'
 
 export interface ConfigureOpts {
@@ -26,11 +26,82 @@ function validatorFor(field: ConfigField): (v: string) => string | null {
   return custom ?? (() => null)
 }
 
-async function promptText(label: string, initial: string | undefined): Promise<string> {
-  return consola.prompt(label, {
-    type: 'text',
-    default: initial ?? '',
-    cancel: 'reject',
+async function promptText(
+  label: string,
+  initial: string | undefined,
+  opts: { showDefault?: boolean; placeholder?: string } = {},
+): Promise<string> {
+  const showDefault = opts.showDefault !== false
+  const promptOpts: {
+    type: 'text'
+    default?: string
+    placeholder?: string
+    cancel: 'reject'
+  } = { type: 'text', cancel: 'reject' }
+  if (initial && showDefault) {
+    promptOpts.default = initial
+    promptOpts.placeholder = initial
+  } else if (opts.placeholder) {
+    promptOpts.placeholder = opts.placeholder
+  }
+  return consola.prompt(label, promptOpts)
+}
+
+const ANSI = {
+  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
+  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
+  gray: (s: string) => `\x1b[90m${s}\x1b[0m`,
+  dim: (s: string) => `\x1b[2m${s}\x1b[22m`,
+}
+
+async function promptPassword(label: string, hint?: string): Promise<string> {
+  if (!process.stdin.isTTY) {
+    return promptText(label + (hint ? ` (${hint})` : ''), undefined)
+  }
+  return new Promise<string>((resolve, reject) => {
+    process.stderr.write(`${ANSI.gray('│')}\n`)
+    process.stderr.write(`${ANSI.cyan('◇')}  ${label}\n`)
+    if (hint) process.stderr.write(`${ANSI.gray('│')}  ${ANSI.dim(hint)}\n`)
+    process.stderr.write(`${ANSI.cyan('│')}  `)
+
+    process.stdin.setRawMode(true)
+    process.stdin.resume()
+    let buf = ''
+
+    const cleanup = () => {
+      process.stdin.setRawMode(false)
+      process.stdin.pause()
+      process.stdin.removeListener('data', onData)
+    }
+
+    const onData = (chunk: Buffer) => {
+      const s = chunk.toString('utf8')
+      for (const ch of s) {
+        if (ch === '\r' || ch === '\n') {
+          cleanup()
+          process.stderr.write(`\n${ANSI.gray('└')}\n`)
+          resolve(buf)
+          return
+        }
+        if (ch === '\x7f' || ch === '\b') {
+          if (buf.length > 0) {
+            buf = buf.slice(0, -1)
+            process.stderr.write('\b \b')
+          }
+          continue
+        }
+        if (ch === '\x03') {
+          cleanup()
+          process.stderr.write('\n')
+          reject(new Error('Prompt cancelled.'))
+          return
+        }
+        if (ch < ' ') continue
+        buf += ch
+        process.stderr.write('•')
+      }
+    }
+    process.stdin.on('data', onData)
   })
 }
 
@@ -42,30 +113,74 @@ async function promptConfirm(label: string, initial: boolean | undefined): Promi
   })
 }
 
-async function promptSelect(label: string, options: readonly string[], initial: string | undefined): Promise<string> {
+async function promptSelect(
+  label: string,
+  options: readonly DynamicEnumOption[],
+  initial: string | undefined,
+): Promise<string> {
   return consola.prompt(label, {
     type: 'select',
-    options: [...options],
+    options: options.map((o) =>
+      typeof o === 'string' ? o : { value: o.value, label: o.label ?? o.value, hint: o.hint ?? '' },
+    ),
     initial,
     cancel: 'reject',
   }) as Promise<string>
 }
 
-async function promptField(field: ConfigField, current: string | boolean | undefined): Promise<string | boolean> {
+function resolveDefault(field: ConfigField): string | boolean | undefined {
+  if (field.default === undefined) return undefined
+  if (typeof field.default === 'function') {
+    try {
+      return field.default()
+    } catch {
+      return undefined
+    }
+  }
+  return field.default
+}
+
+async function promptField(
+  field: ConfigField,
+  current: string | boolean | undefined,
+  partial: ModuleConfig,
+): Promise<string | boolean> {
   while (true) {
     let answer: string | boolean
+    const fieldDefault = resolveDefault(field)
     if (field.kind === 'boolean') {
-      answer = await promptConfirm(field.label, (current as boolean | undefined) ?? (field.default as boolean | undefined))
+      answer = await promptConfirm(field.label, (current as boolean | undefined) ?? (fieldDefault as boolean | undefined))
     } else if (field.kind === 'enum') {
-      const initial = (current as string | undefined) ?? (field.default as string | undefined)
-      answer = await promptSelect(field.label, field.enum ?? [], initial)
-    } else {
-      const initial = (current as string | undefined) ?? (field.default as string | undefined)
-      if (field.kind === 'secret' && initial) {
-        consola.info('(existing secret will be kept if you leave this blank)')
+      const initial = (current as string | undefined) ?? (fieldDefault as string | undefined)
+      let options: readonly DynamicEnumOption[] = field.enum ?? []
+      if (field.dynamicEnum) {
+        try {
+          options = await field.dynamicEnum(partial)
+        } catch (err) {
+          consola.warn(`could not fetch options for "${field.label}": ${(err as Error).message}`)
+        }
       }
-      const text = await promptText(field.label + (field.help ? ` — ${field.help}` : ''), initial)
-      if (field.kind === 'secret' && text.trim() === '' && initial) {
+      if (options.length === 0) {
+        const text = await promptText(field.label + ' (free text — could not fetch options)', initial)
+        answer = text
+      } else {
+        answer = await promptSelect(field.label, options, initial)
+      }
+    } else {
+      const initial = (current as string | undefined) ?? (fieldDefault as string | undefined)
+      const isSecret = field.kind === 'secret'
+      const label = field.label
+      const hint = field.help
+      let text: string
+      if (isSecret) {
+        const secretHint = initial ? 'press enter to keep current' : hint
+        text = await promptPassword(label, secretHint)
+      } else {
+        text = await promptText(label + (hint ? ` — ${hint}` : ''), initial, {
+          showDefault: true,
+        })
+      }
+      if (isSecret && text.trim() === '' && initial) {
         return initial
       }
       const err = validatorFor(field)(text)
@@ -106,7 +221,7 @@ export async function runConfigure(manifest: ModuleManifest, opts: ConfigureOpts
           : (existing[field.key] as string | boolean | undefined)
       let answer: string | boolean
       try {
-        answer = await promptField(field, current)
+        answer = await promptField(field, current, probeConfig)
       } catch (err) {
         if (err instanceof Error && err.message.toLowerCase().includes('cancel')) {
           throw new UserError('configure cancelled', 'cancelled')

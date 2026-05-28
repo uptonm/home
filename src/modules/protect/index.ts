@@ -1,4 +1,5 @@
 import type { ModuleManifest } from '../../core/types'
+import { defaultControllerUrl } from '../../core/net'
 import { connect, readProtectConfig } from './client'
 import { camerasGet, camerasList } from './commands/cameras'
 import { eventsList, eventsRecent } from './commands/events'
@@ -12,27 +13,29 @@ export const manifest: ModuleManifest = {
   configSchema: [
     {
       key: 'url',
-      label: 'Protect controller URL (e.g. https://10.0.0.1)',
+      label: 'Protect controller URL',
       kind: 'url',
       required: true,
+      default: defaultControllerUrl,
+    },
+    {
+      key: 'insecureTLS',
+      label: 'Allow self-signed TLS certificate?',
+      kind: 'boolean',
+      default: false,
     },
     {
       key: 'username',
       label: 'Local Protect username',
       kind: 'string',
       required: true,
+      help: 'controller-local user, not your Ubiquiti SSO',
     },
     {
       key: 'password',
       label: 'Local Protect password',
       kind: 'secret',
       required: true,
-    },
-    {
-      key: 'insecureTLS',
-      label: 'Allow self-signed TLS certificate?',
-      kind: 'boolean',
-      default: true,
     },
   ],
   commands: [camerasList, camerasGet, eventsList, eventsRecent, snapshot],

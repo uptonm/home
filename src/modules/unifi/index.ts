@@ -1,4 +1,5 @@
 import type { ModuleManifest } from '../../core/types'
+import { defaultControllerUrl } from '../../core/net'
 import { listSites, readUnifiConfig } from './client'
 import { devicesGet, devicesList } from './commands/devices'
 import { clientsList } from './commands/clients'
@@ -12,9 +13,17 @@ export const manifest: ModuleManifest = {
   configSchema: [
     {
       key: 'url',
-      label: 'UniFi controller URL (e.g. https://10.0.0.1)',
+      label: 'UniFi controller URL',
       kind: 'url',
       required: true,
+      default: defaultControllerUrl,
+    },
+    {
+      key: 'insecureTLS',
+      label: 'Allow self-signed TLS certificate?',
+      kind: 'boolean',
+      default: false,
+      help: 'UniFi controllers ship with self-signed certs — answer yes only if you have not installed a real cert',
     },
     {
       key: 'apiKey',
@@ -25,16 +34,19 @@ export const manifest: ModuleManifest = {
     },
     {
       key: 'site',
-      label: 'Site name (internal id, usually "default")',
-      kind: 'string',
+      label: 'Site',
+      kind: 'enum',
+      required: true,
       default: 'default',
-    },
-    {
-      key: 'insecureTLS',
-      label: 'Allow self-signed TLS certificate?',
-      kind: 'boolean',
-      default: true,
-      help: 'UniFi controllers ship with self-signed certs by default',
+      async dynamicEnum(partial) {
+        const sites = (await listSites(readUnifiConfig(partial))) as { name?: string; desc?: string }[]
+        return sites
+          .filter((s) => s.name)
+          .map((s) => ({
+            value: s.name as string,
+            label: s.desc ? `${s.desc} (${s.name})` : (s.name as string),
+          }))
+      },
     },
   ],
   commands: [devicesList, devicesGet, clientsList, siteInfoCmd, siteHealthCmd],
