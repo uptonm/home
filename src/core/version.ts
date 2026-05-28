@@ -13,7 +13,10 @@ function devVersion(): string {
 function devCommit(): string {
   try {
     const { execSync } = require('node:child_process') as typeof import('node:child_process')
-    return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim()
+    return execSync('git rev-parse --short HEAD', {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
   } catch {
     return 'dev'
   }
