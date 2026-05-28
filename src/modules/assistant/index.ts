@@ -1,5 +1,5 @@
 import type { ModuleManifest } from '../../core/types'
-import { info, readAssistantConfig } from './client'
+import { getConfig, readAssistantConfig } from './client'
 import { stateGet, statesList } from './commands/states'
 import { serviceCall } from './commands/service'
 import { automationTrigger } from './commands/automation'
@@ -29,8 +29,16 @@ export const manifest: ModuleManifest = {
   commands: [statesList, stateGet, serviceCall, automationTrigger, historyGet, logbookList],
   async status(cfg) {
     try {
-      const data = await info(readAssistantConfig(cfg))
-      return { ok: true, data: { message: data.message ?? '(no message)', version: data.version ?? '?' } }
+      const data = await getConfig(readAssistantConfig(cfg))
+      return {
+        ok: true,
+        data: {
+          version: data.version ?? '?',
+          location: data.location_name ?? '?',
+          timeZone: data.time_zone ?? '?',
+          status: 'reachable',
+        },
+      }
     } catch (err) {
       return { ok: false, kind: 'system', message: (err as Error).message, code: 'status_failed' }
     }

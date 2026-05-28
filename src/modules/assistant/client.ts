@@ -25,6 +25,19 @@ export async function info(cfg: AssistantConfig): Promise<{ message?: string; ve
   return requestJson(`${cfg.url}/api/`, { headers: headers(cfg) })
 }
 
+export interface HassConfig {
+  version?: string
+  location_name?: string
+  time_zone?: string
+  components?: string[]
+  unit_system?: Record<string, string>
+  [k: string]: unknown
+}
+
+export async function getConfig(cfg: AssistantConfig): Promise<HassConfig> {
+  return requestJson<HassConfig>(`${cfg.url}/api/config`, { headers: headers(cfg) })
+}
+
 export interface HassState {
   entity_id: string
   state: string
