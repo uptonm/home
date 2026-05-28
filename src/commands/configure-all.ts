@@ -24,6 +24,6 @@ export const configureAllCmd: CommandDef = defineCommand({
         results.push({ module: manifest.name, ok: false, error: (err as Error).message })
       }
     }
-    emit({ ok: true, data: results }, { json })
+    await emit({ ok: true, data: results }, { json })
   },
 })

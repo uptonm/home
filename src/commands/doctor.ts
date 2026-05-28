@@ -78,6 +78,6 @@ export const doctorCmd: CommandDef = defineCommand({
       modules: moduleReports,
       ...('error' in update ? { updateError: update.error } : { update }),
     }
-    emit({ ok: true, data: report }, { json })
+    await emit({ ok: true, data: report }, { json })
   },
 })

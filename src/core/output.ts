@@ -1,21 +1,29 @@
+import type { Writable } from 'node:stream'
 import type { RunResult } from './types'
 
 export interface EmitOptions {
   json: boolean
 }
 
-export function emit(result: RunResult, { json }: EmitOptions): never {
+function drain(stream: Writable, text: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    stream.write(text, (err) => (err ? reject(err) : resolve()))
+  })
+}
+
+export async function emit(result: RunResult, { json }: EmitOptions): Promise<never> {
   if (result.ok) {
     if (json) {
-      process.stdout.write(JSON.stringify(result.data ?? null) + '\n')
+      await drain(process.stdout, JSON.stringify(result.data ?? null) + '\n')
     } else if (result.data !== undefined && result.data !== null) {
-      process.stdout.write(formatHuman(result.data) + '\n')
+      await drain(process.stdout, formatHuman(result.data) + '\n')
     }
     process.exit(0)
   }
   const code = result.kind === 'config' ? 3 : result.kind === 'user' ? 1 : 2
   if (json) {
-    process.stdout.write(
+    await drain(
+      process.stdout,
       JSON.stringify({
         ok: false,
         code: result.code ?? result.kind,
@@ -23,7 +31,7 @@ export function emit(result: RunResult, { json }: EmitOptions): never {
       }) + '\n',
     )
   } else {
-    process.stderr.write(`error: ${result.message}\n`)
+    await drain(process.stderr, `error: ${result.message}\n`)
   }
   process.exit(code)
 }

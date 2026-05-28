@@ -45,7 +45,7 @@ export const secretsCmd: CommandDef = defineCommand({
         const payload = { $schemaVersion: 1, entries: rows }
         writeFileSync(out, JSON.stringify(payload, null, 2) + '\n', { mode: 0o600 })
         chmodSync(out, 0o600)
-        emit({ ok: true, data: { path: out, count: rows.length } }, { json })
+        await emit({ ok: true, data: { path: out, count: rows.length } }, { json })
       },
     }),
     import: defineCommand({
@@ -56,7 +56,7 @@ export const secretsCmd: CommandDef = defineCommand({
         const json = Boolean(raw.json)
         const inPath = String(raw.in)
         if (!existsSync(inPath)) {
-          emit(
+          await emit(
             { ok: false, kind: 'user', message: `file not found: ${inPath}`, code: 'not_found' },
             { json },
           )
@@ -64,7 +64,7 @@ export const secretsCmd: CommandDef = defineCommand({
         const data = JSON.parse(readFileSync(inPath, 'utf8')) as { entries?: SecretRow[] }
         const rows = data.entries ?? []
         importAll(rows)
-        emit({ ok: true, data: { imported: rows.length } }, { json })
+        await emit({ ok: true, data: { imported: rows.length } }, { json })
       },
     }),
   },

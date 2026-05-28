@@ -22,7 +22,7 @@ export const initCmd: CommandDef = defineCommand({
     const cfg = loadGlobalConfig()
 
     if (cfg.secretsBackend) {
-      emit(
+      await emit(
         {
           ok: true,
           data: {
@@ -39,7 +39,7 @@ export const initCmd: CommandDef = defineCommand({
     let backend: 'keyring' | 'file' = 'keyring'
     if (!keyringWorks) {
       if (!process.stdin.isTTY) {
-        emit(
+        await emit(
           {
             ok: false,
             kind: 'system',
@@ -54,7 +54,7 @@ export const initCmd: CommandDef = defineCommand({
         { type: 'confirm', initial: false, cancel: 'reject' },
       )
       if (!accept) {
-        emit(
+        await emit(
           {
             ok: false,
             kind: 'user',
@@ -68,7 +68,7 @@ export const initCmd: CommandDef = defineCommand({
     }
     selectAndPersistBackend(backend)
     saveGlobalConfig({ ...loadGlobalConfig(), secretsBackend: backend })
-    emit(
+    await emit(
       {
         ok: true,
         data: {

@@ -17,7 +17,7 @@ export const skillCmd: CommandDef = defineCommand({
         const raw = args as Record<string, unknown>
         const json = Boolean(raw.json)
         const written = writeAllSkills(modules)
-        emit({ ok: true, data: written }, { json })
+        await emit({ ok: true, data: written }, { json })
       },
     }),
   },

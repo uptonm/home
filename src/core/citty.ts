@@ -77,7 +77,7 @@ function makeUserLeaf(manifest: ModuleManifest, spec: CommandSpec): CommandDef {
       const env = ctxFromArgs(raw)
       const config = resolveModuleConfig(manifest)
       if (!config && requiresConfig) {
-        emit(
+        await emit(
           {
             ok: false,
             kind: 'config',
@@ -93,7 +93,7 @@ function makeUserLeaf(manifest: ModuleManifest, spec: CommandSpec): CommandDef {
         config: config ?? {},
       }
       const result = await spec.run(ctx)
-      emit(result, { json: env.json })
+      await emit(result, { json: env.json })
     },
   })
 }
@@ -112,9 +112,9 @@ function makeConfigureCommand(manifest: ModuleManifest): CommandDef {
       const env = ctxFromArgs(raw)
       try {
         await runConfigure(manifest, { rotate: Boolean(raw.rotate), force: Boolean(raw.force) })
-        emit({ ok: true, data: `${manifest.name}: configured` }, { json: env.json })
+        await emit({ ok: true, data: `${manifest.name}: configured` }, { json: env.json })
       } catch (err) {
-        emit(
+        await emit(
           {
             ok: false,
             kind: 'user',
@@ -138,7 +138,7 @@ function makeStatusCommand(manifest: ModuleManifest): CommandDef {
       const env = ctxFromArgs(raw)
       const config = resolveModuleConfig(manifest)
       if (!config && requiresConfig) {
-        emit(
+        await emit(
           {
             ok: false,
             kind: 'config',
@@ -150,9 +150,9 @@ function makeStatusCommand(manifest: ModuleManifest): CommandDef {
       }
       try {
         const result = await manifest.status(config ?? {})
-        emit(result, { json: env.json })
+        await emit(result, { json: env.json })
       } catch (err) {
-        emit(
+        await emit(
           { ok: false, kind: 'system', message: (err as Error).message, code: 'status_failed' },
           { json: env.json },
         )
@@ -169,7 +169,7 @@ function makeSkillCommand(manifest: ModuleManifest): CommandDef {
       const raw = args as Record<string, unknown>
       const env = ctxFromArgs(raw)
       const path = writeSkill(manifest)
-      emit({ ok: true, data: { path } }, { json: env.json })
+      await emit({ ok: true, data: { path } }, { json: env.json })
     },
   })
 }
