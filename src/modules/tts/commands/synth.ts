@@ -3,7 +3,7 @@ import { readTtsConfig, synth } from '../client'
 
 export const synthCmd: CommandSpec = {
   path: ['synth'],
-  description: 'Synthesize speech from text and write it to disk as m4a. Prints the path; does not play anything.',
+  description: 'Synthesize speech from text and write it to disk as a 16-bit PCM WAV file (works on every Sonos generation, including S1 hardware like Play:5 Gen 1 that does not decode AAC-in-MP4 reliably). Prints the path; does not play anything.',
   args: [
     { name: 'text', kind: 'positional', description: 'Text to speak', required: true },
     { name: 'voice', kind: 'string', description: 'Voice name (default from config; macOS `say -v ?` for the list)' },
@@ -16,11 +16,9 @@ export const synthCmd: CommandSpec = {
     'FILE=$(home tts synth "Hello world" --json | jq -r .path) && home sonos notify "Living Room" --file "$FILE"',
   ],
   async run(ctx) {
-    const text = String(ctx.args.text ?? '').trim()
-    if (!text) return { ok: false, kind: 'user', message: 'text is required', code: 'missing_arg' }
     const cfg = readTtsConfig(ctx.config)
     const result = await synth(cfg, {
-      text,
+      text: String(ctx.args.text ?? ''),
       voice: ctx.args.voice ? String(ctx.args.voice) : undefined,
       rate: ctx.args.rate !== undefined ? Number(ctx.args.rate) : undefined,
       outPath: ctx.args.out ? String(ctx.args.out) : undefined,

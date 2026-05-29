@@ -1,5 +1,5 @@
 import type { ModuleManifest } from '../../core/types'
-import { readTtsConfig, synth } from './client'
+import { pingProvider, readTtsConfig } from './client'
 import { synthCmd } from './commands/synth'
 
 export const manifest: ModuleManifest = {
@@ -11,8 +11,9 @@ export const manifest: ModuleManifest = {
   commands: [synthCmd],
   async status(cfg) {
     try {
-      const result = await synth(readTtsConfig(cfg), { text: 'ok' })
-      return { ok: true, data: { provider: result.provider, voice: result.voice, sampleAt: result.path } }
+      const ttsCfg = readTtsConfig(cfg)
+      await pingProvider(ttsCfg)
+      return { ok: true, data: { provider: ttsCfg.provider, voice: ttsCfg.voice, rate: ttsCfg.rate } }
     } catch (err) {
       return { ok: false, kind: 'system', message: (err as Error).message, code: 'status_failed' }
     }

@@ -20,7 +20,11 @@ const DEFAULT_VOICE = 'Samantha'
 const DEFAULT_RATE = 175
 
 export function readTtsConfig(cfg: ModuleConfig): TtsConfig {
-  const provider = (cfg.provider as TtsProvider | undefined) ?? 'say'
+  const rawProvider = cfg.provider === undefined || cfg.provider === null ? 'say' : String(cfg.provider)
+  if (!(TTS_PROVIDERS as readonly string[]).includes(rawProvider)) {
+    throw new SystemError(`unknown tts provider: ${rawProvider} (known: ${TTS_PROVIDERS.join(', ')})`, 'unsupported_provider')
+  }
+  const provider = rawProvider as TtsProvider
   const voice = String(cfg.voice ?? DEFAULT_VOICE)
   const rateRaw = Number(cfg.rate)
   const rate = Number.isFinite(rateRaw) && rateRaw > 0 ? Math.round(rateRaw) : DEFAULT_RATE
@@ -61,9 +65,6 @@ function runCommand(cmd: string, args: string[]): Promise<{ code: number; stderr
  * ~44 KB/s of speech, which is fine for LAN-served notifications.
  */
 export async function synth(cfg: TtsConfig, opts: SynthOptions): Promise<SynthResult> {
-  if (cfg.provider !== 'say') {
-    throw new SystemError(`unsupported tts provider: ${cfg.provider}`, 'unsupported_provider')
-  }
   if (!opts.text || !opts.text.trim()) {
     throw new SystemError('text is empty', 'empty_text')
   }
@@ -96,22 +97,20 @@ export async function synth(cfg: TtsConfig, opts: SynthOptions): Promise<SynthRe
   return { path: outPath, provider: 'say', voice, rate, format: 'wav' }
 }
 
-/** List the macOS voices available to `say`. Used by configure prompts. */
-export async function listSayVoices(): Promise<{ name: string; locale: string; sample: string }[]> {
-  return new Promise((resolve, reject) => {
-    const child = spawn('say', ['-v', '?'], { stdio: ['ignore', 'pipe', 'pipe'] })
-    let stdout = ''
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString('utf8')
-    })
+/**
+ * Lightweight provider-availability check used by `home tts status`. Doesn't
+ * synthesize anything, doesn't leave files on disk — just confirms the
+ * configured backend is reachable.
+ */
+export async function pingProvider(cfg: TtsConfig): Promise<void> {
+  if (cfg.provider !== 'say') {
+    throw new SystemError(`unsupported tts provider: ${cfg.provider}`, 'unsupported_provider')
+  }
+  // `say -?` exits 1 with usage on stderr; we only care whether the binary is
+  // on PATH and runnable, not the exit code.
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn('say', ['-?'], { stdio: ['ignore', 'ignore', 'ignore'] })
     child.once('error', reject)
-    child.once('close', () => {
-      const voices = stdout
-        .split('\n')
-        .map((line) => line.match(/^(\S+)\s+(\S+)\s+#\s+(.*)$/))
-        .filter((m): m is RegExpMatchArray => !!m)
-        .map((m) => ({ name: m[1]!, locale: m[2]!, sample: m[3]! }))
-      resolve(voices)
-    })
+    child.once('close', () => resolve())
   })
 }
