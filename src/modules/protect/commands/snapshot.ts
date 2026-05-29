@@ -28,7 +28,9 @@ export const snapshot: CommandSpec = {
       const buf = await api.getSnapshot(camera)
       if (!buf) return null
       if (toStdout) {
-        process.stdout.write(buf)
+        await new Promise<void>((resolve, reject) => {
+          process.stdout.write(buf, (err) => (err ? reject(err) : resolve()))
+        })
         return { stdout: true, bytes: buf.length, camera: camera.name }
       }
       writeFileSync(out, buf)
