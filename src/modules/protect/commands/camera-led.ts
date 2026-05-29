@@ -56,7 +56,7 @@ export const camerasLed: CommandSpec = {
           ledSettings: {
             isEnabled: state === 'on',
             // Preserve existing floodLed/welcomeLed values
-            ...'floodLed' in camera.ledSettings ? { floodLed: state === 'on' } : {},
+            ...(camera.ledSettings && 'floodLed' in camera.ledSettings ? { floodLed: state === 'on' } : {}),
           } as Record<string, unknown>,
         }
       } else {
