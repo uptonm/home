@@ -81,13 +81,13 @@ export function searchStates(states: HassState[], query: string): SearchResult[]
   return states
     .filter((s) => {
       if (s.entity_id.toLowerCase().includes(lower)) return true
-      const fn = s.attributes?.friendly_name
+      const fn = friendlyName(s)
       return typeof fn === 'string' && fn.toLowerCase().includes(lower)
     })
     .map((s) => ({
       entity_id: s.entity_id,
       state: s.state,
-      friendly_name: typeof s.attributes?.friendly_name === 'string' ? s.attributes.friendly_name : undefined,
+      friendly_name: friendlyName(s),
     }))
 }
 
