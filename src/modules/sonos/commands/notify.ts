@@ -115,25 +115,44 @@ async function restoreState(d: SonosDevice, s: SavedState): Promise<void> {
   }
 }
 
+const TERMINAL_STATES = new Set(['STOPPED', 'NO_MEDIA_PRESENT', 'PAUSED_PLAYBACK', 'TRANSITIONING'])
+const MAX_CONSECUTIVE_POLL_FAILURES = 5
+
 /**
- * Wait for the notification to finish by polling transport state. The
- * x-rincon-mp3radio:// scheme makes Sonos treat the file as a radio stream:
- * once it has played the bytes it transitions PLAYING → TRANSITIONING and
- * immediately reconnects to our HTTP server for "more content" — which we'd
- * keep serving, looping forever. So as soon as Sonos exits PLAYING after
- * having reached it, we declare the notification done; caller issues Stop()
- * before restore to break the loop.
+ * Wait for the notification to finish by polling transport state.
+ *
+ * Sonos exits PLAYING via either STOPPED (clean end on http://) or
+ * TRANSITIONING (mp3radio scheme treats the file as a radio stream that just
+ * dropped its connection). Both count as "done" once we've actually observed
+ * PLAYING — otherwise a 100ms gap between SetAVTransportURI and Play would
+ * return immediately.
+ *
+ * Critically: a *transient* SOAP failure (network blip, Sonos under load,
+ * Bun fetch hiccup) returns null from GetTransportInfo. If we treated null
+ * as "exit PLAYING," any single mid-notification SOAP error would silently
+ * end the wait, fire restoreState, and cut the audio off. We require a
+ * *successful* poll returning a known-terminal state before declaring done,
+ * and a separate consecutive-failure counter so a sustained outage still
+ * eventually bails instead of polling forever.
  */
-async function waitForPlaybackEnd(d: SonosDevice, timeoutMs: number): Promise<'done' | 'timeout'> {
+async function waitForPlaybackEnd(d: SonosDevice, timeoutMs: number): Promise<'done' | 'timeout' | 'unreachable'> {
   const deadline = Date.now() + timeoutMs
   const pollMs = 250
   let everPlayed = false
+  let consecutiveFailures = 0
   while (Date.now() < deadline) {
     const ti = await d.AVTransportService.GetTransportInfo().catch(() => null)
-    const state = ti?.CurrentTransportState
+    if (ti === null) {
+      consecutiveFailures++
+      if (consecutiveFailures >= MAX_CONSECUTIVE_POLL_FAILURES) return 'unreachable'
+      await new Promise((r) => setTimeout(r, pollMs))
+      continue
+    }
+    consecutiveFailures = 0
+    const state = ti.CurrentTransportState
     if (state === 'PLAYING') {
       everPlayed = true
-    } else if (everPlayed) {
+    } else if (everPlayed && TERMINAL_STATES.has(state)) {
       return 'done'
     }
     await new Promise((r) => setTimeout(r, pollMs))
@@ -183,7 +202,7 @@ export const notifyCmd: CommandSpec = {
     }
 
     const saved = await saveState(device)
-    let completion: 'done' | 'timeout' = 'timeout'
+    let completion: 'done' | 'timeout' | 'unreachable' = 'timeout'
     try {
       if (volumeOverride !== undefined) {
         await device.RenderingControlService.SetVolume({ InstanceID: 0, Channel: 'Master', DesiredVolume: volumeOverride })
