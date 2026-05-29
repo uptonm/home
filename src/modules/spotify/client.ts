@@ -280,9 +280,14 @@ export function normalizeSearchResponse(raw: RawSearchResponse): SpotifySearchRe
   return { tracks, albums, artists, playlists }
 }
 
-/** Extract the Spotify ID from a `spotify:<type>:<id>` URI. */
+/**
+ * Extract the Spotify ID from a `spotify:<type>:<id>` URI. Spotify IDs are
+ * always exactly 22 base62 characters in production — enforcing the length
+ * here rejects malformed input at the producer boundary instead of letting
+ * it propagate into the Sonos transport-URI construction downstream.
+ */
 export function extractSpotifyId(uri: string): string | null {
-  const m = uri.match(/^spotify:[a-zA-Z]+:([A-Za-z0-9]+)$/)
+  const m = uri.match(/^spotify:[a-zA-Z]+:([A-Za-z0-9]{22})$/)
   return m ? m[1]! : null
 }
 

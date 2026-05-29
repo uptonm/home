@@ -78,6 +78,13 @@ describe('extractSpotifyId', () => {
     expect(extractSpotifyId('apple:song:1234')).toBeNull()
     expect(extractSpotifyId('')).toBeNull()
   })
+
+  test('rejects malformed Spotify URIs (Spotify IDs are exactly 22 base62 chars)', () => {
+    expect(extractSpotifyId('spotify:track:tooshort')).toBeNull()
+    expect(extractSpotifyId('spotify:track:waytoolongtobeavalidspotifyid')).toBeNull()
+    expect(extractSpotifyId('spotify:track:')).toBeNull()
+    expect(extractSpotifyId('spotify:track:contains-dashes-not-base62')).toBeNull()
+  })
 })
 
 describe('normalizeSearchResponse', () => {
