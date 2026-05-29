@@ -21,9 +21,9 @@ describe('translateSpotifyInput', () => {
       .toBe('spotify:track:7qiZfU4dY1lWllzX7mPBI3')
   })
 
-  test('maps artist share URL to artistTopTracks (Sonos cpcontainer convention)', () => {
+  test('maps artist share URL to canonical spotify:artist — the guard then rejects it cleanly', () => {
     expect(translateSpotifyInput('https://open.spotify.com/artist/4tZwfgrHOc3mvqYlEYSvVi'))
-      .toBe('spotify:artistTopTracks:4tZwfgrHOc3mvqYlEYSvVi')
+      .toBe('spotify:artist:4tZwfgrHOc3mvqYlEYSvVi')
   })
 
   test('returns non-Spotify input unchanged', () => {
@@ -75,22 +75,25 @@ describe('isPlayableSpotifyUri', () => {
     expect(isPlayableSpotifyUri('spotify:track:7oK9VyNzrYvRFo7nQEYkWN')).toBe(true)
   })
 
-  test('rejects every container shape (album / playlist / artistTopTracks / user / artistRadio)', () => {
+  test('rejects every container shape (album / artist / playlist / artistTopTracks / user / artistRadio)', () => {
     expect(isPlayableSpotifyUri('spotify:album:5r36AJ6VOJtp00oxSkBZ5h')).toBe(false)
+    expect(isPlayableSpotifyUri('spotify:artist:7kNqXtgeIwFtelmRjWv205')).toBe(false)
     expect(isPlayableSpotifyUri('spotify:playlist:37i9dQZF1DXcBWIGoYBM5M')).toBe(false)
     expect(isPlayableSpotifyUri('spotify:artistTopTracks:7kNqXtgeIwFtelmRjWv205')).toBe(false)
-    expect(isPlayableSpotifyUri('spotify:user:1234')).toBe(false)
-    expect(isPlayableSpotifyUri('spotify:artistRadio:1234')).toBe(false)
+    expect(isPlayableSpotifyUri('spotify:user:7kNqXtgeIwFtelmRjWv205')).toBe(false)
+    expect(isPlayableSpotifyUri('spotify:artistRadio:7kNqXtgeIwFtelmRjWv205')).toBe(false)
+  })
+
+  test('rejects malformed Spotify track IDs (real IDs are 22 base62 chars)', () => {
+    expect(isPlayableSpotifyUri('spotify:track:tooshort')).toBe(false)
+    expect(isPlayableSpotifyUri('spotify:track:waytoolongtobeavalidspotifyid')).toBe(false)
+    expect(isPlayableSpotifyUri('spotify:track:contains-dashes-not-base62')).toBe(false)
+    expect(isPlayableSpotifyUri('spotify:track:')).toBe(false)
   })
 
   test('rejects non-Spotify input', () => {
     expect(isPlayableSpotifyUri('https://example.com/song.mp3')).toBe(false)
     expect(isPlayableSpotifyUri('apple:song:1234')).toBe(false)
     expect(isPlayableSpotifyUri('')).toBe(false)
-  })
-
-  test('rejects spotify:track: missing or malformed id', () => {
-    expect(isPlayableSpotifyUri('spotify:track:')).toBe(false)
-    expect(isPlayableSpotifyUri('spotify:track:abc-def')).toBe(false)
   })
 })
