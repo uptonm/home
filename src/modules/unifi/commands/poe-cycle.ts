@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { getDevice, listDevices, powerCyclePort, readUnifiConfig } from '../client'
+import { listDevices, powerCyclePort, readUnifiConfig } from '../client'
 
 export const devicesPoeCycle: CommandSpec = {
   path: ['devices', 'poe-cycle'],
