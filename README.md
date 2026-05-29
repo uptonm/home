@@ -122,6 +122,9 @@ only (no metadata leaves your machine).
 | --- | --- |
 | `home assistant states list [--domain <d>]` | Entity states |
 | `home assistant state get <entity_id>` | Single entity |
+| `home assistant light <on\|off\|toggle> <name\|id> [--brightness 0-100] [--color <c>]` | Control a light by name or id |
+| `home assistant switch <on\|off\|toggle> <name\|id>` | Control a switch by name or id |
+| `home assistant climate <name\|id> [--temperature <t>] [--mode <m>]` | Set thermostat temp / HVAC mode |
 | `home assistant service call <domain>.<service> [--data <json>]` | Call a service |
 | `home assistant automation trigger automation.<id>` | Fire an automation |
 | `home assistant history get <entity_id> [--since 1h]` | State history |
