@@ -6,6 +6,7 @@ import { lightCmd, switchCmd, climateCmd } from './commands/control'
 import { automationTrigger } from './commands/automation'
 import { historyGet } from './commands/history'
 import { logbookList } from './commands/logbook'
+import { sceneActivate, scriptRun } from './commands/scene-script'
 
 export const manifest: ModuleManifest = {
   name: 'assistant',
@@ -27,7 +28,7 @@ export const manifest: ModuleManifest = {
       help: 'Profile → Security → Long-lived access tokens → Create',
     },
   ],
-  commands: [statesList, statesSearch, stateGet, lightCmd, switchCmd, climateCmd, serviceCall, automationTrigger, historyGet, logbookList],
+  commands: [statesList, statesSearch, stateGet, lightCmd, switchCmd, climateCmd, sceneActivate, scriptRun, serviceCall, automationTrigger, historyGet, logbookList],
   async status(cfg) {
     try {
       const data = await getConfig(readAssistantConfig(cfg))
