@@ -8,13 +8,13 @@ import type { ModuleConfigData } from '../core/config'
 
 const exportArgs: ArgsDef = {
   out: { type: 'string', description: 'Output JSON path (default: stdout)' },
-  json: { type: 'boolean', description: 'Emit JSON to stdout' },
+  json: { type: 'boolean', description: 'Format confirmation as JSON' },
 }
 
 const importArgs: ArgsDef = {
   in: { type: 'string', description: 'Input JSON path', required: true },
   replace: { type: 'boolean', description: 'Replace all existing configs (default: merge)' },
-  json: { type: 'boolean', description: 'Emit JSON to stdout' },
+  json: { type: 'boolean', description: 'Format confirmation as JSON' },
 }
 
 interface ConfigExport {
@@ -34,9 +34,8 @@ function collectConfigs(): ConfigExport {
 async function writeExport(outPath: string | undefined, json: boolean): Promise<void> {
   const data = collectConfigs()
   if (outPath) {
-    const { writeFileSync, chmodSync } = await import('node:fs')
+    const { writeFileSync } = await import('node:fs')
     writeFileSync(outPath, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 })
-    chmodSync(outPath, 0o600)
     await emit({ ok: true, data: { path: outPath, modules: Object.keys(data.modules).length } }, { json })
   } else {
     // Always write to stdout when no --out, regardless of --json
@@ -95,6 +94,7 @@ export const configCmd: CommandDef = defineCommand({
             { ok: false, kind: 'user', message: `file not found: ${inPath}`, code: 'not_found' },
             { json },
           )
+          return
         }
         const result = await applyImport(inPath, replace)
         await emit({ ok: true, data: result }, { json })
