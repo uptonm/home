@@ -2,12 +2,16 @@ import type { ModuleManifest } from '../../core/types'
 import { defaultControllerUrl } from '../../core/net'
 import { connect, readProtectConfig } from './client'
 import { camerasGet, camerasList } from './commands/cameras'
+import { camerasLed } from './commands/camera-led'
+import { camerasPtz } from './commands/ptz'
+import { camerasTalkback } from './commands/talkback'
 import { eventsList, eventsRecent } from './commands/events'
+import { lights } from './commands/lights'
 import { snapshot } from './commands/snapshot'
 
 export const manifest: ModuleManifest = {
   name: 'protect',
-  description: 'Query UniFi Protect (cameras, motion/smart events, snapshots)',
+  description: 'Query and control UniFi Protect (cameras with PTZ/LED/talkback, lights, motion/smart events, snapshots)',
   whenToUse:
     'Use when the user asks about cameras, doorbells, recordings, motion events, or smart detections (person, package, vehicle). Do not use for network gear (`home-unifi`) or sensors/automations (`home-assistant`).',
   configSchema: [
@@ -38,7 +42,7 @@ export const manifest: ModuleManifest = {
       required: true,
     },
   ],
-  commands: [camerasList, camerasGet, eventsList, eventsRecent, snapshot],
+  commands: [camerasList, camerasGet, camerasPtz, camerasLed, camerasTalkback, eventsList, eventsRecent, lights, snapshot],
   async status(cfg) {
     try {
       const api = await connect(readProtectConfig(cfg))
