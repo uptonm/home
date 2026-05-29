@@ -65,6 +65,45 @@ export async function getState(cfg: AssistantConfig, entityId: string): Promise<
   return (await res.json()) as HassState
 }
 
+export interface SearchResult {
+  entity_id: string
+  state: string
+  friendly_name?: string
+}
+
+/**
+ * Pure search over an already-fetched state list — unit-testable without
+ * network access.  Search is case-insensitive substring against entity_id
+ * and friendly_name.
+ */
+export function searchStates(states: HassState[], query: string): SearchResult[] {
+  const lower = query.toLowerCase()
+  return states
+    .filter((s) => {
+      if (s.entity_id.toLowerCase().includes(lower)) return true
+      const fn = friendlyName(s)
+      return typeof fn === 'string' && fn.toLowerCase().includes(lower)
+    })
+    .map((s) => ({
+      entity_id: s.entity_id,
+      state: s.state,
+      friendly_name: friendlyName(s),
+    }))
+}
+
+/**
+ * Search entities by case-insensitive substring match against entity_id and
+ * friendly_name.  When `domain` is given the search is scoped to that domain.
+ */
+export async function searchEntities(
+  cfg: AssistantConfig,
+  query: string,
+  domain?: string,
+): Promise<SearchResult[]> {
+  const all = await listStates(cfg, domain)
+  return searchStates(all, query)
+}
+
 export async function callService(
   cfg: AssistantConfig,
   domain: string,

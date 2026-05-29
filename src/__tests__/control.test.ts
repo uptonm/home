@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { parseColor } from '../modules/assistant/commands/control'
-import { matchEntity } from '../modules/assistant/client'
+import { matchEntity, searchStates } from '../modules/assistant/client'
 import type { HassState } from '../modules/assistant/client'
 
 const fixture: HassState[] = [
@@ -40,6 +40,33 @@ describe('matchEntity', () => {
   })
   test('not found', () => {
     expect(matchEntity(fixture, 'kitchen').kind).toBe('not_found')
+  })
+})
+
+describe('searchStates', () => {
+  test('matches by entity_id substring', () => {
+    const r = searchStates(fixture, 'floor')
+    expect(r).toHaveLength(1)
+    expect(r[0]!.entity_id).toBe('light.floor_lamp')
+  })
+
+  test('matches by friendly_name substring', () => {
+    const r = searchStates(fixture, 'room')
+    expect(r).toHaveLength(2)
+    expect(r.map((x) => x.entity_id).sort()).toEqual(['light.living_room', 'light.living_room_ap_led'])
+  })
+
+  test('case-insensitive', () => {
+    const r = searchStates(fixture, 'LAMP')
+    expect(r).toHaveLength(2)
+  })
+
+  test('no match returns empty', () => {
+    expect(searchStates(fixture, 'kitchen')).toHaveLength(0)
+  })
+
+  test('empty query matches everything', () => {
+    expect(searchStates(fixture, '')).toHaveLength(fixture.length)
   })
 })
 
