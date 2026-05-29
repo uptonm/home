@@ -3,44 +3,83 @@ import type SonosDevice from '@svrooij/sonos/lib/sonos-device'
 /**
  * Translate a Spotify share URL (https://open.spotify.com/track/<id>?si=...) or
  * spotify-app URI (spotify:track:<id>) into the canonical `spotify:type:id`
- * form that MetaDataHelper.GuessMetaDataAndTrackUri understands. Returns the
- * input unchanged if it doesn't look like Spotify.
+ * form. Returns the input unchanged if it doesn't look like Spotify.
  */
 export function translateSpotifyInput(input: string): string {
   const m = input.match(/^https?:\/\/open\.spotify\.com\/(?:intl-[a-z]+\/)?(track|album|playlist|artist)\/([a-zA-Z0-9]+)(?:\?[^#]*)?/i)
   if (m) {
     const kind = m[1]!.toLowerCase()
     const id = m[2]!
-    // Spotify share URLs for an artist map to the library's "artistTopTracks" pattern.
     if (kind === 'artist') return `spotify:artistTopTracks:${id}`
     return `spotify:${kind}:${id}`
   }
   return input
 }
 
-/**
- * The library hard-codes `sn=7` in Spotify cpcontainer / x-sonos-spotify URIs.
- * Different Sonos households have Spotify in different account slots — this
- * rewrites `sn=` to a discovered or user-supplied value. Also rewrites the
- * Spotify region in the CdUdn metadata when sn != 7.
- */
-export function rewriteSpotifySession(trackUri: string, sn: number): string {
-  return trackUri.replace(/(\?|&amp;|&)sn=\d+/g, `$1sn=${sn}`)
+export interface SpotifyAccount {
+  /** Sonos catalog service Id for Spotify (currently 12). */
+  sid: number
+  /** Subscription number for this household's Spotify account. */
+  sn: number
 }
 
-const SONOS_SPOTIFY_SERVICE_ID = 12
-
 /**
- * Try to discover the household's Spotify subscription number (sn=) by
- * inspecting `ListAvailableServices`. Returns null if Spotify isn't a
- * recognized service on the household at all. Note: this returns the *catalog*
- * service Id, which is also the value most households use for `sn=`. A
- * household with the Sonos-native Spotify integration disabled (e.g. using
- * Spotify Connect only) will still see Spotify in this list but cpcontainer
- * URIs will fail at playback time with an auth error.
+ * Discover the household's Spotify Sonos-side identifiers.
+ *
+ * Sonos encodes a household's subscribed services as `ServiceType = sid*256 + sn`
+ * entries in `MusicServicesService.ListAvailableServices().AvailableServiceTypeList`.
+ * We:
+ *   1. Look up Spotify's catalog Id (`sid`) via ListAndParseAvailableServices,
+ *      so we stay correct when Sonos renumbers services (e.g. legacy 9 → 12).
+ *   2. Scan the household's subscribed-services list for a ServiceType in
+ *      Spotify's `[sid*256, sid*256+255]` window. The remainder is `sn`.
+ *
+ * Returns null if Spotify isn't in the catalog or the household has no Spotify
+ * subscription.
  */
-export async function discoverSpotifySn(device: SonosDevice): Promise<number | null> {
+export async function discoverSpotifyAccount(device: SonosDevice): Promise<SpotifyAccount | null> {
   const services = await device.MusicServicesService.ListAndParseAvailableServices()
   const spotify = services.find((s) => s.Name === 'Spotify')
-  return spotify ? spotify.Id : null
+  if (!spotify) return null
+  const sid = spotify.Id
+  const raw = await device.MusicServicesService.ListAvailableServices()
+  const subscribed = String(raw.AvailableServiceTypeList ?? '')
+    .split(',')
+    .map((n) => Number(n.trim()))
+    .filter((n) => Number.isFinite(n))
+  const match = subscribed.find((t) => t >= sid * 256 && t < (sid + 1) * 256)
+  if (match === undefined) return null
+  return { sid, sn: match - sid * 256 }
+}
+
+/**
+ * Build the Sonos transport URI for a canonical `spotify:type:id` reference.
+ * The metadata payload that should accompany this is just an empty string —
+ * with valid sid/sn, Sonos fetches the real DIDL-Lite from SMAPI on its own,
+ * and any metadata we'd generate ourselves (the library's hardcoded sid=9 /
+ * region 2311 / Svc2311 CdUdn) trips UPnP 402 (Invalid args) on modern
+ * firmware. Returns null if `spotifyUri` isn't a recognized spotify URI.
+ */
+export function buildSpotifyTransportUri(spotifyUri: string, account: SpotifyAccount): string | null {
+  if (!spotifyUri.startsWith('spotify:')) return null
+  const enc = spotifyUri.replace(/:/g, '%3a')
+  const { sid, sn } = account
+
+  const kind = spotifyUri.split(':')[1]
+  switch (kind) {
+    case 'track':
+      return `x-sonos-spotify:${spotifyUri}?sid=${sid}&flags=8224&sn=${sn}`
+    case 'album':
+      return `x-rincon-cpcontainer:1004206c${enc}?sid=${sid}&flags=8300&sn=${sn}`
+    case 'playlist':
+      return `x-rincon-cpcontainer:1006206c${enc}?sid=${sid}&flags=8300&sn=${sn}`
+    case 'user':
+      return `x-rincon-cpcontainer:10062a6c${enc}?sid=${sid}&flags=10860&sn=${sn}`
+    case 'artistTopTracks':
+      return `x-rincon-cpcontainer:100e206c${enc}?sid=${sid}&flags=8300&sn=${sn}`
+    case 'artistRadio':
+      return `x-sonosapi-radio:${enc}?sid=${sid}&flags=8300&sn=${sn}`
+    default:
+      return null
+  }
 }

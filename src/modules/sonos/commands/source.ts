@@ -1,43 +1,42 @@
 import { MetaDataHelper } from '@svrooij/sonos'
 import type SonosDevice from '@svrooij/sonos/lib/sonos-device'
-import type { CommandSpec } from '../../../core/types'
+import type { CommandSpec, RunResult } from '../../../core/types'
 import { discover, readSonosConfig, resolveRoom } from '../client'
-import { discoverSpotifySn, rewriteSpotifySession, translateSpotifyInput } from '../spotify'
-
-/**
- * Convert a user-supplied URI into the (transport URI, metadata) pair Sonos
- * needs. Raw HTTP(S) stream URLs are rewritten to `x-rincon-mp3radio://host/...`
- * — Sonos rejects the original `http://`/`https://` scheme on SetAVTransportURI
- * with UPnP 714 (Illegal MIME-Type), and empty metadata is fine for streams.
- * Spotify share URLs and spotify:* URIs pass through translation +
- * session-number rewriting before MetaDataHelper.
- */
-async function resolveTrackUriAndMetadata(
-  device: SonosDevice,
-  rawUri: string,
-  snOverride?: number,
-): Promise<{ trackUri: string; metadata: string }> {
-  if (/^https?:\/\//i.test(rawUri) && !/^https?:\/\/open\.spotify\.com\//i.test(rawUri)) {
-    return { trackUri: rawUri.replace(/^https?:\/\//i, 'x-rincon-mp3radio://'), metadata: '' }
-  }
-  const uri = translateSpotifyInput(rawUri)
-  const guessed = MetaDataHelper.GuessMetaDataAndTrackUri(uri)
-  let trackUri = guessed.trackUri
-  let metadata =
-    typeof guessed.metadata === 'string'
-      ? guessed.metadata
-      : MetaDataHelper.TrackToMetaData(guessed.metadata)
-  if (uri.startsWith('spotify:')) {
-    const sn = snOverride ?? (await discoverSpotifySn(device).catch(() => null))
-    if (sn !== null && sn !== undefined) {
-      trackUri = rewriteSpotifySession(trackUri, sn)
-      metadata = rewriteSpotifySession(metadata, sn)
-    }
-  }
-  return { trackUri, metadata }
-}
+import {
+  buildSpotifyTransportUri,
+  discoverSpotifyAccount,
+  translateSpotifyInput,
+  type SpotifyAccount,
+} from '../spotify'
 
 const roomArg = { name: 'room', kind: 'positional', description: 'Room name (case-insensitive, partial match)', required: true } as const
+
+async function resolveSpotifyAccount(d: SonosDevice, snOverride: number | undefined): Promise<SpotifyAccount | null> {
+  const discovered = await discoverSpotifyAccount(d).catch(() => null)
+  if (!discovered) return null
+  return snOverride !== undefined ? { sid: discovered.sid, sn: snOverride } : discovered
+}
+
+async function playSpotifyOnDevice(d: SonosDevice, transportUri: string): Promise<void> {
+  // For Spotify, the clean "replace and play" is: clear queue, enqueue, seek, play.
+  // SetAVTransportURI on a single x-sonos-spotify:track URI fails; cpcontainer
+  // URIs would work but mixing modes makes the play-uri contract muddier.
+  await d.AVTransportService.RemoveAllTracksFromQueue({ InstanceID: 0 })
+  const queueUri = `x-rincon-queue:${d.Uuid}#0`
+  await d.AVTransportService.SetAVTransportURI({ InstanceID: 0, CurrentURI: queueUri, CurrentURIMetaData: '' })
+  const result = await d.AVTransportService.AddURIToQueue({
+    InstanceID: 0,
+    EnqueuedURI: transportUri,
+    EnqueuedURIMetaData: '',
+    DesiredFirstTrackNumberEnqueued: 0,
+    EnqueueAsNext: true,
+  })
+  const trackNr = Number(result.FirstTrackNumberEnqueued)
+  if (Number.isFinite(trackNr) && trackNr > 0) {
+    await d.AVTransportService.Seek({ InstanceID: 0, Unit: 'TRACK_NR', Target: String(trackNr) })
+  }
+  await d.Play()
+}
 
 export const playUri: CommandSpec = {
   path: ['play-uri'],
@@ -49,28 +48,53 @@ export const playUri: CommandSpec = {
   ],
   examples: [
     'home sonos play-uri "Dining Room" "https://ice1.somafm.com/groovesalad-128-mp3"',
-    'home sonos play-uri "Dining Room" "spotify:track:7qiZfU4dY1lWllzX7mPBI3"',
-    'home sonos play-uri "Dining Room" "https://open.spotify.com/track/7qiZfU4dY1lWllzX7mPBI3"',
+    'home sonos play-uri "Dining Room" "spotify:track:7oK9VyNzrYvRFo7nQEYkWN"',
+    'home sonos play-uri "Dining Room" "https://open.spotify.com/album/5r36AJ6VOJtp00oxSkBZ5h"',
   ],
-  async run(ctx) {
+  async run(ctx): Promise<RunResult> {
     const mgr = await discover(readSonosConfig(ctx.config))
     const ref = String(ctx.args.room ?? '')
-    const uri = String(ctx.args.uri ?? '')
-    if (!uri) return { ok: false, kind: 'user', message: 'uri is required', code: 'missing_arg' }
+    const rawUri = String(ctx.args.uri ?? '')
+    if (!rawUri) return { ok: false, kind: 'user', message: 'uri is required', code: 'missing_arg' }
     const r = resolveRoom(mgr.Devices, ref)
     if (r.kind === 'not_found') return { ok: false, kind: 'user', message: `no room matching "${ref}"`, code: 'not_found' }
     if (r.kind === 'ambiguous') return { ok: false, kind: 'user', message: `room is ambiguous — candidates: ${r.candidates.join(', ')}`, code: 'ambiguous' }
 
     const d = r.device.Coordinator ?? r.device
-    const snOverride = ctx.args.sn !== undefined ? Number(ctx.args.sn) : undefined
-    const { trackUri, metadata } = await resolveTrackUriAndMetadata(d, uri, snOverride)
+
+    // Raw HTTP(S) stream (anything that's not open.spotify.com).
+    if (/^https?:\/\//i.test(rawUri) && !/^https?:\/\/open\.spotify\.com\//i.test(rawUri)) {
+      const trackUri = rawUri.replace(/^https?:\/\//i, 'x-rincon-mp3radio://')
+      await d.AVTransportService.SetAVTransportURI({ InstanceID: 0, CurrentURI: trackUri, CurrentURIMetaData: '' })
+      await d.Play()
+      return { ok: true, data: { room: d.Name, uri: trackUri, action: 'play_uri' } }
+    }
+
+    // Spotify (canonical URI or share URL).
+    const uri = translateSpotifyInput(rawUri)
+    if (uri.startsWith('spotify:')) {
+      const snOverride = ctx.args.sn !== undefined ? Number(ctx.args.sn) : undefined
+      const account = await resolveSpotifyAccount(d, snOverride)
+      if (!account) return { ok: false, kind: 'system', message: 'Spotify is not subscribed on this Sonos household', code: 'spotify_not_subscribed' }
+      const built = buildSpotifyTransportUri(uri, account)
+      if (!built) return { ok: false, kind: 'user', message: `unsupported Spotify URI shape: ${uri}`, code: 'unsupported_spotify_uri' }
+      await playSpotifyOnDevice(d, built)
+      return { ok: true, data: { room: d.Name, uri: built, action: 'play_uri' } }
+    }
+
+    // Fall-through: trust MetaDataHelper for anything else it knows about.
+    const guessed = MetaDataHelper.GuessMetaDataAndTrackUri(uri)
+    const metadata =
+      typeof guessed.metadata === 'string'
+        ? guessed.metadata
+        : MetaDataHelper.TrackToMetaData(guessed.metadata)
     await d.AVTransportService.SetAVTransportURI({
       InstanceID: 0,
-      CurrentURI: trackUri,
+      CurrentURI: guessed.trackUri,
       CurrentURIMetaData: metadata,
     })
     await d.Play()
-    return { ok: true, data: { room: d.Name, uri: trackUri, action: 'play_uri' } }
+    return { ok: true, data: { room: d.Name, uri: guessed.trackUri, action: 'play_uri' } }
   },
 }
 

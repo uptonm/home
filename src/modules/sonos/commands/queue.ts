@@ -2,7 +2,12 @@ import { MetaDataHelper } from '@svrooij/sonos'
 import type SonosDevice from '@svrooij/sonos/lib/sonos-device'
 import type { CommandSpec, RunResult } from '../../../core/types'
 import { discover, readSonosConfig, resolveRoom } from '../client'
-import { discoverSpotifySn, rewriteSpotifySession, translateSpotifyInput } from '../spotify'
+import {
+  buildSpotifyTransportUri,
+  discoverSpotifyAccount,
+  translateSpotifyInput,
+  type SpotifyAccount,
+} from '../spotify'
 
 async function withCoordinator(
   ctx: Parameters<CommandSpec['run']>[0],
@@ -17,6 +22,12 @@ async function withCoordinator(
 }
 
 const roomArg = { name: 'room', kind: 'positional', description: 'Room name (case-insensitive, partial match)', required: true } as const
+
+async function resolveSpotifyAccount(d: SonosDevice, snOverride: number | undefined): Promise<SpotifyAccount | null> {
+  const discovered = await discoverSpotifyAccount(d).catch(() => null)
+  if (!discovered) return null
+  return snOverride !== undefined ? { sid: discovered.sid, sn: snOverride } : discovered
+}
 
 export const queueList: CommandSpec = {
   path: ['queue', 'list'],
@@ -77,18 +88,13 @@ export const queueAdd: CommandSpec = {
       let enqueuedUri: string
       let enqueuedMetadata: string
       if (uri.startsWith('spotify:')) {
-        const guessed = MetaDataHelper.GuessMetaDataAndTrackUri(uri)
-        enqueuedUri = guessed.trackUri
-        enqueuedMetadata =
-          typeof guessed.metadata === 'string'
-            ? guessed.metadata
-            : MetaDataHelper.TrackToMetaData(guessed.metadata)
         const snOverride = ctx.args.sn !== undefined ? Number(ctx.args.sn) : undefined
-        const sn = snOverride ?? (await discoverSpotifySn(d).catch(() => null))
-        if (sn !== null && sn !== undefined) {
-          enqueuedUri = rewriteSpotifySession(enqueuedUri, sn)
-          enqueuedMetadata = rewriteSpotifySession(enqueuedMetadata, sn)
-        }
+        const account = await resolveSpotifyAccount(d, snOverride)
+        if (!account) return { ok: false, kind: 'system', message: 'Spotify is not subscribed on this Sonos household', code: 'spotify_not_subscribed' }
+        const built = buildSpotifyTransportUri(uri, account)
+        if (!built) return { ok: false, kind: 'user', message: `unsupported Spotify URI shape: ${uri}`, code: 'unsupported_spotify_uri' }
+        enqueuedUri = built
+        enqueuedMetadata = ''
       } else {
         const guessed = MetaDataHelper.GuessMetaDataAndTrackUri(uri)
         enqueuedUri = guessed.trackUri

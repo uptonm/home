@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { rewriteSpotifySession, translateSpotifyInput } from '../modules/sonos/spotify'
+import { buildSpotifyTransportUri, translateSpotifyInput } from '../modules/sonos/spotify'
 
 describe('translateSpotifyInput', () => {
   test('passes through canonical spotify URIs', () => {
@@ -21,7 +21,7 @@ describe('translateSpotifyInput', () => {
       .toBe('spotify:track:7qiZfU4dY1lWllzX7mPBI3')
   })
 
-  test('maps artist share URL to artistTopTracks (library convention)', () => {
+  test('maps artist share URL to artistTopTracks (Sonos cpcontainer convention)', () => {
     expect(translateSpotifyInput('https://open.spotify.com/artist/4tZwfgrHOc3mvqYlEYSvVi'))
       .toBe('spotify:artistTopTracks:4tZwfgrHOc3mvqYlEYSvVi')
   })
@@ -33,22 +33,39 @@ describe('translateSpotifyInput', () => {
   })
 })
 
-describe('rewriteSpotifySession', () => {
-  test('replaces sn= with the new value in cpcontainer URIs', () => {
-    const input = 'x-rincon-cpcontainer:1004206cspotify%3aalbum%3a5r36AJ6VOJtp00oxSkBZ5h?sid=9&flags=8300&sn=7'
-    expect(rewriteSpotifySession(input, 3)).toBe(
-      'x-rincon-cpcontainer:1004206cspotify%3aalbum%3a5r36AJ6VOJtp00oxSkBZ5h?sid=9&flags=8300&sn=3',
-    )
+describe('buildSpotifyTransportUri', () => {
+  const acct = { sid: 12, sn: 7 }
+
+  test('builds track URI (x-sonos-spotify scheme, no colon escaping)', () => {
+    expect(buildSpotifyTransportUri('spotify:track:7oK9VyNzrYvRFo7nQEYkWN', acct))
+      .toBe('x-sonos-spotify:spotify:track:7oK9VyNzrYvRFo7nQEYkWN?sid=12&flags=8224&sn=7')
   })
 
-  test('replaces sn= when it appears first in the query (& form)', () => {
-    const input = 'x-sonos-spotify:spotify%3atrack%3a7qiZfU4dY1lWllzX7mPBI3?sid=9&amp;flags=8224&amp;sn=7'
-    expect(rewriteSpotifySession(input, 12)).toBe(
-      'x-sonos-spotify:spotify%3atrack%3a7qiZfU4dY1lWllzX7mPBI3?sid=9&amp;flags=8224&amp;sn=12',
-    )
+  test('builds album URI (cpcontainer with %3a-escaped id)', () => {
+    expect(buildSpotifyTransportUri('spotify:album:5r36AJ6VOJtp00oxSkBZ5h', acct))
+      .toBe('x-rincon-cpcontainer:1004206cspotify%3aalbum%3a5r36AJ6VOJtp00oxSkBZ5h?sid=12&flags=8300&sn=7')
   })
 
-  test('leaves URI alone when there is no sn= parameter', () => {
-    expect(rewriteSpotifySession('https://example.com', 5)).toBe('https://example.com')
+  test('builds playlist URI', () => {
+    expect(buildSpotifyTransportUri('spotify:playlist:37i9dQZF1DXcBWIGoYBM5M', acct))
+      .toBe('x-rincon-cpcontainer:1006206cspotify%3aplaylist%3a37i9dQZF1DXcBWIGoYBM5M?sid=12&flags=8300&sn=7')
+  })
+
+  test('builds artistTopTracks URI', () => {
+    expect(buildSpotifyTransportUri('spotify:artistTopTracks:4tZwfgrHOc3mvqYlEYSvVi', acct))
+      .toBe('x-rincon-cpcontainer:100e206cspotify%3aartistTopTracks%3a4tZwfgrHOc3mvqYlEYSvVi?sid=12&flags=8300&sn=7')
+  })
+
+  test('honors a different account (sid/sn)', () => {
+    expect(buildSpotifyTransportUri('spotify:track:abc', { sid: 9, sn: 3 }))
+      .toBe('x-sonos-spotify:spotify:track:abc?sid=9&flags=8224&sn=3')
+  })
+
+  test('returns null for non-Spotify input', () => {
+    expect(buildSpotifyTransportUri('https://example.com/song.mp3', acct)).toBeNull()
+  })
+
+  test('returns null for unsupported spotify kind', () => {
+    expect(buildSpotifyTransportUri('spotify:show:1234', acct)).toBeNull()
   })
 })
