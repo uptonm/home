@@ -5,6 +5,7 @@ import { discover, readSonosConfig, resolveRoom } from '../client'
 import {
   buildSpotifyTransportUri,
   discoverSpotifyAccount,
+  isPlayableSpotifyUri,
   translateSpotifyInput,
   type SpotifyAccount,
 } from '../spotify'
@@ -73,6 +74,14 @@ export const playUri: CommandSpec = {
     // Spotify (canonical URI or share URL).
     const uri = translateSpotifyInput(rawUri)
     if (uri.startsWith('spotify:')) {
+      if (!isPlayableSpotifyUri(uri)) {
+        return {
+          ok: false,
+          kind: 'user',
+          message: `${uri} is a container URI; Sonos cannot play it directly on this household. Use a spotify:track: URI.`,
+          code: 'container_not_playable',
+        }
+      }
       const snOverride = ctx.args.sn !== undefined ? Number(ctx.args.sn) : undefined
       const account = await resolveSpotifyAccount(d, snOverride)
       if (!account) return { ok: false, kind: 'system', message: 'Spotify is not subscribed on this Sonos household', code: 'spotify_not_subscribed' }

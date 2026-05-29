@@ -53,6 +53,18 @@ export async function discoverSpotifyAccount(device: SonosDevice): Promise<Spoti
 }
 
 /**
+ * True only for `spotify:track:<id>` URIs. All other Spotify URI shapes
+ * (album / playlist / artistTopTracks / user / artistRadio) are containers
+ * that require Sonos to call back into the Spotify SMAPI service to expand;
+ * that callback fails on this household with UPnP 402 / 800 regardless of
+ * sid/sn/metadata permutations we tried. Sonos commands use this to fail
+ * fast with a clean error instead of dumping a raw UPnP fault.
+ */
+export function isPlayableSpotifyUri(uri: string): boolean {
+  return /^spotify:track:[A-Za-z0-9]+$/.test(uri)
+}
+
+/**
  * Build the Sonos transport URI for a canonical `spotify:type:id` reference.
  * The metadata payload that should accompany this is just an empty string —
  * with valid sid/sn, Sonos fetches the real DIDL-Lite from SMAPI on its own,

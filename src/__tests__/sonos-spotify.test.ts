@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { buildSpotifyTransportUri, translateSpotifyInput } from '../modules/sonos/spotify'
+import { buildSpotifyTransportUri, isPlayableSpotifyUri, translateSpotifyInput } from '../modules/sonos/spotify'
 
 describe('translateSpotifyInput', () => {
   test('passes through canonical spotify URIs', () => {
@@ -67,5 +67,30 @@ describe('buildSpotifyTransportUri', () => {
 
   test('returns null for unsupported spotify kind', () => {
     expect(buildSpotifyTransportUri('spotify:show:1234', acct)).toBeNull()
+  })
+})
+
+describe('isPlayableSpotifyUri', () => {
+  test('accepts spotify:track:<id>', () => {
+    expect(isPlayableSpotifyUri('spotify:track:7oK9VyNzrYvRFo7nQEYkWN')).toBe(true)
+  })
+
+  test('rejects every container shape (album / playlist / artistTopTracks / user / artistRadio)', () => {
+    expect(isPlayableSpotifyUri('spotify:album:5r36AJ6VOJtp00oxSkBZ5h')).toBe(false)
+    expect(isPlayableSpotifyUri('spotify:playlist:37i9dQZF1DXcBWIGoYBM5M')).toBe(false)
+    expect(isPlayableSpotifyUri('spotify:artistTopTracks:7kNqXtgeIwFtelmRjWv205')).toBe(false)
+    expect(isPlayableSpotifyUri('spotify:user:1234')).toBe(false)
+    expect(isPlayableSpotifyUri('spotify:artistRadio:1234')).toBe(false)
+  })
+
+  test('rejects non-Spotify input', () => {
+    expect(isPlayableSpotifyUri('https://example.com/song.mp3')).toBe(false)
+    expect(isPlayableSpotifyUri('apple:song:1234')).toBe(false)
+    expect(isPlayableSpotifyUri('')).toBe(false)
+  })
+
+  test('rejects spotify:track: missing or malformed id', () => {
+    expect(isPlayableSpotifyUri('spotify:track:')).toBe(false)
+    expect(isPlayableSpotifyUri('spotify:track:abc-def')).toBe(false)
   })
 })
