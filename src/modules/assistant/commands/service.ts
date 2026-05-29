@@ -33,6 +33,21 @@ export const serviceCall: CommandSpec = {
       }
     }
     const result = await callService(cfg, domain, service, data)
+
+    // Validate the HA response — surface any error states returned
+    if (Array.isArray(result)) {
+      const errors = result.filter(
+        (s: { state?: string; attributes?: Record<string, unknown> }) =>
+          s.state === 'error' || s.state === 'unavailable',
+      )
+      if (errors.length > 0) {
+        const detail = errors
+          .map((e) => `${e.entity_id ?? '?'}: ${e.state}`)
+          .join(', ')
+        return { ok: false, kind: 'system', message: `service call errors: ${detail}`, code: 'service_error' }
+      }
+    }
+
     return { ok: true, data: result }
   },
 }
