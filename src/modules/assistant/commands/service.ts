@@ -37,7 +37,7 @@ export const serviceCall: CommandSpec = {
     // Validate the HA response — surface any error states returned
     if (Array.isArray(result)) {
       const errors = result.filter(
-        (s: { state?: string; attributes?: Record<string, unknown> }) =>
+        (s: { state?: string }) =>
           s.state === 'error' || s.state === 'unavailable',
       )
       if (errors.length > 0) {
