@@ -73,3 +73,31 @@ export async function siteInfo(cfg: UnifiConfig): Promise<unknown | null> {
   const sites = await listSites(cfg)
   return (sites as { name?: string }[]).find((s) => s.name === cfg.site) ?? null
 }
+
+async function postCommand(cfg: UnifiConfig, endpoint: string, body: Record<string, unknown>): Promise<unknown> {
+  return requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/cmd/${endpoint}`,
+    {
+      method: 'POST',
+      headers: { ...headers(cfg), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    { insecureTLS: cfg.insecureTLS },
+  )
+}
+
+export async function blockClient(cfg: UnifiConfig, mac: string): Promise<unknown> {
+  return postCommand(cfg, 'stamgr', { cmd: 'block-sta', mac })
+}
+
+export async function unblockClient(cfg: UnifiConfig, mac: string): Promise<unknown> {
+  return postCommand(cfg, 'stamgr', { cmd: 'unblock-sta', mac })
+}
+
+export async function reconnectClient(cfg: UnifiConfig, mac: string): Promise<unknown> {
+  return postCommand(cfg, 'stamgr', { cmd: 'kick-sta', mac })
+}
+
+export async function powerCyclePort(cfg: UnifiConfig, mac: string, port: number): Promise<unknown> {
+  return postCommand(cfg, 'devmgr', { cmd: 'power-cycle', mac, port_idx: port })
+}

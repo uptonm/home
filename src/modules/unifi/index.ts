@@ -2,7 +2,9 @@ import type { ModuleManifest } from '../../core/types'
 import { defaultControllerUrl } from '../../core/net'
 import { listSites, readUnifiConfig } from './client'
 import { devicesGet, devicesList } from './commands/devices'
+import { devicesPoeCycle } from './commands/poe-cycle'
 import { clientsList } from './commands/clients'
+import { clientsControl } from './commands/client-control'
 import { siteHealthCmd, siteInfoCmd } from './commands/site'
 
 export const manifest: ModuleManifest = {
@@ -49,7 +51,7 @@ export const manifest: ModuleManifest = {
       },
     },
   ],
-  commands: [devicesList, devicesGet, clientsList, siteInfoCmd, siteHealthCmd],
+  commands: [devicesList, devicesGet, devicesPoeCycle, clientsList, clientsControl, siteInfoCmd, siteHealthCmd],
   async status(cfg) {
     try {
       const sites = await listSites(readUnifiConfig(cfg))
