@@ -1,6 +1,8 @@
-import type { CommandSpec, RunResult } from '../../../core/types'
+import { MetaDataHelper } from '@svrooij/sonos'
 import type SonosDevice from '@svrooij/sonos/lib/sonos-device'
+import type { CommandSpec, RunResult } from '../../../core/types'
 import { discover, readSonosConfig, resolveRoom } from '../client'
+import { discoverSpotifySn, rewriteSpotifySession, translateSpotifyInput } from '../spotify'
 
 async function withCoordinator(
   ctx: Parameters<CommandSpec['run']>[0],
@@ -53,23 +55,56 @@ export const queueClear: CommandSpec = {
 
 export const queueAdd: CommandSpec = {
   path: ['queue', 'add'],
-  description: 'Add a URI to the queue (spotify:track:..., spotify:album:..., HTTP stream, etc.). Metadata is auto-guessed for known services.',
+  description: 'Add a URI to the queue (spotify:track:..., open.spotify.com share URL, HTTP stream, etc.). Metadata is auto-guessed for known services; Spotify sn= is auto-discovered.',
   args: [
     roomArg,
-    { name: 'uri', kind: 'positional', description: 'Track URI (spotify:track:..., http://stream, etc.)', required: true },
+    { name: 'uri', kind: 'positional', description: 'Track URI (spotify:track:..., open.spotify.com/...,  http://stream, etc.)', required: true },
     { name: 'next', kind: 'boolean', description: 'Enqueue as next track (default true)' },
     { name: 'play', kind: 'boolean', description: 'Start playing after adding (skips to the added track and plays)' },
+    { name: 'sn', kind: 'number', description: 'Override Spotify subscription number (auto-discovered by default)' },
   ],
   examples: [
     'home sonos queue add "Dining Room" "spotify:track:7qiZfU4dY1lWllzX7mPBI3" --play',
-    'home sonos queue add "Dining Room" "spotify:album:5r36AJ6VOJtp00oxSkBZ5h"',
+    'home sonos queue add "Dining Room" "https://open.spotify.com/album/5r36AJ6VOJtp00oxSkBZ5h" --play',
   ],
   async run(ctx) {
     return withCoordinator(ctx, async (d) => {
-      const uri = String(ctx.args.uri ?? '')
-      if (!uri) return { ok: false, kind: 'user', message: 'uri is required', code: 'missing_arg' }
+      const raw = String(ctx.args.uri ?? '')
+      if (!raw) return { ok: false, kind: 'user', message: 'uri is required', code: 'missing_arg' }
       const enqueueAsNext = ctx.args.next === undefined ? true : Boolean(ctx.args.next)
-      const result = await d.AddUriToQueue(uri, 0, enqueueAsNext)
+      const uri = translateSpotifyInput(raw)
+
+      let enqueuedUri: string
+      let enqueuedMetadata: string
+      if (uri.startsWith('spotify:')) {
+        const guessed = MetaDataHelper.GuessMetaDataAndTrackUri(uri)
+        enqueuedUri = guessed.trackUri
+        enqueuedMetadata =
+          typeof guessed.metadata === 'string'
+            ? guessed.metadata
+            : MetaDataHelper.TrackToMetaData(guessed.metadata)
+        const snOverride = ctx.args.sn !== undefined ? Number(ctx.args.sn) : undefined
+        const sn = snOverride ?? (await discoverSpotifySn(d).catch(() => null))
+        if (sn !== null && sn !== undefined) {
+          enqueuedUri = rewriteSpotifySession(enqueuedUri, sn)
+          enqueuedMetadata = rewriteSpotifySession(enqueuedMetadata, sn)
+        }
+      } else {
+        const guessed = MetaDataHelper.GuessMetaDataAndTrackUri(uri)
+        enqueuedUri = guessed.trackUri
+        enqueuedMetadata =
+          typeof guessed.metadata === 'string'
+            ? guessed.metadata
+            : MetaDataHelper.TrackToMetaData(guessed.metadata)
+      }
+
+      const result = await d.AVTransportService.AddURIToQueue({
+        InstanceID: 0,
+        EnqueuedURI: enqueuedUri,
+        EnqueuedURIMetaData: enqueuedMetadata,
+        DesiredFirstTrackNumberEnqueued: 0,
+        EnqueueAsNext: enqueueAsNext,
+      })
       if (ctx.args.play) {
         const trackNr = Number(result.FirstTrackNumberEnqueued)
         if (Number.isFinite(trackNr) && trackNr > 0) {
@@ -81,6 +116,7 @@ export const queueAdd: CommandSpec = {
         ok: true,
         data: {
           room: d.Name,
+          enqueuedUri,
           firstTrackEnqueued: result.FirstTrackNumberEnqueued,
           numTracksAdded: result.NumTracksAdded,
           newQueueLength: result.NewQueueLength,
