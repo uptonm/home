@@ -1,7 +1,7 @@
 import { MetaDataHelper } from '@svrooij/sonos'
 import type SonosDevice from '@svrooij/sonos/lib/sonos-device'
 import type { CommandSpec, RunResult } from '../../../core/types'
-import { discover, readSonosConfig, resolveRoom } from '../client'
+import { discover, enqueueAndPlay, readSonosConfig, resolveRoom } from '../client'
 import {
   buildSpotifyTransportUri,
   discoverSpotifyAccount,
@@ -18,25 +18,16 @@ async function resolveSpotifyAccount(d: SonosDevice, snOverride: number | undefi
   return snOverride !== undefined ? { sid: discovered.sid, sn: snOverride } : discovered
 }
 
-async function playSpotifyOnDevice(d: SonosDevice, transportUri: string): Promise<void> {
-  // For Spotify, the clean "replace and play" is: clear queue, enqueue, seek, play.
-  // SetAVTransportURI on a single x-sonos-spotify:track URI fails; cpcontainer
-  // URIs would work but mixing modes makes the play-uri contract muddier.
+/**
+ * `SetAVTransportURI` on `x-sonos-spotify:track:` fails on this household —
+ * Sonos only accepts single Spotify tracks via the queue. Clear, point the
+ * transport at the queue, then hand off to the shared `enqueueAndPlay`.
+ */
+async function replaceAndPlaySpotifyViaQueue(d: SonosDevice, transportUri: string): Promise<void> {
   await d.AVTransportService.RemoveAllTracksFromQueue({ InstanceID: 0 })
   const queueUri = `x-rincon-queue:${d.Uuid}#0`
   await d.AVTransportService.SetAVTransportURI({ InstanceID: 0, CurrentURI: queueUri, CurrentURIMetaData: '' })
-  const result = await d.AVTransportService.AddURIToQueue({
-    InstanceID: 0,
-    EnqueuedURI: transportUri,
-    EnqueuedURIMetaData: '',
-    DesiredFirstTrackNumberEnqueued: 0,
-    EnqueueAsNext: true,
-  })
-  const trackNr = Number(result.FirstTrackNumberEnqueued)
-  if (Number.isFinite(trackNr) && trackNr > 0) {
-    await d.AVTransportService.Seek({ InstanceID: 0, Unit: 'TRACK_NR', Target: String(trackNr) })
-  }
-  await d.Play()
+  await enqueueAndPlay(d, transportUri, '')
 }
 
 export const playUri: CommandSpec = {
@@ -87,7 +78,7 @@ export const playUri: CommandSpec = {
       if (!account) return { ok: false, kind: 'system', message: 'Spotify is not subscribed on this Sonos household', code: 'spotify_not_subscribed' }
       const built = buildSpotifyTransportUri(uri, account)
       if (!built) return { ok: false, kind: 'user', message: `unsupported Spotify URI shape: ${uri}`, code: 'unsupported_spotify_uri' }
-      await playSpotifyOnDevice(d, built)
+      await replaceAndPlaySpotifyViaQueue(d, built)
       return { ok: true, data: { room: d.Name, uri: built, action: 'play_uri' } }
     }
 

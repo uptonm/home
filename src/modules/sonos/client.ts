@@ -98,3 +98,45 @@ export function pickCoordinator(devices: SonosDevice[], ref?: string): ResolveRo
   if (r.kind !== 'ok') return r
   return { kind: 'ok', device: r.device.Coordinator ?? r.device }
 }
+
+export interface EnqueueResult {
+  firstTrackEnqueued: number
+  numTracksAdded: number
+  newQueueLength: number
+}
+
+/**
+ * Add a URI to the device's queue and start playing it. Handles the
+ * "AddURIToQueue → Seek-to-the-added-track → Play" sequence the SOAP API
+ * needs for any newly-added item to actually become the current track,
+ * including the `Number(result.FirstTrackNumberEnqueued)` finiteness check
+ * that several Sonos firmwares fail silently if you skip.
+ *
+ * Shared between `home sonos play-uri` (replace + play) and
+ * `home sonos queue add --play` (append + play) — both routes need exactly
+ * this 3-step recipe and used to inline it independently.
+ */
+export async function enqueueAndPlay(
+  device: SonosDevice,
+  transportUri: string,
+  metadata: string,
+  opts: { enqueueAsNext?: boolean } = {},
+): Promise<EnqueueResult> {
+  const result = await device.AVTransportService.AddURIToQueue({
+    InstanceID: 0,
+    EnqueuedURI: transportUri,
+    EnqueuedURIMetaData: metadata,
+    DesiredFirstTrackNumberEnqueued: 0,
+    EnqueueAsNext: opts.enqueueAsNext ?? true,
+  })
+  const trackNr = Number(result.FirstTrackNumberEnqueued)
+  if (Number.isFinite(trackNr) && trackNr > 0) {
+    await device.AVTransportService.Seek({ InstanceID: 0, Unit: 'TRACK_NR', Target: String(trackNr) })
+  }
+  await device.Play()
+  return {
+    firstTrackEnqueued: result.FirstTrackNumberEnqueued,
+    numTracksAdded: result.NumTracksAdded,
+    newQueueLength: result.NewQueueLength,
+  }
+}

@@ -1,7 +1,7 @@
 import { MetaDataHelper } from '@svrooij/sonos'
 import type SonosDevice from '@svrooij/sonos/lib/sonos-device'
 import type { CommandSpec, RunResult } from '../../../core/types'
-import { discover, readSonosConfig, resolveRoom } from '../client'
+import { discover, enqueueAndPlay, readSonosConfig, resolveRoom } from '../client'
 import {
   buildSpotifyTransportUri,
   discoverSpotifyAccount,
@@ -113,28 +113,34 @@ export const queueAdd: CommandSpec = {
             : MetaDataHelper.TrackToMetaData(guessed.metadata)
       }
 
-      const result = await d.AVTransportService.AddURIToQueue({
-        InstanceID: 0,
-        EnqueuedURI: enqueuedUri,
-        EnqueuedURIMetaData: enqueuedMetadata,
-        DesiredFirstTrackNumberEnqueued: 0,
-        EnqueueAsNext: enqueueAsNext,
-      })
+      let firstTrackEnqueued: number
+      let numTracksAdded: number
+      let newQueueLength: number
       if (ctx.args.play) {
-        const trackNr = Number(result.FirstTrackNumberEnqueued)
-        if (Number.isFinite(trackNr) && trackNr > 0) {
-          await d.AVTransportService.Seek({ InstanceID: 0, Unit: 'TRACK_NR', Target: String(trackNr) })
-        }
-        await d.Play()
+        const r = await enqueueAndPlay(d, enqueuedUri, enqueuedMetadata, { enqueueAsNext })
+        firstTrackEnqueued = r.firstTrackEnqueued
+        numTracksAdded = r.numTracksAdded
+        newQueueLength = r.newQueueLength
+      } else {
+        const r = await d.AVTransportService.AddURIToQueue({
+          InstanceID: 0,
+          EnqueuedURI: enqueuedUri,
+          EnqueuedURIMetaData: enqueuedMetadata,
+          DesiredFirstTrackNumberEnqueued: 0,
+          EnqueueAsNext: enqueueAsNext,
+        })
+        firstTrackEnqueued = r.FirstTrackNumberEnqueued
+        numTracksAdded = r.NumTracksAdded
+        newQueueLength = r.NewQueueLength
       }
       return {
         ok: true,
         data: {
           room: d.Name,
           enqueuedUri,
-          firstTrackEnqueued: result.FirstTrackNumberEnqueued,
-          numTracksAdded: result.NumTracksAdded,
-          newQueueLength: result.NewQueueLength,
+          firstTrackEnqueued,
+          numTracksAdded,
+          newQueueLength,
           played: Boolean(ctx.args.play),
         },
       }
