@@ -45,44 +45,57 @@ export const stateGet: CommandSpec = {
 
     // Watch mode: poll continuously until interrupted.
     let prev: string | undefined
+    let consecutiveFailures = 0
     const out = ctx.json ? process.stdout : process.stderr
+    let active = true
 
     const poll = async () => {
+      if (!active) return
       try {
         const data = await getState(cfg, entity)
         if (!data) {
           out.write(`[${new Date().toISOString()}] entity ${entity} not found\n`)
-          return
-        }
-        const current = data.state
-        if (current !== prev) {
-          const ts = new Date().toISOString()
-          if (ctx.json) {
-            out.write(JSON.stringify({ ts, entity_id: data.entity_id, state: current, attributes: data.attributes }) + '\n')
-          } else {
-            const fn = typeof data.attributes?.friendly_name === 'string' ? ` (${data.attributes.friendly_name})` : ''
-            out.write(`${ts}  ${entity}${fn} → ${current}\n`)
+          consecutiveFailures++
+          if (consecutiveFailures >= 3) {
+            out.write(`[${new Date().toISOString()}] entity ${entity} not found 3 times — giving up\n`)
+            cleanup()
+            return
           }
-          prev = current
+        } else {
+          consecutiveFailures = 0
+          const current = data.state
+          if (current !== prev) {
+            const ts = new Date().toISOString()
+            if (ctx.json) {
+              out.write(JSON.stringify({ ts, entity_id: data.entity_id, state: current, attributes: data.attributes }) + '\n')
+            } else {
+              const fn = typeof data.attributes?.friendly_name === 'string' ? ` (${data.attributes.friendly_name})` : ''
+              out.write(`${ts}  ${entity}${fn} → ${current}\n`)
+            }
+            prev = current
+          }
         }
       } catch (err) {
         out.write(`[${new Date().toISOString()}] error: ${(err as Error).message}\n`)
       }
+      if (active) setTimeout(poll, intervalSec * 1000)
     }
+
+    const cleanup = () => {
+      active = false
+      process.removeListener('SIGINT', cleanup)
+      process.removeListener('SIGTERM', cleanup)
+      resolve({ ok: true } as const)
+    }
+
+    let resolve: (value: { ok: true }) => void
+    const promise = new Promise<{ ok: true }>((res) => { resolve = res })
+    process.on('SIGINT', cleanup)
+    process.on('SIGTERM', cleanup)
 
     // Initial poll immediately.
     await poll()
 
-    return new Promise((resolve) => {
-      const timer = setInterval(poll, intervalSec * 1000)
-      const cleanup = () => {
-        clearInterval(timer)
-        process.removeListener('SIGINT', cleanup)
-        process.removeListener('SIGTERM', cleanup)
-        resolve({ ok: true } as const)
-      }
-      process.on('SIGINT', cleanup)
-      process.on('SIGTERM', cleanup)
-    })
+    return promise
   },
 }
