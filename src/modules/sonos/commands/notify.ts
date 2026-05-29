@@ -23,13 +23,14 @@ function mimeFor(path: string): string {
 }
 
 /**
- * Sonos's SetAVTransportURI accepts the x-rincon-mp3radio:// scheme for
- * arbitrary HTTP-served audio (proven in earlier testing on this household —
- * plain http:// fails with UPnP 714 Illegal MIME-Type). We keep the rewrite
- * here at the command boundary so the rest of the code talks in real URLs.
+ * For files we host ourselves (with proper Content-Type + Content-Length) Sonos
+ * accepts plain http:// across every generation we tested (S1 Play:5 Gen 1
+ * through S2 Arc). It's also dramatically faster than x-rincon-mp3radio://
+ * (~300 ms vs ~7 s to start playing) and ends cleanly in STOPPED instead of
+ * cycling PLAYING ↔ TRANSITIONING the way mp3radio does when the stream ends.
  */
-function rinconUrlForHost(ip: string, port: number, filename: string): string {
-  return `x-rincon-mp3radio://${ip}:${port}/${filename}`
+function httpUrlForHost(ip: string, port: number, filename: string): string {
+  return `http://${ip}:${port}/${filename}`
 }
 
 interface HostedFile {
@@ -63,7 +64,7 @@ function hostFile(filePath: string, peerIp: string): HostedFile {
 
   const port = server.port
   if (port === undefined) throw new Error('Bun.serve did not return a port')
-  return { server, trackUri: rinconUrlForHost(localIp, port, filename) }
+  return { server, trackUri: httpUrlForHost(localIp, port, filename) }
 }
 
 interface SavedState {
@@ -178,7 +179,7 @@ export const notifyCmd: CommandSpec = {
       hosted = hostFile(file, device.Host)
       trackUri = hosted.trackUri
     } else {
-      trackUri = url!.replace(/^https?:\/\//i, 'x-rincon-mp3radio://')
+      trackUri = url!
     }
 
     const saved = await saveState(device)
