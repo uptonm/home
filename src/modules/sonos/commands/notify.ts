@@ -3,7 +3,7 @@ import { extname } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import type SonosDevice from '@svrooij/sonos/lib/sonos-device'
 import type { CommandSpec, RunResult } from '../../../core/types'
-import { discover, readSonosConfig, resolveRoom, toSonosTrackUri } from '../client'
+import { toSonosTrackUri, withRoom } from '../client'
 import { pickLocalIpForPeer } from '../lan'
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -198,7 +198,6 @@ export const notifyCmd: CommandSpec = {
     'home sonos notify "Living Room" --url https://example.com/chime.mp3 --volume 40',
   ],
   async run(ctx): Promise<RunResult> {
-    const ref = String(ctx.args.room ?? '')
     const file = ctx.args.file ? String(ctx.args.file) : undefined
     const url = ctx.args.url ? String(ctx.args.url) : undefined
     if (!file && !url) return { ok: false, kind: 'user', message: 'one of --file or --url is required', code: 'missing_arg' }
@@ -207,49 +206,45 @@ export const notifyCmd: CommandSpec = {
     const timeoutSec = ctx.args.timeout !== undefined ? Math.max(1, Number(ctx.args.timeout)) : 30
     const volumeOverride = ctx.args.volume !== undefined ? Math.max(0, Math.min(100, Math.round(Number(ctx.args.volume)))) : undefined
 
-    const mgr = await discover(readSonosConfig(ctx.config))
-    const r = resolveRoom(mgr.Devices, ref)
-    if (r.kind === 'not_found') return { ok: false, kind: 'user', message: `no room matching "${ref}"`, code: 'not_found' }
-    if (r.kind === 'ambiguous') return { ok: false, kind: 'user', message: `room is ambiguous — candidates: ${r.candidates.join(', ')}`, code: 'ambiguous' }
-    const device = r.device
-
-    let hosted: HostedFile | null = null
-    let trackUri: string
-    if (file) {
-      hosted = hostFile(file, device.Host)
-      trackUri = hosted.trackUri
-    } else {
-      trackUri = toSonosTrackUri(url!)
-    }
-
-    const saved = await saveState(device)
-    let completion: 'done' | 'timeout' | 'unreachable' = 'timeout'
-    try {
-      if (volumeOverride !== undefined) {
-        await device.RenderingControlService.SetVolume({ InstanceID: 0, Channel: 'Master', DesiredVolume: volumeOverride })
+    return withRoom(ctx, { pick: 'device', required: true }, async (device) => {
+      let hosted: HostedFile | null = null
+      let trackUri: string
+      if (file) {
+        hosted = hostFile(file, device.Host)
+        trackUri = hosted.trackUri
+      } else {
+        trackUri = toSonosTrackUri(url!)
       }
-      await device.AVTransportService.SetAVTransportURI({ InstanceID: 0, CurrentURI: trackUri, CurrentURIMetaData: '' })
-      await device.Play()
-      completion = await waitForPlaybackEnd(device, timeoutSec * 1000)
-    } finally {
-      // Stop first because the notification source may be an indefinite
-      // stream (`--url https://...` via toSonosTrackUri → x-rincon-mp3radio)
-      // that won't end on its own — SetAVTransportURI during restore would
-      // otherwise race with Sonos still pulling bytes from us.
-      await device.Stop().catch(() => {})
-      await restoreState(device, saved)
-      hosted?.server.stop(true)
-    }
 
-    return {
-      ok: true,
-      data: {
-        room: device.Name,
-        action: 'notify',
-        source: file ? { kind: 'file', path: file, servedAs: hosted!.trackUri } : { kind: 'url', url },
-        completion,
-        restored: { transportState: saved.transportState, volume: saved.volume },
-      },
-    }
+      const saved = await saveState(device)
+      let completion: 'done' | 'timeout' | 'unreachable' = 'timeout'
+      try {
+        if (volumeOverride !== undefined) {
+          await device.RenderingControlService.SetVolume({ InstanceID: 0, Channel: 'Master', DesiredVolume: volumeOverride })
+        }
+        await device.AVTransportService.SetAVTransportURI({ InstanceID: 0, CurrentURI: trackUri, CurrentURIMetaData: '' })
+        await device.Play()
+        completion = await waitForPlaybackEnd(device, timeoutSec * 1000)
+      } finally {
+        // Stop first because the notification source may be an indefinite
+        // stream (`--url https://...` via toSonosTrackUri → x-rincon-mp3radio)
+        // that won't end on its own — SetAVTransportURI during restore would
+        // otherwise race with Sonos still pulling bytes from us.
+        await device.Stop().catch(() => {})
+        await restoreState(device, saved)
+        hosted?.server.stop(true)
+      }
+
+      return {
+        ok: true,
+        data: {
+          room: device.Name,
+          action: 'notify',
+          source: file ? { kind: 'file', path: file, servedAs: hosted!.trackUri } : { kind: 'url', url },
+          completion,
+          restored: { transportState: saved.transportState, volume: saved.volume },
+        },
+      }
+    })
   },
 }

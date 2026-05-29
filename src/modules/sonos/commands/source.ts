@@ -1,7 +1,7 @@
 import { MetaDataHelper } from '@svrooij/sonos'
 import type SonosDevice from '@svrooij/sonos/lib/sonos-device'
 import type { CommandSpec, RunResult } from '../../../core/types'
-import { discover, enqueueAndPlay, readSonosConfig, resolveRoom, toSonosTrackUri } from '../client'
+import { discover, enqueueAndPlay, readSonosConfig, toSonosTrackUri, withRoom } from '../client'
 import {
   buildSpotifyTransportUri,
   discoverSpotifyAccount,
@@ -44,57 +44,52 @@ export const playUri: CommandSpec = {
     'home sonos play-uri "Dining Room" "https://open.spotify.com/album/5r36AJ6VOJtp00oxSkBZ5h"',
   ],
   async run(ctx): Promise<RunResult> {
-    const mgr = await discover(readSonosConfig(ctx.config))
-    const ref = String(ctx.args.room ?? '')
     const rawUri = String(ctx.args.uri ?? '')
     if (!rawUri) return { ok: false, kind: 'user', message: 'uri is required', code: 'missing_arg' }
-    const r = resolveRoom(mgr.Devices, ref)
-    if (r.kind === 'not_found') return { ok: false, kind: 'user', message: `no room matching "${ref}"`, code: 'not_found' }
-    if (r.kind === 'ambiguous') return { ok: false, kind: 'user', message: `room is ambiguous — candidates: ${r.candidates.join(', ')}`, code: 'ambiguous' }
 
-    const d = r.device.Coordinator ?? r.device
-
-    // Raw HTTP(S) stream (anything that's not open.spotify.com).
-    if (/^https?:\/\//i.test(rawUri) && !/^https?:\/\/open\.spotify\.com\//i.test(rawUri)) {
-      const trackUri = toSonosTrackUri(rawUri)
-      await d.AVTransportService.SetAVTransportURI({ InstanceID: 0, CurrentURI: trackUri, CurrentURIMetaData: '' })
-      await d.Play()
-      return { ok: true, data: { room: d.Name, uri: trackUri, action: 'play_uri' } }
-    }
-
-    // Spotify (canonical URI or share URL).
-    const uri = translateSpotifyInput(rawUri)
-    if (uri.startsWith('spotify:')) {
-      if (!isPlayableSpotifyUri(uri)) {
-        return {
-          ok: false,
-          kind: 'user',
-          message: `${uri} is a container URI; Sonos cannot play it directly on this household. Use a spotify:track: URI.`,
-          code: 'container_not_playable',
-        }
+    return withRoom(ctx, { pick: 'coordinator', required: true }, async (d) => {
+      // Raw HTTP(S) stream (anything that's not open.spotify.com).
+      if (/^https?:\/\//i.test(rawUri) && !/^https?:\/\/open\.spotify\.com\//i.test(rawUri)) {
+        const trackUri = toSonosTrackUri(rawUri)
+        await d.AVTransportService.SetAVTransportURI({ InstanceID: 0, CurrentURI: trackUri, CurrentURIMetaData: '' })
+        await d.Play()
+        return { ok: true, data: { room: d.Name, uri: trackUri, action: 'play_uri' } }
       }
-      const snOverride = ctx.args.sn !== undefined ? Number(ctx.args.sn) : undefined
-      const account = await resolveSpotifyAccount(d, snOverride)
-      if (!account) return { ok: false, kind: 'system', message: 'Spotify is not subscribed on this Sonos household', code: 'spotify_not_subscribed' }
-      const built = buildSpotifyTransportUri(uri, account)
-      if (!built) return { ok: false, kind: 'user', message: `unsupported Spotify URI shape: ${uri}`, code: 'unsupported_spotify_uri' }
-      await replaceAndPlaySpotifyViaQueue(d, built)
-      return { ok: true, data: { room: d.Name, uri: built, action: 'play_uri' } }
-    }
 
-    // Fall-through: trust MetaDataHelper for anything else it knows about.
-    const guessed = MetaDataHelper.GuessMetaDataAndTrackUri(uri)
-    const metadata =
-      typeof guessed.metadata === 'string'
-        ? guessed.metadata
-        : MetaDataHelper.TrackToMetaData(guessed.metadata)
-    await d.AVTransportService.SetAVTransportURI({
-      InstanceID: 0,
-      CurrentURI: guessed.trackUri,
-      CurrentURIMetaData: metadata,
+      // Spotify (canonical URI or share URL).
+      const uri = translateSpotifyInput(rawUri)
+      if (uri.startsWith('spotify:')) {
+        if (!isPlayableSpotifyUri(uri)) {
+          return {
+            ok: false,
+            kind: 'user',
+            message: `${uri} is a container URI; Sonos cannot play it directly on this household. Use a spotify:track: URI.`,
+            code: 'container_not_playable',
+          }
+        }
+        const snOverride = ctx.args.sn !== undefined ? Number(ctx.args.sn) : undefined
+        const account = await resolveSpotifyAccount(d, snOverride)
+        if (!account) return { ok: false, kind: 'system', message: 'Spotify is not subscribed on this Sonos household', code: 'spotify_not_subscribed' }
+        const built = buildSpotifyTransportUri(uri, account)
+        if (!built) return { ok: false, kind: 'user', message: `unsupported Spotify URI shape: ${uri}`, code: 'unsupported_spotify_uri' }
+        await replaceAndPlaySpotifyViaQueue(d, built)
+        return { ok: true, data: { room: d.Name, uri: built, action: 'play_uri' } }
+      }
+
+      // Fall-through: trust MetaDataHelper for anything else it knows about.
+      const guessed = MetaDataHelper.GuessMetaDataAndTrackUri(uri)
+      const metadata =
+        typeof guessed.metadata === 'string'
+          ? guessed.metadata
+          : MetaDataHelper.TrackToMetaData(guessed.metadata)
+      await d.AVTransportService.SetAVTransportURI({
+        InstanceID: 0,
+        CurrentURI: guessed.trackUri,
+        CurrentURIMetaData: metadata,
+      })
+      await d.Play()
+      return { ok: true, data: { room: d.Name, uri: guessed.trackUri, action: 'play_uri' } }
     })
-    await d.Play()
-    return { ok: true, data: { room: d.Name, uri: guessed.trackUri, action: 'play_uri' } }
   },
 }
 

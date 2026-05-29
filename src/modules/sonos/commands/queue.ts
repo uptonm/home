@@ -1,7 +1,7 @@
 import { MetaDataHelper } from '@svrooij/sonos'
 import type SonosDevice from '@svrooij/sonos/lib/sonos-device'
-import type { CommandSpec, RunResult } from '../../../core/types'
-import { discover, enqueueAndPlay, readSonosConfig, resolveRoom } from '../client'
+import type { CommandSpec } from '../../../core/types'
+import { enqueueAndPlay, withRoom } from '../client'
 import {
   buildSpotifyTransportUri,
   discoverSpotifyAccount,
@@ -9,18 +9,6 @@ import {
   translateSpotifyInput,
   type SpotifyAccount,
 } from '../spotify'
-
-async function withCoordinator(
-  ctx: Parameters<CommandSpec['run']>[0],
-  fn: (d: SonosDevice) => Promise<RunResult>,
-): Promise<RunResult> {
-  const mgr = await discover(readSonosConfig(ctx.config))
-  const ref = String(ctx.args.room ?? '')
-  const r = resolveRoom(mgr.Devices, ref)
-  if (r.kind === 'not_found') return { ok: false, kind: 'user', message: `no room matching "${ref}"`, code: 'not_found' }
-  if (r.kind === 'ambiguous') return { ok: false, kind: 'user', message: `room is ambiguous — candidates: ${r.candidates.join(', ')}`, code: 'ambiguous' }
-  return fn(r.device.Coordinator ?? r.device)
-}
 
 const roomArg = { name: 'room', kind: 'positional', description: 'Room name (case-insensitive, partial match)', required: true } as const
 
@@ -36,7 +24,7 @@ export const queueList: CommandSpec = {
   args: [roomArg],
   examples: ['home sonos queue list "Dining Room" --json'],
   async run(ctx) {
-    return withCoordinator(ctx, async (d) => {
+    return withRoom(ctx, { pick: 'coordinator', required: true }, async (d) => {
       const q = await d.GetQueue()
       const tracks = Array.isArray(q.Result) ? q.Result : []
       const rows = tracks.map((t, i) => ({
@@ -58,7 +46,7 @@ export const queueClear: CommandSpec = {
   args: [roomArg],
   examples: ['home sonos queue clear "Dining Room"'],
   async run(ctx) {
-    return withCoordinator(ctx, async (d) => {
+    return withRoom(ctx, { pick: 'coordinator', required: true }, async (d) => {
       await d.AVTransportService.RemoveAllTracksFromQueue({ InstanceID: 0 })
       return { ok: true, data: { room: d.Name, action: 'queue_cleared' } }
     })
@@ -80,7 +68,7 @@ export const queueAdd: CommandSpec = {
     'home sonos queue add "Dining Room" "https://open.spotify.com/album/5r36AJ6VOJtp00oxSkBZ5h" --play',
   ],
   async run(ctx) {
-    return withCoordinator(ctx, async (d) => {
+    return withRoom(ctx, { pick: 'coordinator', required: true }, async (d) => {
       const raw = String(ctx.args.uri ?? '')
       if (!raw) return { ok: false, kind: 'user', message: 'uri is required', code: 'missing_arg' }
       const enqueueAsNext = ctx.args.next === undefined ? true : Boolean(ctx.args.next)
