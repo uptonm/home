@@ -325,12 +325,12 @@ async function resolvePlaylistFirstTrack(cfg: SpotifyConfig, playlistId: string,
 }
 
 /**
- * Rewrite a single container match (album / artist / playlist) so its `uri`
- * points at the resolved representative track and `trackTitle` carries that
- * track's name. Pure — kept separate from the HTTP calls so it can be tested
- * independently of `search()`.
+ * Returns the match unchanged when `resolved` is null — the per-container
+ * resolver failure case, which the sonos container_not_playable guard catches
+ * downstream. Pure on purpose so the success/failure semantics can be tested
+ * without network.
  */
-export function applyResolvedTrack<T extends AlbumMatch | ArtistMatch | PlaylistMatch>(
+export function withResolvedTrack<T extends AlbumMatch | ArtistMatch | PlaylistMatch>(
   match: T,
   resolved: ResolvedTrack | null,
 ): T {
@@ -350,17 +350,17 @@ export async function search(cfg: SpotifyConfig, opts: SearchOptions): Promise<S
     Promise.all(normalized.albums.map(async (a) => {
       const id = extractSpotifyId(a.uri)
       const resolved = id ? await resolveAlbumFirstTrack(cfg, id, opts.market) : null
-      return applyResolvedTrack(a, resolved)
+      return withResolvedTrack(a, resolved)
     })),
     Promise.all(normalized.artists.map(async (a) => {
       const id = extractSpotifyId(a.uri)
       const resolved = id ? await resolveArtistTopTrack(cfg, id, opts.market) : null
-      return applyResolvedTrack(a, resolved)
+      return withResolvedTrack(a, resolved)
     })),
     Promise.all(normalized.playlists.map(async (p) => {
       const id = extractSpotifyId(p.uri)
       const resolved = id ? await resolvePlaylistFirstTrack(cfg, id, opts.market) : null
-      return applyResolvedTrack(p, resolved)
+      return withResolvedTrack(p, resolved)
     })),
   ])
 

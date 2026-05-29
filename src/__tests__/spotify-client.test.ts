@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import {
-  applyResolvedTrack,
+  withResolvedTrack,
   authedRequestJson,
   buildAlbumTracksUrl,
   buildArtistTopTracksUrl,
@@ -323,7 +323,7 @@ describe('getAccessToken', () => {
   })
 })
 
-describe('applyResolvedTrack', () => {
+describe('withResolvedTrack', () => {
   const album: AlbumMatch = {
     kind: 'album',
     uri: 'spotify:album:alb1',
@@ -344,17 +344,17 @@ describe('applyResolvedTrack', () => {
   }
 
   test('rewrites uri to spotify:track:<id> and adds trackTitle on success', () => {
-    expect(applyResolvedTrack(album, { id: 'track1', title: 'Where You Are' })).toEqual({
+    expect(withResolvedTrack(album, { id: 'track1', title: 'Where You Are' })).toEqual({
       ...album,
       uri: 'spotify:track:track1',
       trackTitle: 'Where You Are',
     })
-    expect(applyResolvedTrack(artist, { id: 'tA', title: 'Light' })).toEqual({
+    expect(withResolvedTrack(artist, { id: 'tA', title: 'Light' })).toEqual({
       ...artist,
       uri: 'spotify:track:tA',
       trackTitle: 'Light',
     })
-    expect(applyResolvedTrack(playlist, { id: 'tP', title: 'Espresso' })).toEqual({
+    expect(withResolvedTrack(playlist, { id: 'tP', title: 'Espresso' })).toEqual({
       ...playlist,
       uri: 'spotify:track:tP',
       trackTitle: 'Espresso',
@@ -362,8 +362,8 @@ describe('applyResolvedTrack', () => {
   })
 
   test('leaves match unchanged when resolution fails — placeholder uri leaks through for the sonos guard to catch', () => {
-    expect(applyResolvedTrack(album, null)).toEqual(album)
-    expect(applyResolvedTrack(artist, null)).toEqual(artist)
-    expect(applyResolvedTrack(playlist, null)).toEqual(playlist)
+    expect(withResolvedTrack(album, null)).toEqual(album)
+    expect(withResolvedTrack(artist, null)).toEqual(artist)
+    expect(withResolvedTrack(playlist, null)).toEqual(playlist)
   })
 })
