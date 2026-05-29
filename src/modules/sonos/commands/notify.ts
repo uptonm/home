@@ -115,27 +115,25 @@ async function restoreState(d: SonosDevice, s: SavedState): Promise<void> {
 }
 
 /**
- * Wait for the notification to finish by polling transport state. Mp3radio
- * streams Sonos pulls from us end as PLAYING → TRANSITIONING (Sonos thinks it's
- * a radio stream that just dropped its connection), not PLAYING → STOPPED, so
- * we treat *any* exit from PLAYING — once PLAYING was actually observed — as
- * the notification finishing. Two consecutive non-PLAYING samples are required
- * to avoid spurious transitions during buffering.
+ * Wait for the notification to finish by polling transport state. The
+ * x-rincon-mp3radio:// scheme makes Sonos treat the file as a radio stream:
+ * once it has played the bytes it transitions PLAYING → TRANSITIONING and
+ * immediately reconnects to our HTTP server for "more content" — which we'd
+ * keep serving, looping forever. So as soon as Sonos exits PLAYING after
+ * having reached it, we declare the notification done; caller issues Stop()
+ * before restore to break the loop.
  */
 async function waitForPlaybackEnd(d: SonosDevice, timeoutMs: number): Promise<'done' | 'timeout'> {
   const deadline = Date.now() + timeoutMs
-  const pollMs = 300
-  let nonPlayingStreak = 0
+  const pollMs = 250
   let everPlayed = false
   while (Date.now() < deadline) {
     const ti = await d.AVTransportService.GetTransportInfo().catch(() => null)
     const state = ti?.CurrentTransportState
     if (state === 'PLAYING') {
       everPlayed = true
-      nonPlayingStreak = 0
     } else if (everPlayed) {
-      nonPlayingStreak++
-      if (nonPlayingStreak >= 2) return 'done'
+      return 'done'
     }
     await new Promise((r) => setTimeout(r, pollMs))
   }
@@ -193,6 +191,9 @@ export const notifyCmd: CommandSpec = {
       await device.Play()
       completion = await waitForPlaybackEnd(device, timeoutSec * 1000)
     } finally {
+      // Stop first so the mp3radio scheme doesn't immediately reconnect to our
+      // server and start playing the file again before we can restore state.
+      await device.Stop().catch(() => {})
       await restoreState(device, saved)
       hosted?.server.stop(true)
     }
