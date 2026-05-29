@@ -81,6 +81,13 @@ function hostFile(filePath: string, peerIp: string): HostedFile {
   return { server, trackUri: httpUrlForHost(localIp, port, filename) }
 }
 
+/**
+ * What we save and restore around a notification. Intentionally a *subset* of
+ * the full transport state — `PlayMode` (shuffle / repeat) and `CrossfadeMode`
+ * are not captured here, so a user with shuffle on will see it silently turned
+ * off across a notification. Capturing those modes is tracked separately as a
+ * follow-up; the asymmetry is deliberate-for-now, not an oversight.
+ */
 interface SavedState {
   currentUri: string
   currentUriMetaData: string
@@ -225,8 +232,10 @@ export const notifyCmd: CommandSpec = {
       await device.Play()
       completion = await waitForPlaybackEnd(device, timeoutSec * 1000)
     } finally {
-      // Stop first so the mp3radio scheme doesn't immediately reconnect to our
-      // server and start playing the file again before we can restore state.
+      // Stop first because the notification source may be an indefinite
+      // stream (`--url https://...` via toSonosTrackUri → x-rincon-mp3radio)
+      // that won't end on its own — SetAVTransportURI during restore would
+      // otherwise race with Sonos still pulling bytes from us.
       await device.Stop().catch(() => {})
       await restoreState(device, saved)
       hosted?.server.stop(true)
