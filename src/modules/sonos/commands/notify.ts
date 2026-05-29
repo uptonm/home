@@ -3,7 +3,7 @@ import { extname } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import type SonosDevice from '@svrooij/sonos/lib/sonos-device'
 import type { CommandSpec, RunResult } from '../../../core/types'
-import { discover, readSonosConfig, resolveRoom } from '../client'
+import { discover, readSonosConfig, resolveRoom, toSonosTrackUri } from '../client'
 import { pickLocalIpForPeer } from '../lan'
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -198,7 +198,7 @@ export const notifyCmd: CommandSpec = {
       hosted = hostFile(file, device.Host)
       trackUri = hosted.trackUri
     } else {
-      trackUri = url!
+      trackUri = toSonosTrackUri(url!)
     }
 
     const saved = await saveState(device)

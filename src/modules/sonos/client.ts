@@ -99,6 +99,25 @@ export function pickCoordinator(devices: SonosDevice[], ref?: string): ResolveRo
   return { kind: 'ok', device: r.device.Coordinator ?? r.device }
 }
 
+/**
+ * Translate a user-supplied URL into a URI Sonos's SOAP API accepts.
+ *
+ * Plain `http://` works for files we host ourselves (`notify --file`,
+ * `enqueueAndPlay` with known-finite Content-Length). For arbitrary remote
+ * URLs — anything we didn't generate — we can't introspect whether the
+ * endpoint is a discrete file or an indefinite stream, so we route through
+ * `x-rincon-mp3radio://` which Sonos treats as a stream uniformly. That's
+ * the same shape that `home sonos play-uri` has used since SomaFM testing;
+ * `home sonos notify --url` now uses the same translation so the two
+ * commands behave identically for the same input URL.
+ */
+export function toSonosTrackUri(rawUrl: string): string {
+  if (/^https?:\/\//i.test(rawUrl)) {
+    return rawUrl.replace(/^https?:\/\//i, 'x-rincon-mp3radio://')
+  }
+  return rawUrl
+}
+
 export interface EnqueueResult {
   firstTrackEnqueued: number
   numTracksAdded: number
