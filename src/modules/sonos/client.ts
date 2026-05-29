@@ -1,5 +1,5 @@
 import { SonosManager, type SonosDevice } from '@svrooij/sonos'
-import type { ModuleConfig } from '../../core/types'
+import type { ModuleConfig, RunContext, RunResult } from '../../core/types'
 
 export interface SonosConfig {
   discoveryTimeoutSec: number
@@ -158,4 +158,66 @@ export async function enqueueAndPlay(
     numTracksAdded: result.NumTracksAdded,
     newQueueLength: result.NewQueueLength,
   }
+}
+
+export interface WithRoomOptions {
+  /**
+   * `'device'` returns the literal speaker matched by the room reference —
+   * use this for per-device operations like volume / mute / notify.
+   *
+   * `'coordinator'` returns the group coordinator (for grouped speakers, the
+   * one that controls playback). With no room reference, falls back to the
+   * household's single coordinator if there's exactly one; otherwise reports
+   * ambiguity. Use this for queue / playback / play-uri commands.
+   */
+  pick: 'device' | 'coordinator'
+  /** Positional arg name holding the room reference. Defaults to `'room'`. */
+  roomArg?: string
+  /** When true, omitting the room reference is a user error. Defaults to false (the helper picks the only coordinator). */
+  required?: boolean
+}
+
+/**
+ * Discover the network, resolve the user-supplied room reference to a single
+ * device, and invoke `fn(device)`. Returns the resulting `RunResult`, or a
+ * structured `'not_found'` / `'ambiguous'` / `'missing_arg'` user error if
+ * the room can't be resolved unambiguously.
+ *
+ * Shared by every per-room sonos command — extracted so error phrasings stay
+ * identical across commands and so future room-resolution behavior changes
+ * happen in one place.
+ */
+export async function withRoom(
+  ctx: RunContext,
+  opts: WithRoomOptions,
+  fn: (device: SonosDevice) => Promise<RunResult>,
+): Promise<RunResult> {
+  const argName = opts.roomArg ?? 'room'
+  const ref = ctx.args[argName] ? String(ctx.args[argName]) : undefined
+  if (opts.required && !ref) {
+    return { ok: false, kind: 'user', message: `${argName} is required`, code: 'missing_arg' }
+  }
+
+  const mgr = await discover(readSonosConfig(ctx.config))
+  const resolved = opts.pick === 'coordinator'
+    ? pickCoordinator(mgr.Devices, ref)
+    : ref ? resolveRoom(mgr.Devices, ref) : { kind: 'not_found' as const }
+
+  if (resolved.kind === 'not_found') {
+    return {
+      ok: false,
+      kind: 'user',
+      message: ref ? `no room matching "${ref}"` : 'no room specified and no single coordinator to fall back to',
+      code: 'not_found',
+    }
+  }
+  if (resolved.kind === 'ambiguous') {
+    return {
+      ok: false,
+      kind: 'user',
+      message: `room is ambiguous — candidates: ${resolved.candidates.join(', ')}`,
+      code: 'ambiguous',
+    }
+  }
+  return fn(resolved.device)
 }
