@@ -8,7 +8,12 @@ import {
 
 const DEFAULT_TYPES: SpotifySearchType[] = ['track', 'album', 'artist', 'playlist']
 const DEFAULT_LIMIT = 5
-const MAX_LIMIT = 50
+// Spotify Client Credentials budget is ~180 req/min. The downstream resolver
+// (feat/spotify-resolve-tracks) issues up to one extra parallel request per
+// container match returned here; capping at 20 keeps worst-case parallelism
+// at 60 requests/search (well under the budget) even at --limit 20 with all
+// three container types.
+const MAX_LIMIT = 20
 const DEFAULT_MARKET = 'US'
 
 function parseTypes(input: string | undefined): { types: SpotifySearchType[]; error?: string } {
@@ -38,7 +43,7 @@ export const searchCmd: CommandSpec = {
       kind: 'string',
       description: `Comma-separated subset of: ${SPOTIFY_SEARCH_TYPES.join(', ')} (default: all)`,
     },
-    { name: 'limit', kind: 'number', description: 'Per-type result cap (1-50, default 5)' },
+    { name: 'limit', kind: 'number', description: 'Per-type result cap (1-20, default 5)' },
     { name: 'market', kind: 'string', description: 'ISO 3166-1 alpha-2 country code (default US)' },
   ],
   examples: [
