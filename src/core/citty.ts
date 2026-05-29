@@ -92,7 +92,17 @@ function makeUserLeaf(manifest: ModuleManifest, spec: CommandSpec): CommandDef {
         args: pickRunArgs(spec, raw),
         config: config ?? {},
       }
-      const result = await spec.run(ctx)
+      let result
+      try {
+        result = await spec.run(ctx)
+      } catch (err) {
+        result = {
+          ok: false as const,
+          kind: 'system' as const,
+          message: (err as Error).message,
+          code: (err as { code?: string }).code ?? 'run_failed',
+        }
+      }
       await emit(result, { json: env.json })
     },
   })
