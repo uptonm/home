@@ -2,6 +2,7 @@ import type { ModuleManifest } from '../../core/types'
 import { getConfig, readAssistantConfig } from './client'
 import { stateGet, statesList } from './commands/states'
 import { serviceCall } from './commands/service'
+import { lightCmd, switchCmd, climateCmd } from './commands/control'
 import { automationTrigger } from './commands/automation'
 import { historyGet } from './commands/history'
 import { logbookList } from './commands/logbook'
@@ -26,7 +27,7 @@ export const manifest: ModuleManifest = {
       help: 'Profile → Security → Long-lived access tokens → Create',
     },
   ],
-  commands: [statesList, stateGet, serviceCall, automationTrigger, historyGet, logbookList],
+  commands: [statesList, stateGet, lightCmd, switchCmd, climateCmd, serviceCall, automationTrigger, historyGet, logbookList],
   async status(cfg) {
     try {
       const data = await getConfig(readAssistantConfig(cfg))

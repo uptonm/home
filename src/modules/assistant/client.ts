@@ -70,12 +70,84 @@ export async function callService(
   domain: string,
   service: string,
   data: Record<string, unknown>,
-): Promise<unknown> {
-  return requestJson(`${cfg.url}/api/services/${encodeURIComponent(domain)}/${encodeURIComponent(service)}`, {
+): Promise<HassState[]> {
+  return requestJson<HassState[]>(`${cfg.url}/api/services/${encodeURIComponent(domain)}/${encodeURIComponent(service)}`, {
     method: 'POST',
     headers: headers(cfg),
     body: JSON.stringify(data),
   })
+}
+
+export interface ResolvedEntity {
+  entity_id: string
+  friendly_name?: string
+}
+
+export type ResolveResult =
+  | { kind: 'ok'; entity: ResolvedEntity }
+  | { kind: 'not_found' }
+  | { kind: 'ambiguous'; matches: ResolvedEntity[] }
+
+function friendlyName(state: HassState): string | undefined {
+  const fn = state.attributes?.friendly_name
+  return typeof fn === 'string' ? fn : undefined
+}
+
+/**
+ * Pure matching core for resolveEntity — operates on an already-fetched state
+ * list so the precedence rules (exact id > exact name > unique substring) can
+ * be unit-tested without network access.
+ */
+export function matchEntity(states: HassState[], ref: string): ResolveResult {
+  const lower = ref.toLowerCase()
+
+  // 1. Exact entity_id match wins outright.
+  const byId = states.find((s) => s.entity_id.toLowerCase() === lower)
+  if (byId) {
+    return { kind: 'ok', entity: { entity_id: byId.entity_id, friendly_name: friendlyName(byId) } }
+  }
+
+  // 2. Case-insensitive friendly_name match.
+  const byName = states.filter((s) => (friendlyName(s) ?? '').toLowerCase() === lower)
+  if (byName.length === 1) {
+    return { kind: 'ok', entity: { entity_id: byName[0]!.entity_id, friendly_name: friendlyName(byName[0]!) } }
+  }
+  if (byName.length > 1) {
+    return {
+      kind: 'ambiguous',
+      matches: byName.map((s) => ({ entity_id: s.entity_id, friendly_name: friendlyName(s) })),
+    }
+  }
+
+  // 3. Substring fallback (only if unambiguous).
+  const bySubstr = states.filter((s) => (friendlyName(s) ?? '').toLowerCase().includes(lower))
+  if (bySubstr.length === 1) {
+    return { kind: 'ok', entity: { entity_id: bySubstr[0]!.entity_id, friendly_name: friendlyName(bySubstr[0]!) } }
+  }
+  if (bySubstr.length > 1) {
+    return {
+      kind: 'ambiguous',
+      matches: bySubstr.map((s) => ({ entity_id: s.entity_id, friendly_name: friendlyName(s) })),
+    }
+  }
+
+  return { kind: 'not_found' }
+}
+
+/**
+ * Resolve a user-supplied reference to a single entity_id. The reference may be
+ * an exact entity_id (returned as-is if present) or a case-insensitive match
+ * against friendly_name. When `domain` is given, only entities in that domain
+ * are considered. Returns an ambiguous result (with candidates) when a
+ * friendly-name match is not unique.
+ */
+export async function resolveEntity(
+  cfg: AssistantConfig,
+  ref: string,
+  domain?: string,
+): Promise<ResolveResult> {
+  const all = await listStates(cfg, domain)
+  return matchEntity(all, ref)
 }
 
 export async function history(
