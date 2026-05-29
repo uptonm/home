@@ -117,23 +117,67 @@ async function saveState(d: SonosDevice): Promise<SavedState> {
   }
 }
 
-async function restoreState(d: SonosDevice, s: SavedState): Promise<void> {
-  await d.RenderingControlService.SetVolume({ InstanceID: 0, Channel: 'Master', DesiredVolume: s.volume })
-  if (!s.currentUri) return // nothing was loaded before; leave the transport empty
+export type RestoreState = 'ok' | 'partial' | 'failed'
+
+export interface RestoreOutcome {
+  state: RestoreState
+  /** Set when state !== 'ok'. Names the step that failed; downstream may show this to the operator. */
+  reason?: string
+}
+
+/**
+ * Put the speaker back to the state captured by `saveState`. Classifies failures:
+ *
+ * - `SetVolume` and the initial `SetAVTransportURI` are *load-bearing* — if
+ *   either throws, the speaker is left in an undefined state (silent, wrong
+ *   queue, wrong URI). Mark `restored: 'failed'` with the throwing step's
+ *   description; the caller surfaces this in the response so the LLM /
+ *   operator can apologize-and-investigate instead of being told `ok: true`.
+ *
+ * - `Seek` and `Play` are *best-effort*. The URI and volume are already back
+ *   in place; missing the seek-to-position or the resume-playing is a minor
+ *   UX regression the user can fix with one tap. Mark `restored: 'partial'`
+ *   and the operation is still considered a success overall.
+ */
+async function restoreState(d: SonosDevice, s: SavedState): Promise<RestoreOutcome> {
+  try {
+    await d.RenderingControlService.SetVolume({ InstanceID: 0, Channel: 'Master', DesiredVolume: s.volume })
+  } catch (err) {
+    return { state: 'failed', reason: `SetVolume failed: ${(err as Error).message}` }
+  }
+  if (!s.currentUri) {
+    // Nothing was loaded before — leave the transport empty.
+    return { state: 'ok' }
+  }
   try {
     await d.AVTransportService.SetAVTransportURI({ InstanceID: 0, CurrentURI: s.currentUri, CurrentURIMetaData: s.currentUriMetaData })
-    if (s.trackNr > 0) {
-      await d.AVTransportService.Seek({ InstanceID: 0, Unit: 'TRACK_NR', Target: String(s.trackNr) }).catch(() => {})
-    }
-    if (s.relTime && s.relTime !== '0:00:00' && s.relTime !== 'NOT_IMPLEMENTED') {
-      await d.AVTransportService.Seek({ InstanceID: 0, Unit: 'REL_TIME', Target: s.relTime }).catch(() => {})
-    }
-    if (s.transportState === 'PLAYING') {
-      await d.Play().catch(() => {})
-    }
-  } catch {
-    // best-effort — if restoration fails the user can resume manually
+  } catch (err) {
+    return { state: 'failed', reason: `SetAVTransportURI failed: ${(err as Error).message}` }
   }
+
+  let partial: string | null = null
+  if (s.trackNr > 0) {
+    try {
+      await d.AVTransportService.Seek({ InstanceID: 0, Unit: 'TRACK_NR', Target: String(s.trackNr) })
+    } catch (err) {
+      partial = `Seek (track) failed: ${(err as Error).message}`
+    }
+  }
+  if (!partial && s.relTime && s.relTime !== '0:00:00' && s.relTime !== 'NOT_IMPLEMENTED') {
+    try {
+      await d.AVTransportService.Seek({ InstanceID: 0, Unit: 'REL_TIME', Target: s.relTime })
+    } catch (err) {
+      partial = `Seek (position) failed: ${(err as Error).message}`
+    }
+  }
+  if (s.transportState === 'PLAYING') {
+    try {
+      await d.Play()
+    } catch (err) {
+      partial = partial ?? `Play (resume) failed: ${(err as Error).message}`
+    }
+  }
+  return partial ? { state: 'partial', reason: partial } : { state: 'ok' }
 }
 
 const TERMINAL_STATES = new Set(['STOPPED', 'NO_MEDIA_PRESENT', 'PAUSED_PLAYBACK', 'TRANSITIONING'])
@@ -218,6 +262,7 @@ export const notifyCmd: CommandSpec = {
 
       const saved = await saveState(device)
       let completion: 'done' | 'timeout' | 'unreachable' = 'timeout'
+      let restored: RestoreOutcome = { state: 'failed', reason: 'restore did not run' }
       try {
         if (volumeOverride !== undefined) {
           await device.RenderingControlService.SetVolume({ InstanceID: 0, Channel: 'Master', DesiredVolume: volumeOverride })
@@ -231,20 +276,33 @@ export const notifyCmd: CommandSpec = {
         // that won't end on its own — SetAVTransportURI during restore would
         // otherwise race with Sonos still pulling bytes from us.
         await device.Stop().catch(() => {})
-        await restoreState(device, saved)
+        restored = await restoreState(device, saved)
         hosted?.server.stop(true)
       }
 
-      return {
-        ok: true,
-        data: {
-          room: device.Name,
-          action: 'notify',
-          source: file ? { kind: 'file', path: file, servedAs: hosted!.trackUri } : { kind: 'url', url },
-          completion,
-          restored: { transportState: saved.transportState, volume: saved.volume },
-        },
+      const data = {
+        room: device.Name,
+        action: 'notify',
+        source: file ? { kind: 'file', path: file, servedAs: hosted!.trackUri } : { kind: 'url', url },
+        completion,
+        priorState: { transportState: saved.transportState, volume: saved.volume },
+        restored,
       }
+
+      // A `'failed'` restore means the speaker is silent / on the wrong queue
+      // — the notification played but the user is worse off than before. Surface
+      // that as a non-ok result so callers can apologize / investigate instead
+      // of being told everything succeeded.
+      if (restored.state === 'failed') {
+        return {
+          ok: false,
+          kind: 'system',
+          message: `notification played but state restore failed: ${restored.reason}`,
+          code: 'restore_failed',
+        }
+      }
+
+      return { ok: true, data }
     })
   },
 }
