@@ -83,6 +83,8 @@ function moduleNode(manifest: ModuleManifest): CompletionNode {
   skill.flags = GLOBAL_FLAGS
   root.subcommands.set('skill', skill)
 
+  // classify: single-depth → direct subcommand; deeper → grouped.
+  // Keep in sync with buildCommandTree in core/citty.ts — both assume max depth 2.
   const groups = new Map<string, CommandSpec[]>()
   for (const cmd of manifest.commands) {
     if (cmd.path.length === 1) {
@@ -110,6 +112,8 @@ function moduleNode(manifest: ModuleManifest): CompletionNode {
 /**
  * Build the full completion tree for the `home` binary from the module
  * registry plus the static top-level commands defined in src/index.ts.
+ *
+ * Keep this list in sync with the top-level commands wired in src/index.ts.
  */
 export function buildCompletionTree(manifests: ModuleManifest[]): CompletionNode {
   const root = newNode([], 'Monolith CLI for homelab services')
