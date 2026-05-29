@@ -6,6 +6,7 @@ import { getSecret } from './secrets'
 import { runConfigure } from './configure'
 import { writeSkill } from './skill'
 import { emit } from './output'
+import { SystemError, UserError, NotConfiguredError } from './errors'
 
 const globalFlags: ArgsDef = {
   json: { type: 'boolean', description: 'Emit JSON to stdout (silent otherwise)' },
@@ -26,6 +27,24 @@ function argsToCitty(args: ArgSpec[]): ArgsDef {
     out[a.name] = spec as ArgsDef[string]
   }
   return out
+}
+
+/**
+ * Map a thrown error into a clean `{ ok: false, kind: 'system', ... }` result.
+ *
+ * Only adopts the thrown error's `.code` field when the error came from our
+ * own taxonomy (`HomeError` / `SystemError` / `UserError` /
+ * `NotConfiguredError`). A generic `Error` with `.code = 'ENOENT'` (Node
+ * errno, or a third-party library convention) shouldn't leak through as the
+ * user-facing code — it's not in our taxonomy and the operator can't act on
+ * it. Falls back to `run_failed` in that case.
+ */
+function systemErrorResultFor(err: unknown): RunResult {
+  const message = err instanceof Error ? err.message : String(err)
+  const code = err instanceof SystemError || err instanceof UserError || err instanceof NotConfiguredError
+    ? err.code
+    : 'run_failed'
+  return { ok: false as const, kind: 'system' as const, message, code }
 }
 
 function pickRunArgs(spec: CommandSpec, raw: Record<string, unknown>): RunContext['args'] {
@@ -92,7 +111,12 @@ function makeUserLeaf(manifest: ModuleManifest, spec: CommandSpec): CommandDef {
         args: pickRunArgs(spec, raw),
         config: config ?? {},
       }
-      const result = await spec.run(ctx)
+      let result
+      try {
+        result = await spec.run(ctx)
+      } catch (err) {
+        result = systemErrorResultFor(err)
+      }
       await emit(result, { json: env.json })
     },
   })
