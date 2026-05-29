@@ -45,16 +45,30 @@ function hostFile(filePath: string, peerIp: string): HostedFile {
   const localIp = pickLocalIpForPeer(peerIp)
   const filename = `${randomBytes(8).toString('hex')}${extname(filePath) || '.mp3'}`
 
+  // `Bun.serve` returns synchronously and the listener is already accepting
+  // connections by the time we get the port back. There's no race between
+  // server creation and the SetAVTransportURI call ~10 ms later that asks
+  // Sonos to fetch this URL — don't be tempted to `await` a non-existent
+  // `.listening` promise.
   const server = Bun.serve({
     hostname: localIp,
     port: 0,
-    fetch(req) {
+    fetch(req, srv) {
+      // Source-IP gate: this file is intended for one specific speaker we
+      // already know the IP of. Anyone else on the LAN (guest VLAN, IoT
+      // device, neighbor on the same broadcast domain) hitting a guessed
+      // filename gets a 404. The ~3-second server lifetime + 64-bit random
+      // filename already make guessing infeasible; this closes the
+      // "guessed within the window" residual.
+      const requesterIp = srv.requestIP(req)?.address
+      if (requesterIp && requesterIp !== peerIp) {
+        return new Response('not found', { status: 404 })
+      }
       const url = new URL(req.url)
       if (url.pathname !== `/${filename}`) return new Response('not found', { status: 404 })
       const headers: Record<string, string> = {
         'Content-Type': mime,
         'Content-Length': String(size),
-        'Accept-Ranges': 'bytes',
         'Cache-Control': 'no-store',
       }
       if (req.method === 'HEAD') return new Response(null, { headers })
