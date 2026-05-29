@@ -17,7 +17,16 @@ export function readSpotifyConfig(cfg: ModuleConfig): SpotifyConfig {
 export const SPOTIFY_SEARCH_TYPES = ['track', 'album', 'artist', 'playlist'] as const
 export type SpotifySearchType = (typeof SPOTIFY_SEARCH_TYPES)[number]
 
+/**
+ * Every match emits a `uri` field that is *directly playable* by
+ * `home sonos play-uri` — i.e. always `spotify:track:<id>`. For container
+ * matches (album / artist / playlist) the resolver picks a representative
+ * track and exposes its title via `trackTitle` so the LLM still has enough
+ * context to say "playing OK Computer's first track" instead of just the
+ * track name.
+ */
 export interface TrackMatch {
+  kind: 'track'
   uri: string
   title: string
   artist: string
@@ -28,28 +37,34 @@ export interface TrackMatch {
 }
 
 export interface AlbumMatch {
+  kind: 'album'
   uri: string
   title: string
   artist: string
   releaseDate?: string
   totalTracks?: number
   albumType?: string
+  trackTitle?: string
 }
 
 export interface ArtistMatch {
+  kind: 'artist'
   uri: string
   name: string
   genres: string[]
   popularity?: number
   followers?: number
+  trackTitle?: string
 }
 
 export interface PlaylistMatch {
+  kind: 'playlist'
   uri: string
   title: string
   owner: string
   totalTracks?: number
   public?: boolean
+  trackTitle?: string
 }
 
 export interface SpotifySearchResult {
@@ -146,6 +161,18 @@ export function buildSearchUrl(opts: SearchOptions): string {
   return `https://api.spotify.com/v1/search?${params.toString()}`
 }
 
+export function buildArtistTopTracksUrl(artistId: string, market: string): string {
+  return `https://api.spotify.com/v1/artists/${encodeURIComponent(artistId)}/top-tracks?market=${encodeURIComponent(market)}`
+}
+
+export function buildAlbumTracksUrl(albumId: string, market: string): string {
+  return `https://api.spotify.com/v1/albums/${encodeURIComponent(albumId)}/tracks?limit=1&market=${encodeURIComponent(market)}`
+}
+
+export function buildPlaylistTracksUrl(playlistId: string, market: string): string {
+  return `https://api.spotify.com/v1/playlists/${encodeURIComponent(playlistId)}/tracks?limit=1&market=${encodeURIComponent(market)}`
+}
+
 interface RawArtist {
   id?: string
   name?: string
@@ -192,6 +219,19 @@ function artistName(artists: RawArtist[] | undefined): string {
   return artists.map((a) => a?.name ?? '').filter(Boolean).join(', ')
 }
 
+export interface ResolvedTrack {
+  id: string
+  title: string
+}
+
+/**
+ * Normalize the raw Spotify /v1/search response into our match types.
+ * Container matches (album / artist / playlist) have their `uri` set to the
+ * placeholder `spotify:<type>:<id>` form here; `search()` overwrites that to
+ * `spotify:track:<id>` once the per-container resolver returns its first
+ * track. If a resolver fails, the placeholder leaks through and the sonos
+ * container_not_playable guard catches it.
+ */
 export function normalizeSearchResponse(raw: RawSearchResponse): SpotifySearchResult {
   const trackItems = (raw.tracks?.items ?? []).filter((t): t is RawTrack => !!t && !!t.id)
   const albumItems = (raw.albums?.items ?? []).filter((a): a is RawAlbum => !!a && !!a.id)
@@ -199,6 +239,7 @@ export function normalizeSearchResponse(raw: RawSearchResponse): SpotifySearchRe
   const playlistItems = (raw.playlists?.items ?? []).filter((p): p is RawPlaylist => !!p && !!p.id)
 
   const tracks: TrackMatch[] = trackItems.map((t) => ({
+    kind: 'track',
     uri: `spotify:track:${t.id}`,
     title: t.name ?? '',
     artist: artistName(t.artists),
@@ -209,6 +250,7 @@ export function normalizeSearchResponse(raw: RawSearchResponse): SpotifySearchRe
   }))
 
   const albums: AlbumMatch[] = albumItems.map((a) => ({
+    kind: 'album',
     uri: `spotify:album:${a.id}`,
     title: a.name ?? '',
     artist: artistName(a.artists),
@@ -218,6 +260,7 @@ export function normalizeSearchResponse(raw: RawSearchResponse): SpotifySearchRe
   }))
 
   const artists: ArtistMatch[] = artistItems.map((a) => ({
+    kind: 'artist',
     uri: `spotify:artist:${a.id}`,
     name: a.name ?? '',
     genres: a.genres ?? [],
@@ -226,6 +269,7 @@ export function normalizeSearchResponse(raw: RawSearchResponse): SpotifySearchRe
   }))
 
   const playlists: PlaylistMatch[] = playlistItems.map((p) => ({
+    kind: 'playlist',
     uri: `spotify:playlist:${p.id}`,
     title: p.name ?? '',
     owner: p.owner?.display_name ?? p.owner?.id ?? '',
@@ -236,7 +280,89 @@ export function normalizeSearchResponse(raw: RawSearchResponse): SpotifySearchRe
   return { tracks, albums, artists, playlists }
 }
 
+/**
+ * Extract the Spotify ID from a `spotify:<type>:<id>` URI. Spotify IDs are
+ * always exactly 22 base62 characters in production — enforcing the length
+ * here rejects malformed input at the producer boundary instead of letting
+ * it propagate into the Sonos transport-URI construction downstream.
+ */
+export function extractSpotifyId(uri: string): string | null {
+  const m = uri.match(/^spotify:[a-zA-Z]+:([A-Za-z0-9]{22})$/)
+  return m ? m[1]! : null
+}
+
+interface RawArtistTopTracks {
+  tracks?: { id?: string; name?: string }[]
+}
+
+async function resolveArtistTopTrack(cfg: SpotifyConfig, artistId: string, market: string): Promise<ResolvedTrack | null> {
+  const data = await authedRequestJson<RawArtistTopTracks>(cfg, buildArtistTopTracksUrl(artistId, market)).catch(() => null)
+  const first = data?.tracks?.[0]
+  if (!first?.id) return null
+  return { id: first.id, title: first.name ?? '' }
+}
+
+interface RawAlbumTracks {
+  items?: { id?: string; name?: string }[]
+}
+
+async function resolveAlbumFirstTrack(cfg: SpotifyConfig, albumId: string, market: string): Promise<ResolvedTrack | null> {
+  const data = await authedRequestJson<RawAlbumTracks>(cfg, buildAlbumTracksUrl(albumId, market)).catch(() => null)
+  const first = data?.items?.[0]
+  if (!first?.id) return null
+  return { id: first.id, title: first.name ?? '' }
+}
+
+interface RawPlaylistTracks {
+  items?: { track?: { id?: string; name?: string } | null }[]
+}
+
+async function resolvePlaylistFirstTrack(cfg: SpotifyConfig, playlistId: string, market: string): Promise<ResolvedTrack | null> {
+  const data = await authedRequestJson<RawPlaylistTracks>(cfg, buildPlaylistTracksUrl(playlistId, market)).catch(() => null)
+  const first = data?.items?.[0]?.track
+  if (!first?.id) return null
+  return { id: first.id, title: first.name ?? '' }
+}
+
+/**
+ * Returns the match unchanged when `resolved` is null — the per-container
+ * resolver failure case, which the sonos container_not_playable guard catches
+ * downstream. Pure on purpose so the success/failure semantics can be tested
+ * without network.
+ */
+export function withResolvedTrack<T extends AlbumMatch | ArtistMatch | PlaylistMatch>(
+  match: T,
+  resolved: ResolvedTrack | null,
+): T {
+  if (!resolved) return match
+  return { ...match, uri: `spotify:track:${resolved.id}`, trackTitle: resolved.title }
+}
+
 export async function search(cfg: SpotifyConfig, opts: SearchOptions): Promise<SpotifySearchResult> {
   const raw = await authedRequestJson<RawSearchResponse>(cfg, buildSearchUrl(opts))
-  return normalizeSearchResponse(raw)
+  const normalized = normalizeSearchResponse(raw)
+
+  // Resolve container matches to first-track URIs in parallel so the LLM can
+  // pipe any match.uri straight to `home sonos play-uri` without knowing the
+  // kind. Per-match failure is non-fatal: the placeholder URI leaks through
+  // and the sonos container_not_playable guard turns it into a clean error.
+  const [albums, artists, playlists] = await Promise.all([
+    Promise.all(normalized.albums.map(async (a) => {
+      const id = extractSpotifyId(a.uri)
+      const resolved = id ? await resolveAlbumFirstTrack(cfg, id, opts.market) : null
+      return withResolvedTrack(a, resolved)
+    })),
+    Promise.all(normalized.artists.map(async (a) => {
+      const id = extractSpotifyId(a.uri)
+      const resolved = id ? await resolveArtistTopTrack(cfg, id, opts.market) : null
+      return withResolvedTrack(a, resolved)
+    })),
+    Promise.all(normalized.playlists.map(async (p) => {
+      const id = extractSpotifyId(p.uri)
+      const resolved = id ? await resolvePlaylistFirstTrack(cfg, id, opts.market) : null
+      return withResolvedTrack(p, resolved)
+    })),
+  ])
+
+  return { tracks: normalized.tracks, albums, artists, playlists }
 }
