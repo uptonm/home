@@ -101,7 +101,7 @@ describe('normalizeSearchResponse', () => {
       albumType: 'album',
     })
     expect(out.artists[0]).toEqual({
-      uri: 'spotify:artistTopTracks:a1',
+      uri: 'spotify:artist:a1',
       name: 'John Summit',
       genres: ['house', 'tech house'],
       popularity: 78,
@@ -116,9 +116,9 @@ describe('normalizeSearchResponse', () => {
     })
   })
 
-  test('emits spotify:artistTopTracks: (not spotify:artist:) so the Sonos pipeline can play it directly', () => {
+  test('emits canonical spotify:artist URIs — sonos owns its own URI shaping', () => {
     const out = normalizeSearchResponse({ artists: { items: [{ id: 'xyz', name: 'X' }] } })
-    expect(out.artists[0]!.uri).toBe('spotify:artistTopTracks:xyz')
+    expect(out.artists[0]!.uri).toBe('spotify:artist:xyz')
   })
 
   test('joins multiple artist names with comma', () => {

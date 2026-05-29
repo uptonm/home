@@ -37,7 +37,6 @@ export interface AlbumMatch {
 }
 
 export interface ArtistMatch {
-  /** Sonos-playable URI: spotify:artistTopTracks:<id> rather than spotify:artist:<id>. */
   uri: string
   name: string
   genres: string[]
@@ -219,7 +218,7 @@ export function normalizeSearchResponse(raw: RawSearchResponse): SpotifySearchRe
   }))
 
   const artists: ArtistMatch[] = artistItems.map((a) => ({
-    uri: `spotify:artistTopTracks:${a.id}`,
+    uri: `spotify:artist:${a.id}`,
     name: a.name ?? '',
     genres: a.genres ?? [],
     popularity: a.popularity,
