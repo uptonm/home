@@ -3,10 +3,10 @@ import { readTtsConfig, synth } from '../client'
 
 export const synthCmd: CommandSpec = {
   path: ['synth'],
-  description: 'Synthesize speech from text and write it to disk as a 16-bit PCM WAV file (works on every Sonos generation, including S1 hardware like Play:5 Gen 1 that does not decode AAC-in-MP4 reliably). Prints the path; does not play anything.',
+  description: 'Synthesize speech from text and write it to disk as an MP3 file (plays on every Sonos generation tested including S1 hardware like Play:5 Gen 1; earlier m4a and WAV outputs both failed silently on S1). Prints the path; does not play anything. Backend: macOS `say` on darwin, `espeak-ng` on linux; both pipe through `lame` so `brew install lame` / `apt install lame` is required.',
   args: [
     { name: 'text', kind: 'positional', description: 'Text to speak', required: true },
-    { name: 'voice', kind: 'string', description: 'Voice name (default from config; macOS `say -v ?` for the list)' },
+    { name: 'voice', kind: 'string', description: 'Voice name (default from config; macOS `say -v ?` for darwin, `espeak-ng --voices` for linux)' },
     { name: 'rate', kind: 'number', description: 'Words per minute (default from config; typical 150-220)' },
     { name: 'out', kind: 'string', description: 'Output path (default: a fresh tempfile)' },
   ],
