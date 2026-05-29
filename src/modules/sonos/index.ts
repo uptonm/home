@@ -6,12 +6,13 @@ import { play, pause, next, prev, nowPlaying } from './commands/playback'
 import { volumeGet, volumeSet, mute } from './commands/volume'
 import { queueList, queueClear, queueAdd } from './commands/queue'
 import { playUri, favoritesList } from './commands/source'
+import { notifyCmd } from './commands/notify'
 
 export const manifest: ModuleManifest = {
   name: 'sonos',
-  description: 'Discover and control Sonos players (playback, volume, queue, play-from-URI, now-playing)',
+  description: 'Discover and control Sonos players (playback, volume, queue, play-from-URI, one-shot notifications, now-playing)',
   whenToUse:
-    'Use when the user asks to play, pause, skip, or change volume on Sonos speakers, queue tracks, play from a URI (Spotify, HTTP streams), or see what is currently playing. Discovery is SSDP multicast on the local network — no configuration required. Do not use for non-Sonos audio (that is `home-assistant`) or other devices.',
+    'Use when the user asks to play, pause, skip, or change volume on Sonos speakers, queue tracks, play from a URI (Spotify, HTTP streams), play a one-shot audio file or URL as a notification (`home sonos notify`), or see what is currently playing. Discovery is SSDP multicast on the local network — no configuration required. Do not use for non-Sonos audio (that is `home-assistant`) or other devices.',
   configSchema: [],
   commands: [
     playersList,
@@ -29,6 +30,7 @@ export const manifest: ModuleManifest = {
     queueAdd,
     playUri,
     favoritesList,
+    notifyCmd,
   ],
   async status(cfg) {
     try {

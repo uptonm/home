@@ -1,7 +1,7 @@
 import { MetaDataHelper } from '@svrooij/sonos'
 import type SonosDevice from '@svrooij/sonos/lib/sonos-device'
 import type { CommandSpec, RunResult } from '../../../core/types'
-import { discover, enqueueAndPlay, readSonosConfig, resolveRoom } from '../client'
+import { discover, enqueueAndPlay, readSonosConfig, resolveRoom, toSonosTrackUri } from '../client'
 import {
   buildSpotifyTransportUri,
   discoverSpotifyAccount,
@@ -56,7 +56,7 @@ export const playUri: CommandSpec = {
 
     // Raw HTTP(S) stream (anything that's not open.spotify.com).
     if (/^https?:\/\//i.test(rawUri) && !/^https?:\/\/open\.spotify\.com\//i.test(rawUri)) {
-      const trackUri = rawUri.replace(/^https?:\/\//i, 'x-rincon-mp3radio://')
+      const trackUri = toSonosTrackUri(rawUri)
       await d.AVTransportService.SetAVTransportURI({ InstanceID: 0, CurrentURI: trackUri, CurrentURIMetaData: '' })
       await d.Play()
       return { ok: true, data: { room: d.Name, uri: trackUri, action: 'play_uri' } }
