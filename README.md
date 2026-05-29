@@ -68,6 +68,27 @@ home secrets export --out ~/home-secrets.json
 home secrets import --in  ~/home-secrets.json
 ```
 
+## Shell completions
+
+`home` generates completion scripts for bash, zsh, and fish straight from its
+command tree, so they stay in sync as modules and commands are added.
+
+```bash
+# bash
+home completions bash | sudo tee /usr/local/etc/bash_completion.d/home
+#   or append to ~/.bashrc:  home completions bash >> ~/.bashrc
+
+# zsh (place on your fpath, then restart the shell)
+home completions zsh > "${fpath[1]}/_home"
+
+# fish
+home completions fish > ~/.config/fish/completions/home.fish
+```
+
+Completion covers every subcommand (including the synthetic
+`configure`/`status`/`skill` per module) and each command's flags; zsh and fish
+show inline descriptions.
+
 ## Telemetry
 
 None. `home doctor` confirms this. Update checks query the GitHub Releases API

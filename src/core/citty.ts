@@ -175,6 +175,8 @@ function makeSkillCommand(manifest: ModuleManifest): CommandDef {
 }
 
 export function buildCommandTree(manifest: ModuleManifest): CommandDef {
+  // classify: single-depth → direct subcommand; deeper → grouped.
+  // Keep in sync with moduleNode() in core/completion.ts — both assume max depth 2.
   const leafByName: Record<string, CommandSpec> = {}
   const groups = new Map<string, CommandSpec[]>()
 
