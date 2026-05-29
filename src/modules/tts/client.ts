@@ -39,7 +39,7 @@ export interface SynthResult {
   provider: TtsProvider
   voice: string
   rate: number
-  format: 'm4a'
+  format: 'wav'
 }
 
 function runCommand(cmd: string, args: string[]): Promise<{ code: number; stderr: string }> {
@@ -55,10 +55,10 @@ function runCommand(cmd: string, args: string[]): Promise<{ code: number; stderr
 }
 
 /**
- * Synthesize via macOS `say`. The output is m4a (AAC in MP4 container) —
- * `say` produces this natively via `--file-format=mp4f --data-format=aac` with
- * no extra dependencies. Sonos plays m4a over HTTP via x-rincon-mp3radio://
- * with no metadata required; we proved this end-to-end on the household.
+ * Synthesize via macOS `say`. The output is uncompressed 16-bit PCM WAV at
+ * 22 kHz mono — works on every Sonos generation, including S1 hardware like
+ * the Play:5 Gen 1 which doesn't decode AAC-in-MP4 reliably. File size is
+ * ~44 KB/s of speech, which is fine for LAN-served notifications.
  */
 export async function synth(cfg: TtsConfig, opts: SynthOptions): Promise<SynthResult> {
   if (cfg.provider !== 'say') {
@@ -75,15 +75,15 @@ export async function synth(cfg: TtsConfig, opts: SynthOptions): Promise<SynthRe
     outPath = opts.outPath
   } else {
     const dir = mkdtempSync(join(tmpdir(), 'home-tts-'))
-    outPath = join(dir, `${randomBytes(6).toString('hex')}.m4a`)
+    outPath = join(dir, `${randomBytes(6).toString('hex')}.wav`)
   }
 
   const args = [
     '-v', voice,
     '-r', String(rate),
     '-o', outPath,
-    '--file-format=mp4f',
-    '--data-format=aac',
+    '--file-format=WAVE',
+    '--data-format=LEI16@22050',
     opts.text,
   ]
   const { code, stderr } = await runCommand('say', args)
@@ -93,7 +93,7 @@ export async function synth(cfg: TtsConfig, opts: SynthOptions): Promise<SynthRe
   if (!existsSync(outPath)) {
     throw new SystemError(`\`say\` reported success but produced no file at ${outPath}`, 'say_no_output')
   }
-  return { path: outPath, provider: 'say', voice, rate, format: 'm4a' }
+  return { path: outPath, provider: 'say', voice, rate, format: 'wav' }
 }
 
 /** List the macOS voices available to `say`. Used by configure prompts. */
