@@ -13,10 +13,12 @@ function drain(stream: Writable, text: string): Promise<void> {
 
 export async function emit(result: RunResult, { json }: EmitOptions): Promise<never> {
   if (result.ok) {
-    if (json) {
-      await drain(process.stdout, JSON.stringify(result.data ?? null) + '\n')
-    } else if (result.data !== undefined && result.data !== null) {
-      await drain(process.stdout, formatHuman(result.data) + '\n')
+    if (result.data !== undefined && result.data !== null) {
+      if (json) {
+        await drain(process.stdout, JSON.stringify(result.data) + '\n')
+      } else {
+        await drain(process.stdout, formatHuman(result.data) + '\n')
+      }
     }
     process.exit(0)
   }
