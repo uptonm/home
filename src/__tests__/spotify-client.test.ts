@@ -1,5 +1,12 @@
-import { describe, expect, test } from 'bun:test'
-import { buildSearchUrl, normalizeSearchResponse } from '../modules/spotify/client'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import {
+  authedRequestJson,
+  buildSearchUrl,
+  getAccessToken,
+  normalizeSearchResponse,
+  resetTokenCache,
+  type SpotifyConfig,
+} from '../modules/spotify/client'
 
 describe('buildSearchUrl', () => {
   test('encodes query, types, limit, market into Spotify search URL', () => {
@@ -150,5 +157,109 @@ describe('normalizeSearchResponse', () => {
     expect(out.albums[0]!.title).toBe('')
     expect(out.artists[0]!.genres).toEqual([])
     expect(out.playlists[0]!.owner).toBe('')
+  })
+})
+
+describe('authedRequestJson 401 recovery', () => {
+  const cfg: SpotifyConfig = { clientId: 'cid', clientSecret: 'csec' }
+  const originalFetch = globalThis.fetch
+  let fetchCalls: { url: string; init?: RequestInit }[]
+  let fetchImpl: (url: string, init?: RequestInit) => Promise<Response>
+
+  beforeEach(() => {
+    resetTokenCache()
+    fetchCalls = []
+    globalThis.fetch = ((url: string, init?: RequestInit) => {
+      fetchCalls.push({ url: String(url), init })
+      return fetchImpl(String(url), init)
+    }) as typeof fetch
+  })
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    resetTokenCache()
+  })
+
+  test('drops the cached token and retries once on 401', async () => {
+    let tokenCalls = 0
+    let searchCalls = 0
+    fetchImpl = async (url) => {
+      if (url.startsWith('https://accounts.spotify.com/api/token')) {
+        tokenCalls++
+        const value = tokenCalls === 1 ? 'stale-token' : 'fresh-token'
+        return new Response(JSON.stringify({ access_token: value, token_type: 'Bearer', expires_in: 3600 }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      searchCalls++
+      if (searchCalls === 1) return new Response('unauthorized', { status: 401 })
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+
+    const result = await authedRequestJson<{ ok: boolean }>(cfg, 'https://api.spotify.com/v1/search?q=test&type=track&limit=1&market=US')
+    expect(result).toEqual({ ok: true })
+    expect(tokenCalls).toBe(2)
+    expect(searchCalls).toBe(2)
+    expect(fetchCalls[1]!.init?.headers).toEqual(expect.objectContaining({ Authorization: 'Bearer stale-token' }))
+    expect(fetchCalls[3]!.init?.headers).toEqual(expect.objectContaining({ Authorization: 'Bearer fresh-token' }))
+  })
+
+  test('does not retry on non-401 failures', async () => {
+    let searchCalls = 0
+    fetchImpl = async (url) => {
+      if (url.startsWith('https://accounts.spotify.com/api/token')) {
+        return new Response(JSON.stringify({ access_token: 'tok', token_type: 'Bearer', expires_in: 3600 }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      searchCalls++
+      return new Response('forbidden', { status: 403 })
+    }
+
+    await expect(authedRequestJson(cfg, 'https://api.spotify.com/v1/search?q=test&type=track&limit=1&market=US')).rejects.toThrow(/403/)
+    expect(searchCalls).toBe(1)
+  })
+
+  test('reuses the cached token on success — no extra token fetch', async () => {
+    let tokenCalls = 0
+    fetchImpl = async (url) => {
+      if (url.startsWith('https://accounts.spotify.com/api/token')) {
+        tokenCalls++
+        return new Response(JSON.stringify({ access_token: 'tok', token_type: 'Bearer', expires_in: 3600 }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+
+    await authedRequestJson(cfg, 'https://api.spotify.com/v1/search?q=test&type=track&limit=1&market=US')
+    await authedRequestJson(cfg, 'https://api.spotify.com/v1/search?q=test2&type=track&limit=1&market=US')
+    expect(tokenCalls).toBe(1)
+  })
+})
+
+describe('getAccessToken', () => {
+  const cfg: SpotifyConfig = { clientId: 'cid', clientSecret: 'csec' }
+  const originalFetch = globalThis.fetch
+
+  beforeEach(() => {
+    resetTokenCache()
+  })
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    resetTokenCache()
+  })
+
+  test('throws SystemError when clientId or clientSecret is missing', async () => {
+    await expect(getAccessToken({ clientId: '', clientSecret: 'csec' })).rejects.toThrow(/not configured/)
+    await expect(getAccessToken({ clientId: 'cid', clientSecret: '' })).rejects.toThrow(/not configured/)
+  })
+
+  test('sends client-credentials grant with HTTP Basic auth', async () => {
+    let init: RequestInit | undefined
+    globalThis.fetch = (async (_url: string, i?: RequestInit) => {
+      init = i
+      return new Response(JSON.stringify({ access_token: 'tok', token_type: 'Bearer', expires_in: 3600 }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }) as typeof fetch
+
+    await getAccessToken(cfg)
+    expect(init?.method).toBe('POST')
+    expect(init?.body).toBe('grant_type=client_credentials')
+    expect((init?.headers as Record<string, string>)?.Authorization).toBe(`Basic ${Buffer.from('cid:csec').toString('base64')}`)
   })
 })

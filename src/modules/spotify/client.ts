@@ -109,9 +109,32 @@ export function getCachedTokenExpiry(): number | null {
   return cachedToken?.expiresAt ?? null
 }
 
-/** Test seam: drop the cached token so re-auth happens on the next call. */
-export function _resetTokenCacheForTests(): void {
+/** Drop the cached token so the next `getAccessToken` re-auths. */
+export function resetTokenCache(): void {
   cachedToken = null
+}
+
+/**
+ * Run a bearer-token-authed `requestJson` against the Spotify API. On a 401
+ * (token revoked or rotated upstream), invalidate the cache and retry exactly
+ * once with a fresh token before propagating the failure.
+ */
+export async function authedRequestJson<T>(cfg: SpotifyConfig, url: string, init: RequestInit = {}): Promise<T> {
+  const withBearer = (token: string): RequestInit => ({
+    ...init,
+    headers: { ...(init.headers ?? {}), Authorization: `Bearer ${token}` },
+  })
+  const firstToken = await getAccessToken(cfg)
+  try {
+    return await requestJson<T>(url, withBearer(firstToken))
+  } catch (err) {
+    if (err instanceof SystemError && err.code === 'http_401') {
+      resetTokenCache()
+      const freshToken = await getAccessToken(cfg)
+      return await requestJson<T>(url, withBearer(freshToken))
+    }
+    throw err
+  }
 }
 
 export function buildSearchUrl(opts: SearchOptions): string {
@@ -215,9 +238,6 @@ export function normalizeSearchResponse(raw: RawSearchResponse): SpotifySearchRe
 }
 
 export async function search(cfg: SpotifyConfig, opts: SearchOptions): Promise<SpotifySearchResult> {
-  const token = await getAccessToken(cfg)
-  const raw = await requestJson<RawSearchResponse>(buildSearchUrl(opts), {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  const raw = await authedRequestJson<RawSearchResponse>(cfg, buildSearchUrl(opts))
   return normalizeSearchResponse(raw)
 }
