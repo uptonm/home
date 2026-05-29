@@ -5,6 +5,7 @@ import { configureAllCmd } from './commands/configure-all'
 import { skillCmd } from './commands/skill'
 import { doctorCmd } from './commands/doctor'
 import { secretsCmd } from './commands/secrets'
+import { completionsCmd } from './commands/completions'
 import { modules } from './registry'
 import { HOME_COMMIT, HOME_VERSION } from './core/version'
 
@@ -31,6 +32,7 @@ const root = defineCommand({
     skill: skillCmd,
     doctor: doctorCmd,
     secrets: secretsCmd,
+    completions: completionsCmd,
   },
 })
 
