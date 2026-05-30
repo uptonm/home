@@ -416,31 +416,58 @@ export function withResolvedTrack<T extends AlbumMatch | ArtistMatch | PlaylistM
   return match
 }
 
+/**
+ * Caps the number of in-flight `task()` calls at `concurrency`. Spotify's
+ * Client Credentials budget is ~180 req/min with no `Retry-After` header
+ * until you cross it; we cap at 5 parallel resolver calls so even a
+ * `--limit 20` search across 3 container types (worst case 60 sequenced
+ * batches of 5) stays well clear without affecting median-case latency
+ * (most searches return a handful of matches and finish in one batch).
+ */
+export async function mapWithConcurrency<I, O>(items: I[], concurrency: number, task: (item: I) => Promise<O>): Promise<O[]> {
+  const out: O[] = new Array(items.length)
+  let next = 0
+  const workers: Promise<void>[] = []
+  for (let w = 0; w < Math.min(concurrency, items.length); w++) {
+    workers.push((async () => {
+      while (true) {
+        const i = next++
+        if (i >= items.length) return
+        out[i] = await task(items[i]!)
+      }
+    })())
+  }
+  await Promise.all(workers)
+  return out
+}
+
+const RESOLVER_CONCURRENCY = 5
+
 export async function search(cfg: SpotifyConfig, opts: SearchOptions): Promise<SpotifySearchResult> {
   const raw = await authedRequestJson<RawSearchResponse>(cfg, buildSearchUrl(opts))
   const normalized = normalizeSearchResponse(raw)
 
-  // Resolve container matches to first-track URIs in parallel. Per-match
-  // failures land as `resolverError` on the match (`spotify_auth_failed`,
-  // `spotify_rate_limited`, `container_not_found`, etc.) so the LLM can tell
-  // distinct causes apart instead of relying on the downstream
-  // `container_not_playable` collapsing everything.
+  // Resolve container matches to first-track URIs with bounded concurrency
+  // (RESOLVER_CONCURRENCY parallel in-flight per type, across all three
+  // types). Per-match failures land as `resolverError` on the match so the
+  // LLM can tell distinct causes apart instead of collapsing everything
+  // into the downstream `container_not_playable`.
   const [albums, artists, playlists] = await Promise.all([
-    Promise.all(normalized.albums.map(async (a) => {
+    mapWithConcurrency(normalized.albums, RESOLVER_CONCURRENCY, async (a) => {
       const id = extractSpotifyId(a.uri)
       const result = id ? await resolveAlbumFirstTrack(cfg, id, opts.market) : null
       return withResolvedTrack(a, result)
-    })),
-    Promise.all(normalized.artists.map(async (a) => {
+    }),
+    mapWithConcurrency(normalized.artists, RESOLVER_CONCURRENCY, async (a) => {
       const id = extractSpotifyId(a.uri)
       const result = id ? await resolveArtistTopTrack(cfg, id, opts.market) : null
       return withResolvedTrack(a, result)
-    })),
-    Promise.all(normalized.playlists.map(async (p) => {
+    }),
+    mapWithConcurrency(normalized.playlists, RESOLVER_CONCURRENCY, async (p) => {
       const id = extractSpotifyId(p.uri)
       const result = id ? await resolvePlaylistFirstTrack(cfg, id, opts.market) : null
       return withResolvedTrack(p, result)
-    })),
+    }),
   ])
 
   return { tracks: normalized.tracks, albums, artists, playlists }
