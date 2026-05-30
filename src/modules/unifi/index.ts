@@ -6,12 +6,19 @@ import { devicesPoeCycle } from './commands/poe-cycle'
 import { clientsList } from './commands/clients'
 import { clientsControl } from './commands/client-control'
 import { siteHealthCmd, siteInfoCmd } from './commands/site'
+import { networksList } from './commands/networks'
+import { reservationsList } from './commands/reservations'
+import { wlansList } from './commands/wlans'
+import { portForwardsList } from './commands/port-forwards'
+import { controllerInfoCmd } from './commands/controller'
+import { healthCmd } from './commands/health'
 
 export const manifest: ModuleManifest = {
   name: 'unifi',
-  description: 'Query the UniFi Network controller (devices, clients, sites, health)',
+  description:
+    'Query the UniFi Network controller (devices, clients, networks/VLANs, fixed-IP reservations, SSIDs, port forwards, health)',
   whenToUse:
-    'Use when the user asks about their home network, wifi, APs, switches, the gateway, or wired/wireless clients. Do not use for cameras (that is `home-protect`) or sensors/automations (that is `home-assistant`).',
+    'Use when the user asks about their home network, wifi, APs, switches, the gateway, wired/wireless clients, VLANs/subnets, fixed-IP (DHCP) reservations, SSIDs, or port forwards. Do not use for cameras (that is `home-protect`) or sensors/automations (that is `home-assistant`).',
   configSchema: [
     {
       key: 'url',
@@ -51,7 +58,21 @@ export const manifest: ModuleManifest = {
       },
     },
   ],
-  commands: [devicesList, devicesGet, devicesPoeCycle, clientsList, clientsControl, siteInfoCmd, siteHealthCmd],
+  commands: [
+    devicesList,
+    devicesGet,
+    devicesPoeCycle,
+    clientsList,
+    clientsControl,
+    siteInfoCmd,
+    siteHealthCmd,
+    networksList,
+    reservationsList,
+    wlansList,
+    portForwardsList,
+    controllerInfoCmd,
+    healthCmd,
+  ],
   async status(cfg) {
     try {
       const sites = await listSites(readUnifiConfig(cfg))
