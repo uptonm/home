@@ -82,11 +82,11 @@ function hostFile(filePath: string, peerIp: string): HostedFile {
 }
 
 /**
- * What we save and restore around a notification. Intentionally a *subset* of
- * the full transport state — `PlayMode` (shuffle / repeat) and `CrossfadeMode`
- * are not captured here, so a user with shuffle on will see it silently turned
- * off across a notification. Capturing those modes is tracked separately as a
- * follow-up; the asymmetry is deliberate-for-now, not an oversight.
+ * Snapshot of the speaker's playback state captured before a notification
+ * starts, used by `restoreState` to put everything back afterwards. Covers
+ * what we can reasonably get back: URI + metadata, queue position, transport
+ * state (PLAYING/PAUSED/STOPPED), volume, PlayMode (shuffle/repeat), and
+ * CrossfadeMode.
  */
 interface SavedState {
   currentUri: string
@@ -95,14 +95,18 @@ interface SavedState {
   relTime: string
   transportState: string
   volume: number
+  playMode: string
+  crossfadeMode: boolean
 }
 
 async function saveState(d: SonosDevice): Promise<SavedState> {
-  const [media, position, transport, vol] = await Promise.all([
+  const [media, position, transport, vol, settings, crossfade] = await Promise.all([
     d.AVTransportService.GetMediaInfo(),
     d.AVTransportService.GetPositionInfo(),
     d.AVTransportService.GetTransportInfo(),
     d.RenderingControlService.GetVolume({ InstanceID: 0, Channel: 'Master' }),
+    d.AVTransportService.GetTransportSettings({ InstanceID: 0 }).catch(() => null),
+    d.AVTransportService.GetCrossfadeMode({ InstanceID: 0 }).catch(() => null),
   ])
   const metadata = typeof media.CurrentURIMetaData === 'string'
     ? media.CurrentURIMetaData
@@ -114,6 +118,8 @@ async function saveState(d: SonosDevice): Promise<SavedState> {
     relTime: position.RelTime,
     transportState: transport.CurrentTransportState,
     volume: vol.CurrentVolume,
+    playMode: settings?.PlayMode ?? 'NORMAL',
+    crossfadeMode: crossfade?.CrossfadeMode ?? false,
   }
 }
 
@@ -155,8 +161,25 @@ async function restoreState(d: SonosDevice, s: SavedState): Promise<RestoreOutco
     return { state: 'failed', reason: `SetAVTransportURI failed: ${(err as Error).message}` }
   }
 
+  // PlayMode and CrossfadeMode are *cosmetic* — getting them wrong is a UX
+  // regression the user can fix in one tap. Restore them before the seek/play
+  // so the resumed playback already honors shuffle/repeat, then degrade to
+  // 'partial' if either set call fails.
   let partial: string | null = null
-  if (s.trackNr > 0) {
+  try {
+    await d.AVTransportService.SetPlayMode({ InstanceID: 0, NewPlayMode: s.playMode as never })
+  } catch (err) {
+    partial = `SetPlayMode failed: ${(err as Error).message}`
+  }
+  if (!partial) {
+    try {
+      await d.AVTransportService.SetCrossfadeMode({ InstanceID: 0, CrossfadeMode: s.crossfadeMode })
+    } catch (err) {
+      partial = `SetCrossfadeMode failed: ${(err as Error).message}`
+    }
+  }
+
+  if (!partial && s.trackNr > 0) {
     try {
       await d.AVTransportService.Seek({ InstanceID: 0, Unit: 'TRACK_NR', Target: String(s.trackNr) })
     } catch (err) {
