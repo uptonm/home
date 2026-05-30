@@ -7,6 +7,7 @@ import { volumeGet, volumeSet, mute } from './commands/volume'
 import { queueList, queueClear, queueAdd } from './commands/queue'
 import { playUri, favoritesList } from './commands/source'
 import { notifyCmd } from './commands/notify'
+import { spotifyAccountsList } from './commands/spotify-accounts'
 
 export const manifest: ModuleManifest = {
   name: 'sonos',
@@ -31,6 +32,7 @@ export const manifest: ModuleManifest = {
     playUri,
     favoritesList,
     notifyCmd,
+    spotifyAccountsList,
   ],
   async status(cfg) {
     try {
