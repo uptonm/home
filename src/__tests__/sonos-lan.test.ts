@@ -1,6 +1,15 @@
 import { describe, expect, test } from 'bun:test'
-import { chooseLocalIp, pickLocalIpForPeer, type InterfaceSnapshot } from '../modules/sonos/lan'
+import { chooseLocalIp, localIpForPeer, pickLocalIpForPeer, routableLocalIp, type InterfaceSnapshot } from '../modules/sonos/lan'
 import { networkInterfaces } from 'node:os'
+
+function firstRealIpv4(): string | undefined {
+  for (const addrs of Object.values(networkInterfaces())) {
+    for (const a of addrs ?? []) {
+      if (a.family === 'IPv4' && !a.internal) return a.address
+    }
+  }
+  return undefined
+}
 
 const v4 = (name: string, address: string, internal = false): InterfaceSnapshot => ({
   name, address, family: 'IPv4', internal,
@@ -72,5 +81,36 @@ describe('chooseLocalIp (pure)', () => {
     expect(() =>
       chooseLocalIp('203.0.113.42', [v4('en0', '10.0.10.166')]),
     ).toThrow(/no local IPv4/)
+  })
+})
+
+describe('routableLocalIp (live)', () => {
+  test('returns a local IPv4 the kernel would use to reach a routable peer', async () => {
+    const own = firstRealIpv4()
+    if (!own) return // no usable interface on this host; skip
+    // Reaching our own address routes locally; the source IP is a real local IPv4.
+    const ip = await routableLocalIp(own)
+    expect(ip).toMatch(/^\d+\.\d+\.\d+\.\d+$/)
+    expect(ip).not.toBe('0.0.0.0')
+  })
+})
+
+describe('localIpForPeer (live)', () => {
+  test('falls back to the routable source IP when no interface shares the peer /24', async () => {
+    const own = firstRealIpv4()
+    if (!own) return // no usable interface on this host; skip
+    // 198.18.0.0/15 is reserved benchmarking space — no host interface is on it,
+    // so the same-subnet pick misses and we exercise the routable fallback.
+    const ip = await localIpForPeer('198.18.0.1')
+    expect(ip).toMatch(/^\d+\.\d+\.\d+\.\d+$/)
+    expect(ip).not.toBe('0.0.0.0')
+  })
+
+  test('prefers the same-subnet pick when one exists', async () => {
+    const own = firstRealIpv4()
+    if (!own) return // skip
+    const peer = own.split('.').slice(0, 3).join('.') + '.254'
+    const ip = await localIpForPeer(peer)
+    expect(ip.split('.').slice(0, 3).join('.')).toBe(own.split('.').slice(0, 3).join('.'))
   })
 })

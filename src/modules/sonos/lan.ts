@@ -1,4 +1,5 @@
 import { networkInterfaces } from 'node:os'
+import { createSocket } from 'node:dgram'
 
 /**
  * Interface name prefixes that the kernel uses for the real LAN-facing NIC
@@ -80,4 +81,57 @@ export function pickLocalIpForPeer(peerIp: string): string {
     }
   }
   return chooseLocalIp(peerIp, flat)
+}
+
+/**
+ * The local source IPv4 the kernel would use to reach `peerIp` *right now*,
+ * found by opening a connected — but never sent-on — UDP socket and reading
+ * the address the kernel binds to it. `connect()` on a datagram socket only
+ * fixes the default destination; no packet leaves the host, but it forces the
+ * route lookup + implicit bind so `address()` reports the egress source IP.
+ *
+ * This reads the live routing table rather than assuming any fixed topology,
+ * so it adapts whether routing is static or dynamic. Unlike `chooseLocalIp` it
+ * also works when the speaker is on a different subnet reachable via a gateway
+ * (Sonos on another VLAN). Async because the socket must bind first.
+ */
+export function routableLocalIp(peerIp: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const sock = createSocket('udp4')
+    sock.once('error', (err) => {
+      sock.close()
+      reject(err)
+    })
+    // Port 9 (discard) is arbitrary — nothing is ever sent here.
+    sock.connect(9, peerIp, () => {
+      try {
+        const addr = sock.address().address
+        sock.close()
+        if (!addr || addr === '0.0.0.0') {
+          reject(new Error(`could not determine a local IP routable to ${peerIp}`))
+          return
+        }
+        resolve(addr)
+      } catch (err) {
+        sock.close()
+        reject(err as Error)
+      }
+    })
+  })
+}
+
+/**
+ * Resolve the local IPv4 to advertise to a Sonos speaker at `peerIp` for the
+ * `notify` HTTP server. Prefers an interface on the speaker's own /24 — the
+ * common same-segment case, with the physical-over-virtual tie-break in
+ * `chooseLocalIp` — and falls back to the kernel's routable source IP when the
+ * speaker is on a different subnet. The fallback is what makes `notify --file`
+ * work when discovery was seeded across a VLAN via SONOS_SEED_HOST.
+ */
+export async function localIpForPeer(peerIp: string): Promise<string> {
+  try {
+    return pickLocalIpForPeer(peerIp)
+  } catch {
+    return await routableLocalIp(peerIp)
+  }
 }

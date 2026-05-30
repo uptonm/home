@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto'
 import type SonosDevice from '@svrooij/sonos/lib/sonos-device'
 import type { CommandSpec, RunResult } from '../../../core/types'
 import { toSonosTrackUri, withRoom } from '../client'
-import { pickLocalIpForPeer } from '../lan'
+import { localIpForPeer } from '../lan'
 
 const MIME_BY_EXT: Record<string, string> = {
   '.mp3': 'audio/mpeg',
@@ -38,11 +38,10 @@ interface HostedFile {
   trackUri: string
 }
 
-function hostFile(filePath: string, peerIp: string): HostedFile {
+function hostFile(filePath: string, peerIp: string, localIp: string): HostedFile {
   if (!existsSync(filePath)) throw new Error(`file not found: ${filePath}`)
   const size = statSync(filePath).size
   const mime = mimeFor(filePath)
-  const localIp = pickLocalIpForPeer(peerIp)
   const filename = `${randomBytes(8).toString('hex')}${extname(filePath) || '.mp3'}`
 
   // `Bun.serve` returns synchronously and the listener is already accepting
@@ -283,7 +282,8 @@ export const notifyCmd: CommandSpec = {
       let hosted: HostedFile | null = null
       let trackUri: string
       if (file) {
-        hosted = hostFile(file, device.Host)
+        const localIp = await localIpForPeer(device.Host)
+        hosted = hostFile(file, device.Host, localIp)
         trackUri = hosted.trackUri
       } else {
         trackUri = toSonosTrackUri(url!)
