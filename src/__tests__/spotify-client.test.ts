@@ -361,9 +361,37 @@ describe('withResolvedTrack', () => {
     })
   })
 
-  test('leaves match unchanged when resolution fails — placeholder uri leaks through for the sonos guard to catch', () => {
+  test('leaves match unchanged when result is null (empty container)', () => {
     expect(withResolvedTrack(album, null)).toEqual(album)
     expect(withResolvedTrack(artist, null)).toEqual(artist)
     expect(withResolvedTrack(playlist, null)).toEqual(playlist)
+  })
+
+  test('keeps placeholder uri but attaches resolverError on ResolverFailure', () => {
+    const fail = { code: 'spotify_rate_limited' as const, message: 'oh no' }
+    expect(withResolvedTrack(album, fail)).toEqual({ ...album, resolverError: fail })
+    expect(withResolvedTrack(artist, fail)).toEqual({ ...artist, resolverError: fail })
+    expect(withResolvedTrack(playlist, fail)).toEqual({ ...playlist, resolverError: fail })
+  })
+})
+
+describe('classifyResolverError', () => {
+  test('maps known SystemError codes onto ResolverFailure shapes', () => {
+    const { classifyResolverError } = require('../modules/spotify/client') as typeof import('../modules/spotify/client')
+    const { SystemError } = require('../core/errors') as typeof import('../core/errors')
+
+    expect(classifyResolverError(new SystemError('x', 'http_401')).code).toBe('spotify_auth_failed')
+    expect(classifyResolverError(new SystemError('x', 'http_403')).code).toBe('spotify_auth_failed')
+    expect(classifyResolverError(new SystemError('x', 'http_429')).code).toBe('spotify_rate_limited')
+    expect(classifyResolverError(new SystemError('x', 'http_404')).code).toBe('container_not_found')
+    expect(classifyResolverError(new SystemError('x', 'http_500')).code).toBe('spotify_unavailable')
+    expect(classifyResolverError(new SystemError('x', 'http_503')).code).toBe('spotify_unavailable')
+    expect(classifyResolverError(new SystemError('x', 'something_else')).code).toBe('spotify_resolver_failed')
+  })
+
+  test('falls back to spotify_resolver_failed for non-SystemError throws', () => {
+    const { classifyResolverError } = require('../modules/spotify/client') as typeof import('../modules/spotify/client')
+    expect(classifyResolverError(new Error('boom')).code).toBe('spotify_resolver_failed')
+    expect(classifyResolverError('weird').code).toBe('spotify_resolver_failed')
   })
 })

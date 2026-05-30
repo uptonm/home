@@ -36,6 +36,26 @@ export interface TrackMatch {
   explicit?: boolean
 }
 
+/**
+ * Why a container match couldn't be rewritten to a `spotify:track:` URI.
+ * Surfaced on the match itself so an LLM reading the search result JSON can
+ * tell "this query has no matches" from "Spotify is rate-limited" from
+ * "this playlist is region-blocked in `--market`" — instead of every failure
+ * collapsing into the same downstream `container_not_playable` from the sonos
+ * guard with no producer-side cause attached.
+ */
+export interface ResolverFailure {
+  code: ResolverFailureCode
+  message: string
+}
+
+export type ResolverFailureCode =
+  | 'spotify_auth_failed'   // 401/403 — token revoked / scope insufficient
+  | 'spotify_rate_limited'  // 429 — over Client Credentials budget
+  | 'container_not_found'   // 404 — region-blocked, deleted, etc.
+  | 'spotify_unavailable'   // 5xx — Spotify upstream having a bad day
+  | 'spotify_resolver_failed' // anything else thrown by the resolver
+
 export interface AlbumMatch {
   kind: 'album'
   uri: string
@@ -45,6 +65,7 @@ export interface AlbumMatch {
   totalTracks?: number
   albumType?: string
   trackTitle?: string
+  resolverError?: ResolverFailure
 }
 
 export interface ArtistMatch {
@@ -55,6 +76,7 @@ export interface ArtistMatch {
   popularity?: number
   followers?: number
   trackTitle?: string
+  resolverError?: ResolverFailure
 }
 
 export interface PlaylistMatch {
@@ -65,6 +87,7 @@ export interface PlaylistMatch {
   totalTracks?: number
   public?: boolean
   trackTitle?: string
+  resolverError?: ResolverFailure
 }
 
 export interface SpotifySearchResult {
@@ -291,76 +314,132 @@ export function extractSpotifyId(uri: string): string | null {
   return m ? m[1]! : null
 }
 
+/**
+ * Map a thrown SystemError (or anything else) into a structured
+ * `ResolverFailure`. Each per-match resolver wraps its call in this so the
+ * cause survives the parallel-resolution pass and ends up on the match.
+ */
+export function classifyResolverError(err: unknown): ResolverFailure {
+  if (err instanceof SystemError) {
+    if (err.code === 'http_401' || err.code === 'http_403') {
+      return { code: 'spotify_auth_failed', message: 'Spotify token rejected — check clientId/clientSecret or re-run `home spotify configure`' }
+    }
+    if (err.code === 'http_429') {
+      return { code: 'spotify_rate_limited', message: 'Spotify Client Credentials budget exceeded — retry or lower `--limit`' }
+    }
+    if (err.code === 'http_404') {
+      return { code: 'container_not_found', message: 'Spotify returned 404 — container may be region-blocked in `--market`, deleted, or never existed' }
+    }
+    if (err.code.startsWith('http_5')) {
+      return { code: 'spotify_unavailable', message: `Spotify upstream returned ${err.code.replace('http_', '')}` }
+    }
+    return { code: 'spotify_resolver_failed', message: err.message }
+  }
+  return { code: 'spotify_resolver_failed', message: err instanceof Error ? err.message : String(err) }
+}
+
+/** Resolver result: a representative track, no track (empty container), or a structured failure. */
+export type ResolverResult = ResolvedTrack | ResolverFailure | null
+
+function isResolvedTrack(r: ResolverResult): r is ResolvedTrack {
+  return r !== null && 'id' in r
+}
+
+function isResolverFailure(r: ResolverResult): r is ResolverFailure {
+  return r !== null && 'code' in r
+}
+
 interface RawArtistTopTracks {
   tracks?: { id?: string; name?: string }[]
 }
 
-async function resolveArtistTopTrack(cfg: SpotifyConfig, artistId: string, market: string): Promise<ResolvedTrack | null> {
-  const data = await authedRequestJson<RawArtistTopTracks>(cfg, buildArtistTopTracksUrl(artistId, market)).catch(() => null)
-  const first = data?.tracks?.[0]
-  if (!first?.id) return null
-  return { id: first.id, title: first.name ?? '' }
+async function resolveArtistTopTrack(cfg: SpotifyConfig, artistId: string, market: string): Promise<ResolverResult> {
+  try {
+    const data = await authedRequestJson<RawArtistTopTracks>(cfg, buildArtistTopTracksUrl(artistId, market))
+    const first = data?.tracks?.[0]
+    if (!first?.id) return null
+    return { id: first.id, title: first.name ?? '' }
+  } catch (err) {
+    return classifyResolverError(err)
+  }
 }
 
 interface RawAlbumTracks {
   items?: { id?: string; name?: string }[]
 }
 
-async function resolveAlbumFirstTrack(cfg: SpotifyConfig, albumId: string, market: string): Promise<ResolvedTrack | null> {
-  const data = await authedRequestJson<RawAlbumTracks>(cfg, buildAlbumTracksUrl(albumId, market)).catch(() => null)
-  const first = data?.items?.[0]
-  if (!first?.id) return null
-  return { id: first.id, title: first.name ?? '' }
+async function resolveAlbumFirstTrack(cfg: SpotifyConfig, albumId: string, market: string): Promise<ResolverResult> {
+  try {
+    const data = await authedRequestJson<RawAlbumTracks>(cfg, buildAlbumTracksUrl(albumId, market))
+    const first = data?.items?.[0]
+    if (!first?.id) return null
+    return { id: first.id, title: first.name ?? '' }
+  } catch (err) {
+    return classifyResolverError(err)
+  }
 }
 
 interface RawPlaylistTracks {
   items?: { track?: { id?: string; name?: string } | null }[]
 }
 
-async function resolvePlaylistFirstTrack(cfg: SpotifyConfig, playlistId: string, market: string): Promise<ResolvedTrack | null> {
-  const data = await authedRequestJson<RawPlaylistTracks>(cfg, buildPlaylistTracksUrl(playlistId, market)).catch(() => null)
-  const first = data?.items?.[0]?.track
-  if (!first?.id) return null
-  return { id: first.id, title: first.name ?? '' }
+async function resolvePlaylistFirstTrack(cfg: SpotifyConfig, playlistId: string, market: string): Promise<ResolverResult> {
+  try {
+    const data = await authedRequestJson<RawPlaylistTracks>(cfg, buildPlaylistTracksUrl(playlistId, market))
+    const first = data?.items?.[0]?.track
+    if (!first?.id) return null
+    return { id: first.id, title: first.name ?? '' }
+  } catch (err) {
+    return classifyResolverError(err)
+  }
 }
 
 /**
- * Returns the match unchanged when `resolved` is null — the per-container
- * resolver failure case, which the sonos container_not_playable guard catches
- * downstream. Pure on purpose so the success/failure semantics can be tested
- * without network.
+ * Rewrite a container match given the resolver's result:
+ *  - `ResolvedTrack` → set `uri` to `spotify:track:<id>` and fill `trackTitle`
+ *  - `ResolverFailure` → keep the placeholder `uri`, set `resolverError` so
+ *    callers can tell "Spotify rate-limited" from "region-blocked" from
+ *    "playlist has no tracks" instead of collapsing every failure into the
+ *    downstream sonos `container_not_playable`
+ *  - `null` → no error, no track (empty container); placeholder URI stays
  */
 export function withResolvedTrack<T extends AlbumMatch | ArtistMatch | PlaylistMatch>(
   match: T,
-  resolved: ResolvedTrack | null,
+  result: ResolverResult,
 ): T {
-  if (!resolved) return match
-  return { ...match, uri: `spotify:track:${resolved.id}`, trackTitle: resolved.title }
+  if (isResolvedTrack(result)) {
+    return { ...match, uri: `spotify:track:${result.id}`, trackTitle: result.title }
+  }
+  if (isResolverFailure(result)) {
+    return { ...match, resolverError: result }
+  }
+  return match
 }
 
 export async function search(cfg: SpotifyConfig, opts: SearchOptions): Promise<SpotifySearchResult> {
   const raw = await authedRequestJson<RawSearchResponse>(cfg, buildSearchUrl(opts))
   const normalized = normalizeSearchResponse(raw)
 
-  // Resolve container matches to first-track URIs in parallel so the LLM can
-  // pipe any match.uri straight to `home sonos play-uri` without knowing the
-  // kind. Per-match failure is non-fatal: the placeholder URI leaks through
-  // and the sonos container_not_playable guard turns it into a clean error.
+  // Resolve container matches to first-track URIs in parallel. Per-match
+  // failures land as `resolverError` on the match (`spotify_auth_failed`,
+  // `spotify_rate_limited`, `container_not_found`, etc.) so the LLM can tell
+  // distinct causes apart instead of relying on the downstream
+  // `container_not_playable` collapsing everything.
   const [albums, artists, playlists] = await Promise.all([
     Promise.all(normalized.albums.map(async (a) => {
       const id = extractSpotifyId(a.uri)
-      const resolved = id ? await resolveAlbumFirstTrack(cfg, id, opts.market) : null
-      return withResolvedTrack(a, resolved)
+      const result = id ? await resolveAlbumFirstTrack(cfg, id, opts.market) : null
+      return withResolvedTrack(a, result)
     })),
     Promise.all(normalized.artists.map(async (a) => {
       const id = extractSpotifyId(a.uri)
-      const resolved = id ? await resolveArtistTopTrack(cfg, id, opts.market) : null
-      return withResolvedTrack(a, resolved)
+      const result = id ? await resolveArtistTopTrack(cfg, id, opts.market) : null
+      return withResolvedTrack(a, result)
     })),
     Promise.all(normalized.playlists.map(async (p) => {
       const id = extractSpotifyId(p.uri)
-      const resolved = id ? await resolvePlaylistFirstTrack(cfg, id, opts.market) : null
-      return withResolvedTrack(p, resolved)
+      const result = id ? await resolvePlaylistFirstTrack(cfg, id, opts.market) : null
+      return withResolvedTrack(p, result)
     })),
   ])
 
