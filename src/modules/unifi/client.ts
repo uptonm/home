@@ -74,6 +74,60 @@ export async function siteInfo(cfg: UnifiConfig): Promise<unknown | null> {
   return (sites as { name?: string }[]).find((s) => s.name === cfg.site) ?? null
 }
 
+export async function listNetworks(cfg: UnifiConfig): Promise<unknown[]> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/networkconf`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? []
+}
+
+export async function listUsers(cfg: UnifiConfig): Promise<unknown[]> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/user`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? []
+}
+
+export async function listWlans(cfg: UnifiConfig): Promise<unknown[]> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/wlanconf`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? []
+}
+
+export async function listPortForwards(cfg: UnifiConfig): Promise<unknown[]> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/portforward`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? []
+}
+
+export async function controllerInfo(cfg: UnifiConfig): Promise<unknown | null> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/sysinfo`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data?.[0] ?? null
+}
+
+export async function healthWidget(cfg: UnifiConfig): Promise<unknown | null> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/widget/health`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data?.[0] ?? null
+}
+
 async function postCommand(cfg: UnifiConfig, endpoint: string, body: Record<string, unknown>): Promise<unknown> {
   return requestJson<{ data: unknown[] }>(
     `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/cmd/${endpoint}`,
