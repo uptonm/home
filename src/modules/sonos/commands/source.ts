@@ -4,18 +4,41 @@ import type { CommandSpec, RunResult } from '../../../core/types'
 import { discover, enqueueAndPlay, readSonosConfig, toSonosTrackUri, withRoom } from '../client'
 import {
   buildSpotifyTransportUri,
-  discoverSpotifyAccount,
   isPlayableSpotifyUri,
+  listSpotifyAccounts,
+  selectSpotifyAccount,
   translateSpotifyInput,
   type SpotifyAccount,
 } from '../spotify'
 
 const roomArg = { name: 'room', kind: 'positional', description: 'Room name (case-insensitive, partial match)', required: true } as const
 
-async function resolveSpotifyAccount(d: SonosDevice, snOverride: number | undefined): Promise<SpotifyAccount | null> {
-  const discovered = await discoverSpotifyAccount(d).catch(() => null)
-  if (!discovered) return null
-  return snOverride !== undefined ? { sid: discovered.sid, sn: snOverride } : discovered
+/**
+ * Returns either the selected account or a `RunResult` error for the command
+ * to surface — covers the single-account happy path, explicit `--sn`
+ * selection, ambiguity when the household has multiple subscribed accounts
+ * with no override, and the various "Spotify not subscribed" outcomes.
+ */
+async function pickSpotifyAccount(d: SonosDevice, snOverride: number | undefined): Promise<{ ok: true; account: SpotifyAccount } | { ok: false; result: RunResult }> {
+  const sel = await selectSpotifyAccount(d, snOverride).catch(
+    (err): { kind: 'discovery_failed'; message: string } => ({ kind: 'discovery_failed', message: (err as Error).message }),
+  )
+  switch (sel.kind) {
+    case 'ok':
+      return { ok: true, account: sel.account }
+    case 'not_subscribed':
+      return { ok: false, result: { ok: false, kind: 'system', message: 'Spotify is not subscribed on this Sonos household', code: 'spotify_not_subscribed' } }
+    case 'sn_not_subscribed': {
+      const available = sel.available.map((a) => a.sn).join(', ')
+      return { ok: false, result: { ok: false, kind: 'user', message: `--sn ${sel.requested} does not match any subscribed Spotify account on this household (available: ${available})`, code: 'sn_not_subscribed' } }
+    }
+    case 'ambiguous': {
+      const list = sel.candidates.map((a) => `sn=${a.sn}`).join(', ')
+      return { ok: false, result: { ok: false, kind: 'user', message: `this Sonos household has ${sel.candidates.length} subscribed Spotify accounts (${list}); pass --sn <N> to pick one. List them with: home sonos spotify-accounts list`, code: 'spotify_account_ambiguous' } }
+    }
+    case 'discovery_failed':
+      return { ok: false, result: { ok: false, kind: 'system', message: `Spotify account discovery failed: ${sel.message}`, code: 'spotify_discovery_failed' } }
+  }
 }
 
 /**
@@ -68,9 +91,9 @@ export const playUri: CommandSpec = {
           }
         }
         const snOverride = ctx.args.sn !== undefined ? Number(ctx.args.sn) : undefined
-        const account = await resolveSpotifyAccount(d, snOverride)
-        if (!account) return { ok: false, kind: 'system', message: 'Spotify is not subscribed on this Sonos household', code: 'spotify_not_subscribed' }
-        const built = buildSpotifyTransportUri(uri, account)
+        const picked = await pickSpotifyAccount(d, snOverride)
+        if (!picked.ok) return picked.result
+        const built = buildSpotifyTransportUri(uri, picked.account)
         if (!built) return { ok: false, kind: 'user', message: `unsupported Spotify URI shape: ${uri}`, code: 'unsupported_spotify_uri' }
         await replaceAndPlaySpotifyViaQueue(d, built)
         return { ok: true, data: { room: d.Name, uri: built, action: 'play_uri' } }

@@ -68,37 +68,77 @@ export interface SpotifyAccount {
 }
 
 /**
- * Discover one of this household's subscribed Spotify accounts.
+ * Enumerate every subscribed Spotify account on this household.
  *
  * Sonos encodes a household's subscribed services as `ServiceType = sid*256 + sn`
  * entries in `MusicServicesService.ListAvailableServices().AvailableServiceTypeList`.
- * We:
+ * Each entry within Spotify's `[sid*256, sid*256+255]` window is a separate
+ * subscribed account; households can have up to ~4. We:
  *   1. Look up Spotify's catalog Id (`sid`) via ListAndParseAvailableServices,
  *      so we stay correct when Sonos renumbers services (e.g. legacy 9 → 12).
- *   2. Scan the household's subscribed-services list for a ServiceType in
- *      Spotify's `[sid*256, sid*256+255]` window. The remainder is `sn`.
+ *   2. Scan the household's subscribed-services list for ServiceTypes inside
+ *      Spotify's window. Each remainder is one account's `sn`.
  *
- * Households can have multiple Spotify subscribers registered — this returns
- * one of them (whichever appears first in the subscribed list). Per-command
- * `--sn` override is the existing escape hatch for explicit selection;
- * enumerating and choosing across multiple accounts is tracked separately.
- *
- * Returns null if Spotify isn't in the catalog or the household has no
- * Spotify subscription at all.
+ * Returns `[]` if Spotify isn't in the catalog or the household has no
+ * Spotify subscription at all. For single-account households this returns a
+ * one-element array, which is the common path — caller can `[0]` it and
+ * carry on.
  */
-export async function discoverSpotifyAccount(device: SonosDevice): Promise<SpotifyAccount | null> {
+export async function listSpotifyAccounts(device: SonosDevice): Promise<SpotifyAccount[]> {
   const services = await device.MusicServicesService.ListAndParseAvailableServices()
   const spotify = services.find((s) => s.Name === 'Spotify')
-  if (!spotify) return null
+  if (!spotify) return []
   const sid = spotify.Id
   const raw = await device.MusicServicesService.ListAvailableServices()
   const subscribed = String(raw.AvailableServiceTypeList ?? '')
     .split(',')
     .map((n) => Number(n.trim()))
     .filter((n) => Number.isFinite(n))
-  const match = subscribed.find((t) => t >= sid * 256 && t < (sid + 1) * 256)
-  if (match === undefined) return null
-  return { sid, sn: match - sid * 256 }
+  const matches = subscribed.filter((t) => t >= sid * 256 && t < (sid + 1) * 256)
+  return matches.map((t) => ({ sid, sn: t - sid * 256 }))
+}
+
+/**
+ * Pick a single Spotify account for use by play-uri / queue add.
+ *
+ *   - `snOverride !== undefined` → use that sn (validated against discovered
+ *     accounts); if it doesn't match, returns `{ kind: 'sn_not_subscribed' }`
+ *   - exactly one account → use it (common path; behavior unchanged from
+ *     the original single-account implementation)
+ *   - zero accounts → `{ kind: 'not_subscribed' }`
+ *   - multiple accounts, no override → `{ kind: 'ambiguous', candidates }`
+ *     so the command can return a clear error telling the user to pass
+ *     `--sn <N>`
+ */
+export type SpotifyAccountSelection =
+  | { kind: 'ok'; account: SpotifyAccount }
+  | { kind: 'not_subscribed' }
+  | { kind: 'sn_not_subscribed'; requested: number; available: SpotifyAccount[] }
+  | { kind: 'ambiguous'; candidates: SpotifyAccount[] }
+
+export async function selectSpotifyAccount(device: SonosDevice, snOverride: number | undefined): Promise<SpotifyAccountSelection> {
+  const accounts = await listSpotifyAccounts(device)
+  if (accounts.length === 0) return { kind: 'not_subscribed' }
+  if (snOverride !== undefined) {
+    const hit = accounts.find((a) => a.sn === snOverride)
+    if (hit) return { kind: 'ok', account: hit }
+    return { kind: 'sn_not_subscribed', requested: snOverride, available: accounts }
+  }
+  if (accounts.length === 1) return { kind: 'ok', account: accounts[0]! }
+  return { kind: 'ambiguous', candidates: accounts }
+}
+
+/**
+ * Back-compat shim — returns the first subscribed Spotify account or null.
+ * Existing call sites in `sonos/commands/{source,queue}.ts` were migrated to
+ * `selectSpotifyAccount` so they can surface the multi-account-ambiguous
+ * case as a clean user error; this stays exported because the `discoverSpotifyAccount`
+ * symbol is part of the module's public surface and removing it would be a
+ * larger break than the value of the cleanup.
+ */
+export async function discoverSpotifyAccount(device: SonosDevice): Promise<SpotifyAccount | null> {
+  const accounts = await listSpotifyAccounts(device)
+  return accounts[0] ?? null
 }
 
 const SPOTIFY_TRACK_URI_RE = /^spotify:track:[A-Za-z0-9]{22}$/
