@@ -13,7 +13,8 @@ export const synthCmd: CommandSpec = {
   examples: [
     'home tts synth "Hello world" --json',
     'home tts synth "Dinner is ready" --voice Samantha --rate 180 --json',
-    'FILE=$(home tts synth "Hello world" --json | jq -r .path) && home sonos notify "Living Room" --file "$FILE"',
+    // One-shot notification: tts synth produces a tempfile, sonos notify --delete-after rms it after playback so /tmp doesn\'t accumulate.
+    'FILE=$(home tts synth "Hello world" --json | jq -r .path) && home sonos notify "Living Room" --file "$FILE" --delete-after',
   ],
   async run(ctx) {
     const cfg = readTtsConfig(ctx.config)
