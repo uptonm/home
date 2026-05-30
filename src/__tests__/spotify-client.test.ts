@@ -375,6 +375,39 @@ describe('withResolvedTrack', () => {
   })
 })
 
+describe('mapWithConcurrency', () => {
+  test('never has more than `concurrency` tasks in flight', async () => {
+    const { mapWithConcurrency } = require('../modules/spotify/client') as typeof import('../modules/spotify/client')
+    let inFlight = 0
+    let peak = 0
+    const items = Array.from({ length: 12 }, (_, i) => i)
+    await mapWithConcurrency(items, 3, async (i) => {
+      inFlight++
+      peak = Math.max(peak, inFlight)
+      await new Promise((r) => setTimeout(r, 10))
+      inFlight--
+      return i * 2
+    })
+    expect(peak).toBe(3)
+  })
+
+  test('preserves input order in the output', async () => {
+    const { mapWithConcurrency } = require('../modules/spotify/client') as typeof import('../modules/spotify/client')
+    const items = ['a', 'b', 'c', 'd', 'e']
+    const out = await mapWithConcurrency(items, 2, async (s) => {
+      await new Promise((r) => setTimeout(r, Math.random() * 5))
+      return s.toUpperCase()
+    })
+    expect(out).toEqual(['A', 'B', 'C', 'D', 'E'])
+  })
+
+  test('handles an empty input list without spinning up workers', async () => {
+    const { mapWithConcurrency } = require('../modules/spotify/client') as typeof import('../modules/spotify/client')
+    const out = await mapWithConcurrency<number, number>([], 5, async (n) => n)
+    expect(out).toEqual([])
+  })
+})
+
 describe('classifyResolverError', () => {
   test('maps known SystemError codes onto ResolverFailure shapes', () => {
     const { classifyResolverError } = require('../modules/spotify/client') as typeof import('../modules/spotify/client')
