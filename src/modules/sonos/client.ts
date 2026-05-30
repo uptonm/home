@@ -1,20 +1,95 @@
 import { SonosManager, type SonosDevice } from '@svrooij/sonos'
 import type { ModuleConfig, RunContext, RunResult } from '../../core/types'
+import { findSonosSeed } from './scan'
+
+export interface SeedHost {
+  host: string
+  port: number
+}
 
 export interface SonosConfig {
   discoveryTimeoutSec: number
+  /** When set, skip SSDP multicast and enumerate the household from this one speaker. */
+  seed: SeedHost | null
+  /** CIDR to scan for a seed speaker when `seed` is unset (split-VLAN setups). */
+  subnet: string | null
 }
 
 const DEFAULT_DISCOVERY_TIMEOUT_SEC = 3
+const DEFAULT_SONOS_PORT = 1400
+
+/**
+ * Parse a seed-host override (one known speaker's address) into host + port.
+ * Accepts `10.0.10.27` or `10.0.10.27:1400`; returns null for blank/absent
+ * input so callers fall back to SSDP multicast.
+ *
+ * The seed exists for split-VLAN setups: SSDP multicast (239.255.255.250:1900)
+ * does not cross subnet boundaries, so a host on a different VLAN than the
+ * speakers can never discover them that way. Sonos's ZoneGroupTopology API,
+ * however, enumerates the entire household from any single reachable speaker
+ * over plain unicast HTTP — which routes across VLANs fine. `InitializeFromDevice`
+ * uses exactly that path.
+ */
+export function parseSeedHost(raw: string | undefined): SeedHost | null {
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+
+  // Only treat a single colon as a host:port separator; anything else (e.g. a
+  // bare IPv6 literal) is taken as the host verbatim, port defaulted.
+  let host = trimmed
+  let port = DEFAULT_SONOS_PORT
+  if ((trimmed.match(/:/g) ?? []).length === 1) {
+    const [h, portStr] = trimmed.split(':')
+    host = h ?? ''
+    const p = Number(portStr)
+    if (!Number.isInteger(p) || p < 1 || p > 65535) {
+      throw new Error(`invalid SONOS_SEED_HOST port "${portStr}" (expected 1-65535)`)
+    }
+    port = p
+  }
+  if (!host) throw new Error(`invalid SONOS_SEED_HOST "${raw}" (expected host or host:port)`)
+  return { host, port }
+}
 
 export function readSonosConfig(cfg: ModuleConfig): SonosConfig {
   const raw = Number(cfg.discoveryTimeoutSec)
   const timeout = Number.isFinite(raw) && raw > 0 ? Math.min(raw, 30) : DEFAULT_DISCOVERY_TIMEOUT_SEC
-  return { discoveryTimeoutSec: timeout }
+  const seedRaw = (typeof cfg.seedHost === 'string' && cfg.seedHost) || process.env.SONOS_SEED_HOST
+  const subnet = typeof cfg.subnet === 'string' && cfg.subnet.trim() ? cfg.subnet.trim() : null
+  return { discoveryTimeoutSec: timeout, seed: parseSeedHost(seedRaw), subnet }
 }
 
+/**
+ * Connect to the household. Precedence:
+ *   1. An explicit seed host (SONOS_SEED_HOST env / `seedHost` config) — unicast.
+ *   2. A configured `subnet` — scanned for one live speaker, then unicast.
+ *   3. SSDP multicast — the zero-config default for same-segment hosts.
+ *
+ * (1) and (2) both enumerate the whole household from one speaker via
+ * ZoneGroupTopology, which routes across VLANs where multicast cannot.
+ */
 export async function discover(cfg: SonosConfig): Promise<SonosManager> {
   const mgr = new SonosManager()
+
+  let seed = cfg.seed
+  if (!seed && cfg.subnet) {
+    const host = await findSonosSeed(cfg.subnet)
+    if (!host) {
+      throw new Error(`no Sonos device found on configured subnet ${cfg.subnet}`)
+    }
+    seed = { host, port: DEFAULT_SONOS_PORT }
+  }
+
+  if (seed) {
+    const ok = await mgr.InitializeFromDevice(seed.host, seed.port)
+    if (!ok) {
+      mgr.CancelSubscription()
+      throw new Error(`no Sonos device reachable at ${seed.host}:${seed.port}`)
+    }
+    return mgr
+  }
+
   const ok = await mgr.InitializeWithDiscovery(cfg.discoveryTimeoutSec)
   if (!ok) {
     mgr.CancelSubscription()

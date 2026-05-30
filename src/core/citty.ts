@@ -84,7 +84,7 @@ export function resolveModuleConfig(manifest: ModuleManifest): ModuleConfig | nu
 }
 
 function makeUserLeaf(manifest: ModuleManifest, spec: CommandSpec): CommandDef {
-  const requiresConfig = manifest.configSchema.length > 0
+  const requiresConfig = manifest.requiresConfig ?? manifest.configSchema.length > 0
   return defineCommand({
     meta: {
       name: spec.path[spec.path.length - 1]!,
@@ -153,7 +153,7 @@ function makeConfigureCommand(manifest: ModuleManifest): CommandDef {
 }
 
 function makeStatusCommand(manifest: ModuleManifest): CommandDef {
-  const requiresConfig = manifest.configSchema.length > 0
+  const requiresConfig = manifest.requiresConfig ?? manifest.configSchema.length > 0
   return defineCommand({
     meta: { name: 'status', description: `Check ${manifest.name} connectivity` },
     args: { ...globalFlags },

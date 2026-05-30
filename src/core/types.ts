@@ -60,6 +60,14 @@ export interface ModuleManifest {
   description: string
   whenToUse: string
   configSchema: ConfigField[]
+  /**
+   * Whether commands hard-error until the module is configured. Defaults to
+   * `configSchema.length > 0` (any schema ⇒ config mandatory). Set `false` for
+   * a module whose config is purely optional — it has fields worth offering via
+   * `configure`, but every command still works unconfigured (e.g. sonos:
+   * SSDP multicast needs no config; the subnet field is only for split-VLAN).
+   */
+  requiresConfig?: boolean
   commands: CommandSpec[]
   status: (cfg: ModuleConfig) => Promise<RunResult>
 }
