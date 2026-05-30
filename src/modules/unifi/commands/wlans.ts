@@ -38,7 +38,7 @@ export const wlansList: CommandSpec = {
         const net = w.networkconf_id ? byId.get(w.networkconf_id) : undefined
         return {
           ssid: w.name ?? '',
-          security: w.wpa_mode ? `${w.security}/${w.wpa_mode}` : (w.security ?? ''),
+          security: w.wpa_mode ? `${w.security ?? ''}/${w.wpa_mode}` : (w.security ?? ''),
           band: w.wlan_band ?? '',
           guest: Boolean(w.is_guest),
           enabled: w.enabled ?? null,
