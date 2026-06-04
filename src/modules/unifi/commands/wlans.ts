@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { listNetworks, listWlans, readUnifiConfig } from '../client'
+import { getWlan, listNetworks, listWlans, readUnifiConfig } from '../client'
 
 interface RawWlan {
   name?: string
@@ -48,6 +48,24 @@ export const wlansList: CommandSpec = {
       })
       .sort((a, b) => a.ssid.localeCompare(b.ssid))
 
+    return { ok: true, data }
+  },
+}
+
+export const wlansGet: CommandSpec = {
+  path: ['wlans', 'get'],
+  description: 'Dump the full raw wlanconf for a single SSID (proxy_arp, mcastenhance, dtim, fast_roaming, etc)',
+  args: [{ name: 'ssid', kind: 'positional', description: 'SSID name (case-insensitive)', required: true }],
+  examples: [
+    'home unifi wlans get IoT',
+    'home unifi wlans get "Guest WiFi" --json | jq \'{proxy_arp, dtim_mode, fast_roaming_enabled}\'',
+  ],
+  async run(ctx) {
+    const cfg = readUnifiConfig(ctx.config)
+    const ssid = String(ctx.args.ssid ?? '')
+    if (!ssid) return { ok: false, kind: 'user', message: 'ssid is required', code: 'missing_arg' }
+    const data = await getWlan(cfg, ssid)
+    if (!data) return { ok: false, kind: 'user', message: `no SSID named ${ssid}`, code: 'not_found' }
     return { ok: true, data }
   },
 }
