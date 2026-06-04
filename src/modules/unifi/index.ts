@@ -16,6 +16,13 @@ import { portProfilesList, portProfilesGet } from './commands/port-profiles'
 import { wlanGroupsList, wlanGroupsGet } from './commands/wlan-groups'
 import { userGroupsList, userGroupsGet } from './commands/user-groups'
 import { radiusProfilesList, radiusProfilesGet } from './commands/radius-profiles'
+import { routesList, routesGet } from './commands/routes'
+import { dpiAppsList, dpiAppsGet } from './commands/dpi-apps'
+import { dpiGroupsList, dpiGroupsGet } from './commands/dpi-groups'
+import { radiusAccountsList, radiusAccountsGet } from './commands/radius-accounts'
+import { dynamicDnsList } from './commands/dynamic-dns'
+import { tagsList, tagsGet } from './commands/tags'
+import { settingsList, settingsGet } from './commands/settings'
 import { controllerInfoCmd } from './commands/controller'
 import { healthCmd } from './commands/health'
 
@@ -92,6 +99,19 @@ export const manifest: ModuleManifest = {
     userGroupsGet,
     radiusProfilesList,
     radiusProfilesGet,
+    routesList,
+    routesGet,
+    dpiAppsList,
+    dpiAppsGet,
+    dpiGroupsList,
+    dpiGroupsGet,
+    radiusAccountsList,
+    radiusAccountsGet,
+    dynamicDnsList,
+    tagsList,
+    tagsGet,
+    settingsList,
+    settingsGet,
     controllerInfoCmd,
     healthCmd,
   ],
