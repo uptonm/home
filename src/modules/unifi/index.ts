@@ -8,7 +8,7 @@ import { clientsControl } from './commands/client-control'
 import { siteHealthCmd, siteInfoCmd } from './commands/site'
 import { networksList, networksGet } from './commands/networks'
 import { reservationsGet, reservationsList } from './commands/reservations'
-import { wlansList } from './commands/wlans'
+import { wlansGet, wlansList } from './commands/wlans'
 import { portForwardsGet, portForwardsList } from './commands/port-forwards'
 import { firewallGet, firewallList } from './commands/firewall'
 import { firewallGroupsList, firewallGroupsGet } from './commands/firewall-groups'
@@ -96,6 +96,7 @@ export const manifest: ModuleManifest = {
     reservationsList,
     reservationsGet,
     wlansList,
+    wlansGet,
     portForwardsList,
     portForwardsGet,
     firewallList,
