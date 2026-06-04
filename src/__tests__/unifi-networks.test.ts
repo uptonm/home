@@ -41,7 +41,7 @@ describe('matchNetwork', () => {
     if (r.kind === 'ok') expect(r.network._id).toBe('e5')
   })
 
-  test('ambiguous substring returns candidates', () => {
+  test('substring with a single hit resolves', () => {
     const r = matchNetwork(fixture, 'guest')
     expect(r.kind).toBe('ok') // only "IoT Guest" contains "guest"
     if (r.kind === 'ok') expect(r.network._id).toBe('c3')

@@ -112,6 +112,7 @@ export function matchNetwork<T extends NetworkRef>(networks: T[], ref: string): 
   const byId = networks.find((n) => n._id === q)
   if (byId) return { kind: 'ok', network: byId }
 
+  // Exact name match (checked before VLAN — a network literally named "180" wins over VLAN-180)
   const byName = networks.filter((n) => (n.name ?? '').toLowerCase() === ql)
   if (byName.length === 1) return { kind: 'ok', network: byName[0]! }
   if (byName.length > 1) return { kind: 'ambiguous', matches: byName }
