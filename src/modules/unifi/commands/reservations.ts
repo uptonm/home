@@ -1,5 +1,42 @@
 import type { CommandSpec } from '../../../core/types'
-import { listNetworks, listUsers, readUnifiConfig } from '../client'
+import { getReservation, listNetworks, listUsers, readUnifiConfig } from '../client'
+
+export const reservationsGet: CommandSpec = {
+  path: ['reservations', 'get'],
+  description: 'Dump the full user record for a fixed-IP reservation by MAC, name, hostname, or IP',
+  args: [
+    {
+      name: 'ref',
+      kind: 'positional',
+      description: 'MAC (with or without colons), reservation name, hostname, or fixed IP',
+      required: true,
+    },
+  ],
+  examples: [
+    'home unifi reservations get 78:8a:20:11:22:33',
+    'home unifi reservations get minisforum',
+    'home unifi reservations get 10.0.14.10 --json',
+  ],
+  async run(ctx) {
+    const cfg = readUnifiConfig(ctx.config)
+    const ref = String(ctx.args.ref ?? '')
+    if (!ref) return { ok: false, kind: 'user', message: 'ref is required', code: 'missing_arg' }
+    const result = await getReservation(cfg, ref)
+    if (result.kind === 'not_found') {
+      return { ok: false, kind: 'user', message: `no reservation matching ${JSON.stringify(ref)}`, code: 'not_found' }
+    }
+    if (result.kind === 'ambiguous') {
+      const names = result.matches.map((u) => u.name ?? u.hostname ?? u.mac ?? u._id ?? '?').join(', ')
+      return {
+        ok: false,
+        kind: 'user',
+        message: `${result.matches.length} reservations match ${JSON.stringify(ref)}: ${names}`,
+        code: 'ambiguous',
+      }
+    }
+    return { ok: true, data: result.user }
+  },
+}
 
 interface RawUser {
   name?: string
