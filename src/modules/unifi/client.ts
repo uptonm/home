@@ -238,6 +238,42 @@ export async function listFirewallGroups(cfg: UnifiConfig): Promise<unknown[]> {
   return body.data ?? []
 }
 
+export async function listPortProfiles(cfg: UnifiConfig): Promise<unknown[]> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/portconf`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? []
+}
+
+export async function listWlanGroups(cfg: UnifiConfig): Promise<unknown[]> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/wlangroup`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? []
+}
+
+export async function listUserGroups(cfg: UnifiConfig): Promise<unknown[]> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/usergroup`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? []
+}
+
+export async function listRadiusProfiles(cfg: UnifiConfig): Promise<unknown[]> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/radiusprofile`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? []
+}
+
 export interface PortForwardRef {
   _id: string
   name?: string
