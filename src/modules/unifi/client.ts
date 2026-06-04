@@ -162,6 +162,14 @@ export async function listWlans(cfg: UnifiConfig): Promise<unknown[]> {
   return body.data ?? []
 }
 
+export async function getWlan(cfg: UnifiConfig, ssid: string): Promise<unknown | null> {
+  const wlans = await listWlans(cfg)
+  const target = ssid.toLowerCase()
+  return (
+    (wlans as { name?: string }[]).find((w) => (w.name ?? '').toLowerCase() === target) ?? null
+  )
+}
+
 export async function listPortForwards(cfg: UnifiConfig): Promise<unknown[]> {
   const body = await requestJson<{ data: unknown[] }>(
     `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/portforward`,
