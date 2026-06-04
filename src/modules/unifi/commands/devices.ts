@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { getDevice, listDevices, readUnifiConfig } from '../client'
+import { getDevice, listDevices, readUnifiConfig, resolveDevice } from '../client'
 import { integrationGetDeviceStats } from '../integration-client'
 
 export const devicesList: CommandSpec = {
@@ -19,15 +19,56 @@ export const devicesList: CommandSpec = {
 
 export const devicesGet: CommandSpec = {
   path: ['devices', 'get'],
-  description: 'Fetch a single device by MAC address',
-  args: [{ name: 'mac', kind: 'positional', description: 'Device MAC (with or without colons)', required: true }],
-  examples: ['home unifi devices get 78:8a:20:11:22:33 --json'],
+  description: 'Fetch a single device by MAC or name (full record: port_table, LAGs, uplink)',
+  args: [
+    {
+      name: 'device',
+      kind: 'positional',
+      description: 'Device MAC (colons optional) or name (exact or unique substring)',
+      required: true,
+    },
+  ],
+  examples: [
+    'home unifi devices get 78:8a:20:11:22:33',
+    'home unifi devices get "USW-Agg" --json',
+    'home unifi devices get udm --json | jq .port_table',
+  ],
   async run(ctx) {
     const cfg = readUnifiConfig(ctx.config)
-    const mac = String(ctx.args.mac ?? '').toLowerCase()
-    if (!mac) return { ok: false, kind: 'user', message: 'mac is required', code: 'missing_arg' }
+    const ref = String(ctx.args.device ?? '').trim()
+    if (!ref) return { ok: false, kind: 'user', message: 'device is required', code: 'missing_arg' }
+
+    const devices = (await listDevices(cfg)) as Array<{
+      mac?: string
+      name?: string
+      model?: string
+      type?: string
+    }>
+
+    const resolved = resolveDevice(devices, ref)
+    if (resolved.kind === 'not_found') {
+      return { ok: false, kind: 'user', message: `no device matching "${ref}"`, code: 'not_found' }
+    }
+    if (resolved.kind === 'ambiguous') {
+      const names = resolved.matches.map((d) => d.name || d.mac).join(', ')
+      return {
+        ok: false,
+        kind: 'user',
+        message: `"${ref}" is ambiguous — matches: ${names}`,
+        code: 'ambiguous',
+      }
+    }
+
+    const mac = resolved.device.mac
+    if (!mac) {
+      return { ok: false, kind: 'user', message: `resolved device has no MAC`, code: 'not_found' }
+    }
+
+    // Fetch the full device record (port_table, LAG/uplink details) by MAC.
     const data = await getDevice(cfg, mac)
-    if (!data) return { ok: false, kind: 'user', message: `no device with mac ${mac}`, code: 'not_found' }
+    if (!data) {
+      return { ok: false, kind: 'user', message: `no device with mac ${mac}`, code: 'not_found' }
+    }
     return { ok: true, data }
   },
 }
