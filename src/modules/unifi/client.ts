@@ -162,6 +162,41 @@ export async function listPortForwards(cfg: UnifiConfig): Promise<unknown[]> {
   return body.data ?? []
 }
 
+export interface PortForwardRef {
+  _id: string
+  name?: string
+}
+
+export type ResolvePortForwardResult<T extends PortForwardRef> =
+  | { kind: 'ok'; rule: T }
+  | { kind: 'ambiguous'; matches: T[] }
+  | { kind: 'not_found' }
+
+/** Resolve a port-forward rule by name or _id. */
+export function matchPortForward<T extends PortForwardRef>(rules: T[], ref: string): ResolvePortForwardResult<T> {
+  const q = ref.trim()
+  if (!q) return { kind: 'not_found' }
+  const ql = q.toLowerCase()
+
+  const byId = rules.find((r) => r._id === q)
+  if (byId) return { kind: 'ok', rule: byId }
+
+  const byName = rules.filter((r) => (r.name ?? '').toLowerCase() === ql)
+  if (byName.length === 1) return { kind: 'ok', rule: byName[0]! }
+  if (byName.length > 1) return { kind: 'ambiguous', matches: byName }
+
+  const bySub = rules.filter((r) => (r.name ?? '').toLowerCase().includes(ql))
+  if (bySub.length === 1) return { kind: 'ok', rule: bySub[0]! }
+  if (bySub.length > 1) return { kind: 'ambiguous', matches: bySub }
+
+  return { kind: 'not_found' }
+}
+
+export async function getPortForward(cfg: UnifiConfig, ref: string): Promise<ResolvePortForwardResult<PortForwardRef & Record<string, unknown>>> {
+  const rules = (await listPortForwards(cfg)) as (PortForwardRef & Record<string, unknown>)[]
+  return matchPortForward(rules, ref)
+}
+
 export async function listFirewallRules(cfg: UnifiConfig): Promise<unknown[]> {
   const body = await requestJson<{ data: unknown[] }>(
     `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/firewallrule`,

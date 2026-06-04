@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { listPortForwards, readUnifiConfig } from '../client'
+import { getPortForward, listPortForwards, readUnifiConfig } from '../client'
 
 interface RawPortForward {
   name?: string
@@ -10,6 +10,7 @@ interface RawPortForward {
   fwd?: string
   fwd_port?: string
   destination_ip?: string
+  _id?: string
 }
 
 export const portForwardsList: CommandSpec = {
@@ -35,5 +36,41 @@ export const portForwardsList: CommandSpec = {
       }))
       .sort((a, b) => a.name.localeCompare(b.name))
     return { ok: true, data }
+  },
+}
+
+export const portForwardsGet: CommandSpec = {
+  path: ['port-forwards', 'get'],
+  description: 'Dump the full portforward config for a single rule by name or _id',
+  args: [
+    {
+      name: 'name',
+      kind: 'positional',
+      description: 'Rule name (case-insensitive, substring ok) or _id',
+      required: true,
+    },
+  ],
+  examples: [
+    'home unifi port-forwards get "Plex"',
+    'home unifi port-forwards get 61abc123def456 --json',
+  ],
+  async run(ctx) {
+    const cfg = readUnifiConfig(ctx.config)
+    const ref = String(ctx.args.name ?? '')
+    if (!ref) return { ok: false, kind: 'user', message: 'name is required', code: 'missing_arg' }
+    const result = await getPortForward(cfg, ref)
+    if (result.kind === 'not_found') {
+      return { ok: false, kind: 'user', message: `no port forward matching ${JSON.stringify(ref)}`, code: 'not_found' }
+    }
+    if (result.kind === 'ambiguous') {
+      const names = result.matches.map((r) => r.name ?? r._id ?? '?').join(', ')
+      return {
+        ok: false,
+        kind: 'user',
+        message: `${result.matches.length} rules match ${JSON.stringify(ref)}: ${names}`,
+        code: 'ambiguous',
+      }
+    }
+    return { ok: true, data: result.rule }
   },
 }

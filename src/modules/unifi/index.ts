@@ -9,7 +9,7 @@ import { siteHealthCmd, siteInfoCmd } from './commands/site'
 import { networksList, networksGet } from './commands/networks'
 import { reservationsList } from './commands/reservations'
 import { wlansList } from './commands/wlans'
-import { portForwardsList } from './commands/port-forwards'
+import { portForwardsGet, portForwardsList } from './commands/port-forwards'
 import { firewallGet, firewallList } from './commands/firewall'
 import { controllerInfoCmd } from './commands/controller'
 import { healthCmd } from './commands/health'
@@ -72,6 +72,7 @@ export const manifest: ModuleManifest = {
     reservationsList,
     wlansList,
     portForwardsList,
+    portForwardsGet,
     firewallList,
     firewallGet,
     controllerInfoCmd,
