@@ -1,6 +1,13 @@
 import type { CommandSpec } from '../../../core/types'
 import { getClient, listClients, readUnifiConfig } from '../client'
 
+/** Normalize a MAC to canonical colon form (xx:xx:xx:xx:xx:xx). Strips non-hex chars first. */
+function normalizeMac(raw: string): string | null {
+  const hex = raw.toLowerCase().replace(/[^0-9a-f]/g, '')
+  if (hex.length !== 12) return null
+  return hex.match(/.{1,2}/g)!.join(':')
+}
+
 export const clientsList: CommandSpec = {
   path: ['clients', 'list'],
   description: 'List currently-connected clients',
@@ -26,8 +33,10 @@ export const clientsGet: CommandSpec = {
   ],
   async run(ctx) {
     const cfg = readUnifiConfig(ctx.config)
-    const mac = String(ctx.args.mac ?? '').toLowerCase()
-    if (!mac) return { ok: false, kind: 'user', message: 'mac is required', code: 'missing_arg' }
+    const raw = String(ctx.args.mac ?? '')
+    if (!raw) return { ok: false, kind: 'user', message: 'mac is required', code: 'missing_arg' }
+    const mac = normalizeMac(raw)
+    if (!mac) return { ok: false, kind: 'user', message: `invalid MAC: ${raw}`, code: 'invalid_arg' }
     const data = await getClient(cfg, mac)
     if (!data) return { ok: false, kind: 'user', message: `no client with mac ${mac}`, code: 'not_found' }
     return { ok: true, data }

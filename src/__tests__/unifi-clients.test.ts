@@ -26,4 +26,21 @@ describe('unifi clients get', () => {
   test('rejects blank mac', async () => {
     expect(errCode(await clientsGet.run({ ...EMPTY_CTX, args: { mac: '' } }))).toBe('missing_arg')
   })
+
+  test('normalizes colon-less MAC', async () => {
+    try {
+      await clientsGet.run({ ...EMPTY_CTX, args: { mac: '788a20112233' } })
+    } catch (e: any) {
+      // API error is expected in CI (no real controller), but must NOT be invalid_arg
+      expect(e.code).not.toBe('invalid_arg')
+    }
+  })
+
+  test('rejects invalid MAC (wrong length)', async () => {
+    expect(errCode(await clientsGet.run({ ...EMPTY_CTX, args: { mac: '78:8a:20' } }))).toBe('invalid_arg')
+  })
+
+  test('rejects non-hex MAC', async () => {
+    expect(errCode(await clientsGet.run({ ...EMPTY_CTX, args: { mac: 'gg:gg:gg:gg:gg:gg' } }))).toBe('invalid_arg')
+  })
 })
