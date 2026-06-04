@@ -108,3 +108,58 @@ export async function withSource<T>(
     throw e
   }
 }
+
+// ── Integration device/client wrappers ────────────────────────────────────
+
+export async function integrationListDevices(cfg: UnifiConfig): Promise<unknown[]> {
+  const siteId = await resolveIntegrationSiteId(cfg)
+  return paginate(cfg, `/sites/${encodeURIComponent(siteId)}/devices`)
+}
+
+export async function integrationGetDevice(cfg: UnifiConfig, id: string): Promise<unknown | null> {
+  const siteId = await resolveIntegrationSiteId(cfg)
+  const body = await requestJson<{ data: unknown }>(
+    `${integrationBase(cfg)}/sites/${encodeURIComponent(siteId)}/devices/${encodeURIComponent(id)}`,
+    { headers: integrationHeaders(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? null
+}
+
+export async function integrationListClients(cfg: UnifiConfig): Promise<unknown[]> {
+  const siteId = await resolveIntegrationSiteId(cfg)
+  return paginate(cfg, `/sites/${encodeURIComponent(siteId)}/clients`)
+}
+
+export async function integrationGetClient(cfg: UnifiConfig, id: string): Promise<unknown | null> {
+  const siteId = await resolveIntegrationSiteId(cfg)
+  const body = await requestJson<{ data: unknown }>(
+    `${integrationBase(cfg)}/sites/${encodeURIComponent(siteId)}/clients/${encodeURIComponent(id)}`,
+    { headers: integrationHeaders(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? null
+}
+
+export async function integrationListSites(cfg: UnifiConfig): Promise<unknown[]> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${integrationBase(cfg)}/sites`,
+    { headers: integrationHeaders(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? []
+}
+
+export async function integrationGetDeviceStats(cfg: UnifiConfig, id: string): Promise<unknown | null> {
+  const siteId = await resolveIntegrationSiteId(cfg)
+  try {
+    const body = await requestJson<{ data: unknown }>(
+      `${integrationBase(cfg)}/sites/${encodeURIComponent(siteId)}/devices/${encodeURIComponent(id)}/statistics/latest`,
+      { headers: integrationHeaders(cfg) },
+      { insecureTLS: cfg.insecureTLS },
+    )
+    return body.data ?? null
+  } catch {
+    return null
+  }
+}

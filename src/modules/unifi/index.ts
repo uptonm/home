@@ -1,7 +1,7 @@
 import type { ModuleManifest } from '../../core/types'
 import { defaultControllerUrl } from '../../core/net'
 import { listSites, readUnifiConfig } from './client'
-import { devicesGet, devicesList } from './commands/devices'
+import { devicesGet, devicesList, devicesStats } from './commands/devices'
 import { devicesPoeCycle } from './commands/poe-cycle'
 import { clientsList, clientsGet } from './commands/clients'
 import { clientsControl } from './commands/client-control'
@@ -84,6 +84,7 @@ export const manifest: ModuleManifest = {
   commands: [
     devicesList,
     devicesGet,
+    devicesStats,
     devicesPoeCycle,
     clientsList,
     clientsGet,
