@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { listNetworks, readUnifiConfig } from '../client'
+import { getNetwork, listNetworks, readUnifiConfig } from '../client'
 
 interface RawNetwork {
   name?: string
@@ -45,5 +45,42 @@ export const networksList: CommandSpec = {
           a.name.localeCompare(b.name),
       )
     return { ok: true, data }
+  },
+}
+
+export const networksGet: CommandSpec = {
+  path: ['networks', 'get'],
+  description: 'Dump the full networkconf for a single network by name, VLAN id, or _id',
+  args: [
+    {
+      name: 'name',
+      kind: 'positional',
+      description: 'Network name (case-insensitive, substring ok), VLAN id, or _id',
+      required: true,
+    },
+  ],
+  examples: [
+    'home unifi networks get IoT',
+    'home unifi networks get 180',
+    'home unifi networks get "Default" --json',
+  ],
+  async run(ctx) {
+    const cfg = readUnifiConfig(ctx.config)
+    const ref = String(ctx.args.name ?? '')
+    if (!ref) return { ok: false, kind: 'user', message: 'name is required', code: 'missing_arg' }
+    const result = await getNetwork(cfg, ref)
+    if (result.kind === 'not_found') {
+      return { ok: false, kind: 'user', message: `no network matching ${JSON.stringify(ref)}`, code: 'not_found' }
+    }
+    if (result.kind === 'ambiguous') {
+      const names = result.matches.map((n) => n.name ?? n._id ?? '?').join(', ')
+      return {
+        ok: false,
+        kind: 'user',
+        message: `${result.matches.length} networks match ${JSON.stringify(ref)}: ${names}`,
+        code: 'ambiguous',
+      }
+    }
+    return { ok: true, data: result.network }
   },
 }

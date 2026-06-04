@@ -6,7 +6,7 @@ import { devicesPoeCycle } from './commands/poe-cycle'
 import { clientsList } from './commands/clients'
 import { clientsControl } from './commands/client-control'
 import { siteHealthCmd, siteInfoCmd } from './commands/site'
-import { networksList } from './commands/networks'
+import { networksList, networksGet } from './commands/networks'
 import { reservationsList } from './commands/reservations'
 import { wlansList } from './commands/wlans'
 import { portForwardsList } from './commands/port-forwards'
@@ -67,6 +67,7 @@ export const manifest: ModuleManifest = {
     siteInfoCmd,
     siteHealthCmd,
     networksList,
+    networksGet,
     reservationsList,
     wlansList,
     portForwardsList,
