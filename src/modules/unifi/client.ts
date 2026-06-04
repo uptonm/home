@@ -83,6 +83,57 @@ export async function listNetworks(cfg: UnifiConfig): Promise<unknown[]> {
   return body.data ?? []
 }
 
+export interface NetworkRef {
+  _id?: string
+  name?: string
+  vlan?: number
+}
+
+export type ResolveNetworkResult<T extends NetworkRef> =
+  | { kind: 'ok'; network: T }
+  | { kind: 'not_found' }
+  | { kind: 'ambiguous'; matches: T[] }
+
+/**
+ * Resolve a network by name, _id, or VLAN id. Pure + synchronous so it can be
+ * unit-tested without hitting the controller. Resolution order:
+ *   1. exact _id
+ *   2. exact name (case-insensitive)
+ *   3. exact VLAN id (when the query is all digits)
+ *   4. unique name substring (case-insensitive)
+ * A substring that matches more than one network is reported as ambiguous so the
+ * caller can list the candidates instead of silently picking one.
+ */
+export function matchNetwork<T extends NetworkRef>(networks: T[], ref: string): ResolveNetworkResult<T> {
+  const q = ref.trim()
+  if (!q) return { kind: 'not_found' }
+  const ql = q.toLowerCase()
+
+  const byId = networks.find((n) => n._id === q)
+  if (byId) return { kind: 'ok', network: byId }
+
+  const byName = networks.filter((n) => (n.name ?? '').toLowerCase() === ql)
+  if (byName.length === 1) return { kind: 'ok', network: byName[0]! }
+  if (byName.length > 1) return { kind: 'ambiguous', matches: byName }
+
+  if (/^\d+$/.test(q)) {
+    const byVlan = networks.filter((n) => n.vlan === Number(q))
+    if (byVlan.length === 1) return { kind: 'ok', network: byVlan[0]! }
+    if (byVlan.length > 1) return { kind: 'ambiguous', matches: byVlan }
+  }
+
+  const bySub = networks.filter((n) => (n.name ?? '').toLowerCase().includes(ql))
+  if (bySub.length === 1) return { kind: 'ok', network: bySub[0]! }
+  if (bySub.length > 1) return { kind: 'ambiguous', matches: bySub }
+
+  return { kind: 'not_found' }
+}
+
+export async function getNetwork(cfg: UnifiConfig, ref: string): Promise<ResolveNetworkResult<NetworkRef & Record<string, unknown>>> {
+  const networks = (await listNetworks(cfg)) as (NetworkRef & Record<string, unknown>)[]
+  return matchNetwork(networks, ref)
+}
+
 export async function listUsers(cfg: UnifiConfig): Promise<unknown[]> {
   const body = await requestJson<{ data: unknown[] }>(
     `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/user`,
