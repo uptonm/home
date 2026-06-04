@@ -12,6 +12,10 @@ import { wlansList } from './commands/wlans'
 import { portForwardsGet, portForwardsList } from './commands/port-forwards'
 import { firewallGet, firewallList } from './commands/firewall'
 import { firewallGroupsList, firewallGroupsGet } from './commands/firewall-groups'
+import { portProfilesList, portProfilesGet } from './commands/port-profiles'
+import { wlanGroupsList, wlanGroupsGet } from './commands/wlan-groups'
+import { userGroupsList, userGroupsGet } from './commands/user-groups'
+import { radiusProfilesList, radiusProfilesGet } from './commands/radius-profiles'
 import { controllerInfoCmd } from './commands/controller'
 import { healthCmd } from './commands/health'
 
@@ -80,6 +84,14 @@ export const manifest: ModuleManifest = {
     firewallGet,
     firewallGroupsList,
     firewallGroupsGet,
+    portProfilesList,
+    portProfilesGet,
+    wlanGroupsList,
+    wlanGroupsGet,
+    userGroupsList,
+    userGroupsGet,
+    radiusProfilesList,
+    radiusProfilesGet,
     controllerInfoCmd,
     healthCmd,
   ],
