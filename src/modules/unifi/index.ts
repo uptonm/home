@@ -11,6 +11,7 @@ import { reservationsGet, reservationsList } from './commands/reservations'
 import { wlansList } from './commands/wlans'
 import { portForwardsGet, portForwardsList } from './commands/port-forwards'
 import { firewallGet, firewallList } from './commands/firewall'
+import { firewallGroupsList, firewallGroupsGet } from './commands/firewall-groups'
 import { controllerInfoCmd } from './commands/controller'
 import { healthCmd } from './commands/health'
 
@@ -77,6 +78,8 @@ export const manifest: ModuleManifest = {
     portForwardsGet,
     firewallList,
     firewallGet,
+    firewallGroupsList,
+    firewallGroupsGet,
     controllerInfoCmd,
     healthCmd,
   ],
