@@ -153,6 +153,64 @@ export async function listUsers(cfg: UnifiConfig): Promise<unknown[]> {
   return body.data ?? []
 }
 
+export interface UserRef {
+  _id: string
+  name?: string
+  hostname?: string
+  mac?: string
+  fixed_ip?: string
+  use_fixedip?: boolean
+}
+
+export type ResolveUserResult<T extends UserRef> =
+  | { kind: 'ok'; user: T }
+  | { kind: 'ambiguous'; matches: T[] }
+  | { kind: 'not_found' }
+
+/** Normalize a MAC to a canonical 12-char lowercase hex string for comparison. */
+function normalizeMac(raw: string): string {
+  return raw.toLowerCase().replace(/[^0-9a-f]/g, '')
+}
+
+/** Resolve a fixed-IP reservation by MAC, name, hostname, or IP. */
+export function matchReservation<T extends UserRef>(users: T[], ref: string): ResolveUserResult<T> {
+  const q = ref.trim()
+  if (!q) return { kind: 'not_found' }
+
+  const fixed = (users as T[]).filter((u) => u.use_fixedip === true || Boolean(u.fixed_ip))
+
+  // 1. MAC match (normalized, without colons)
+  const normQ = normalizeMac(q)
+  if (normQ.length === 12) {
+    const byMac = fixed.filter((u) => u.mac && normalizeMac(u.mac) === normQ)
+    if (byMac.length === 1) return { kind: 'ok', user: byMac[0]! }
+    if (byMac.length > 1) return { kind: 'ambiguous', matches: byMac }
+  }
+
+  const ql = q.toLowerCase()
+
+  // 2. Exact name/hostname/IP match
+  const byExact = fixed.filter((u) =>
+    (u.name ?? '').toLowerCase() === ql ||
+    (u.hostname ?? '').toLowerCase() === ql ||
+    u.fixed_ip === q,
+  )
+  if (byExact.length === 1) return { kind: 'ok', user: byExact[0]! }
+  if (byExact.length > 1) return { kind: 'ambiguous', matches: byExact }
+
+  // 3. Unique name substring
+  const bySub = fixed.filter((u) => (u.name ?? '').toLowerCase().includes(ql) || (u.hostname ?? '').toLowerCase().includes(ql))
+  if (bySub.length === 1) return { kind: 'ok', user: bySub[0]! }
+  if (bySub.length > 1) return { kind: 'ambiguous', matches: bySub }
+
+  return { kind: 'not_found' }
+}
+
+export async function getReservation(cfg: UnifiConfig, ref: string): Promise<ResolveUserResult<UserRef & Record<string, unknown>>> {
+  const users = (await listUsers(cfg)) as (UserRef & Record<string, unknown>)[]
+  return matchReservation(users, ref)
+}
+
 export async function listWlans(cfg: UnifiConfig): Promise<unknown[]> {
   const body = await requestJson<{ data: unknown[] }>(
     `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/wlanconf`,
