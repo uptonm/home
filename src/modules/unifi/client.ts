@@ -229,6 +229,15 @@ export async function listPortForwards(cfg: UnifiConfig): Promise<unknown[]> {
   return body.data ?? []
 }
 
+export async function listFirewallGroups(cfg: UnifiConfig): Promise<unknown[]> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/firewallgroup`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? []
+}
+
 export interface PortForwardRef {
   _id: string
   name?: string
