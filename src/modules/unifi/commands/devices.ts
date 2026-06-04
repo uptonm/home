@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { getDevice, listDevices, readUnifiConfig, resolveDevice } from '../client'
+import { listDevices, readUnifiConfig, resolveDevice } from '../client'
 import { integrationGetDeviceStats } from '../integration-client'
 
 export const devicesList: CommandSpec = {
@@ -59,17 +59,8 @@ export const devicesGet: CommandSpec = {
       }
     }
 
-    const mac = resolved.device.mac
-    if (!mac) {
-      return { ok: false, kind: 'user', message: `resolved device has no MAC`, code: 'not_found' }
-    }
-
-    // Fetch the full device record (port_table, LAG/uplink details) by MAC.
-    const data = await getDevice(cfg, mac)
-    if (!data) {
-      return { ok: false, kind: 'user', message: `no device with mac ${mac}`, code: 'not_found' }
-    }
-    return { ok: true, data }
+    // resolved.device is already the full record from /stat/device — no second fetch needed.
+    return { ok: true, data: resolved.device }
   },
 }
 
