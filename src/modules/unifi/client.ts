@@ -60,6 +60,15 @@ export async function listClients(cfg: UnifiConfig): Promise<unknown[]> {
   return body.data ?? []
 }
 
+export async function getClient(cfg: UnifiConfig, mac: string): Promise<unknown | null> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/sta/${encodeURIComponent(mac)}`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data?.[0] ?? null
+}
+
 export async function siteHealth(cfg: UnifiConfig): Promise<unknown[]> {
   const body = await requestJson<{ data: unknown[] }>(
     `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/health`,
