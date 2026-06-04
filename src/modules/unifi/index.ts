@@ -24,6 +24,7 @@ import { dynamicDnsList } from './commands/dynamic-dns'
 import { tagsList, tagsGet } from './commands/tags'
 import { settingsList, settingsGet } from './commands/settings'
 import { clientsAll, dpiStatsClient, dpiStatsSite, eventsList, alarmsList, rogueApsList, guestsList, sessionsList } from './commands/operational'
+import { integrationAppInfo } from './integration-client'
 import { controllerInfoCmd } from './commands/controller'
 import { healthCmd } from './commands/health'
 
@@ -54,6 +55,14 @@ export const manifest: ModuleManifest = {
       kind: 'secret',
       required: true,
       help: 'Site Manager → Settings → Admins → API Keys',
+    },
+    {
+      key: 'source',
+      label: 'API source',
+      kind: 'enum',
+      enum: ['auto', 'network', 'integration'],
+      default: 'auto',
+      help: "auto: prefer private Network API, fallback to Integration on 401/403/404. network: private API only. integration: Integration API only.",
     },
     {
       key: 'site',
@@ -127,7 +136,8 @@ export const manifest: ModuleManifest = {
   async status(cfg) {
     try {
       const sites = await listSites(readUnifiConfig(cfg))
-      return { ok: true, data: { sites: sites.length, status: 'reachable' } }
+      const info = await integrationAppInfo(readUnifiConfig(cfg))
+      return { ok: true, data: { sites: sites.length, status: 'reachable', integration: info ? { version: info.version } : null } }
     } catch (err) {
       return {
         ok: false,
