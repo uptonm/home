@@ -162,6 +162,24 @@ export async function listPortForwards(cfg: UnifiConfig): Promise<unknown[]> {
   return body.data ?? []
 }
 
+export async function listFirewallRules(cfg: UnifiConfig): Promise<unknown[]> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/firewallrule`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? []
+}
+
+export async function getFirewallRule(cfg: UnifiConfig, id: string): Promise<unknown | null> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/firewallrule/${encodeURIComponent(id)}`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data?.[0] ?? null
+}
+
 export async function controllerInfo(cfg: UnifiConfig): Promise<unknown | null> {
   const body = await requestJson<{ data: unknown[] }>(
     `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/sysinfo`,

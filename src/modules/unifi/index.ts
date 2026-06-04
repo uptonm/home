@@ -10,15 +10,16 @@ import { networksList, networksGet } from './commands/networks'
 import { reservationsList } from './commands/reservations'
 import { wlansList } from './commands/wlans'
 import { portForwardsList } from './commands/port-forwards'
+import { firewallGet, firewallList } from './commands/firewall'
 import { controllerInfoCmd } from './commands/controller'
 import { healthCmd } from './commands/health'
 
 export const manifest: ModuleManifest = {
   name: 'unifi',
   description:
-    'Query the UniFi Network controller (devices, clients, networks/VLANs, fixed-IP reservations, SSIDs, port forwards, health)',
+    'Query the UniFi Network controller (devices, clients, networks/VLANs, fixed-IP reservations, SSIDs, port forwards, firewall rules, health)',
   whenToUse:
-    'Use when the user asks about their home network, wifi, APs, switches, the gateway, wired/wireless clients, VLANs/subnets, fixed-IP (DHCP) reservations, SSIDs, or port forwards. Do not use for cameras (that is `home-protect`) or sensors/automations (that is `home-assistant`).',
+    'Use when the user asks about their home network, wifi, APs, switches, the gateway, wired/wireless clients, VLANs/subnets, fixed-IP (DHCP) reservations, SSIDs, port forwards, or firewall rules. Do not use for cameras (that is `home-protect`) or sensors/automations (that is `home-assistant`).',
   configSchema: [
     {
       key: 'url',
@@ -71,6 +72,8 @@ export const manifest: ModuleManifest = {
     reservationsList,
     wlansList,
     portForwardsList,
+    firewallList,
+    firewallGet,
     controllerInfoCmd,
     healthCmd,
   ],
