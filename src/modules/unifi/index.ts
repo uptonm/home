@@ -23,6 +23,7 @@ import { radiusAccountsList, radiusAccountsGet } from './commands/radius-account
 import { dynamicDnsList } from './commands/dynamic-dns'
 import { tagsList, tagsGet } from './commands/tags'
 import { settingsList, settingsGet } from './commands/settings'
+import { clientsAll, dpiStatsClient, dpiStatsSite, eventsList, alarmsList, rogueApsList, guestsList, sessionsList } from './commands/operational'
 import { controllerInfoCmd } from './commands/controller'
 import { healthCmd } from './commands/health'
 
@@ -112,6 +113,14 @@ export const manifest: ModuleManifest = {
     tagsGet,
     settingsList,
     settingsGet,
+    clientsAll,
+    eventsList,
+    alarmsList,
+    rogueApsList,
+    guestsList,
+    sessionsList,
+    dpiStatsSite,
+    dpiStatsClient,
     controllerInfoCmd,
     healthCmd,
   ],

@@ -337,6 +337,90 @@ export async function listSettings(cfg: UnifiConfig): Promise<unknown[]> {
   return body.data ?? []
 }
 
+export async function listAllClients(cfg: UnifiConfig): Promise<unknown[]> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/alluser`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? []
+}
+
+export async function listEvents(cfg: UnifiConfig, limit?: number): Promise<unknown[]> {
+  const body = limit
+    ? await requestJson<{ data: unknown[] }>(
+        `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/event`,
+        { method: 'POST', headers: { ...headers(cfg), 'Content-Type': 'application/json' }, body: JSON.stringify({ _limit: limit }) },
+        { insecureTLS: cfg.insecureTLS },
+      )
+    : await requestJson<{ data: unknown[] }>(
+        `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/event`,
+        { headers: headers(cfg) },
+        { insecureTLS: cfg.insecureTLS },
+      )
+  return body.data ?? []
+}
+
+export async function listAlarms(cfg: UnifiConfig): Promise<unknown[]> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/alarm`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? []
+}
+
+export async function listRogueAps(cfg: UnifiConfig): Promise<unknown[]> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/rogueap`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? []
+}
+
+export async function listGuests(cfg: UnifiConfig): Promise<unknown[]> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/authorization`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? []
+}
+
+export async function listSessions(cfg: UnifiConfig, limit?: number): Promise<unknown[]> {
+  const body = limit
+    ? await requestJson<{ data: unknown[] }>(
+        `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/sessions`,
+        { method: 'POST', headers: { ...headers(cfg), 'Content-Type': 'application/json' }, body: JSON.stringify({ _limit: limit }) },
+        { insecureTLS: cfg.insecureTLS },
+      )
+    : await requestJson<{ data: unknown[] }>(
+        `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/sessions`,
+        { headers: headers(cfg) },
+        { insecureTLS: cfg.insecureTLS },
+      )
+  return body.data ?? []
+}
+
+export async function listSiteDpi(cfg: UnifiConfig): Promise<unknown[]> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/sitedpi`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? []
+}
+
+export async function getClientDpi(cfg: UnifiConfig, mac: string): Promise<unknown[]> {
+  const body = await requestJson<{ data: unknown[] }>(
+    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/stadpi/${encodeURIComponent(mac)}`,
+    { headers: headers(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? []
+}
+
 export interface PortForwardRef {
   _id: string
   name?: string
