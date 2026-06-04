@@ -42,6 +42,49 @@ export async function listDevices(cfg: UnifiConfig): Promise<unknown[]> {
   return body.data ?? []
 }
 
+export interface DeviceRef {
+  mac?: string
+  name?: string
+  model?: string
+  type?: string
+}
+
+export type ResolveDeviceResult<T extends DeviceRef> =
+  | { kind: 'ok'; device: T }
+  | { kind: 'not_found' }
+  | { kind: 'ambiguous'; matches: T[] }
+
+/**
+ * Resolve a device by MAC or name. Pure + synchronous so it can be unit-tested
+ * without hitting the controller. Resolution order:
+ *   1. exact MAC (colons optional — they're normalized away)
+ *   2. exact name (case-insensitive)
+ *   3. unique name substring (case-insensitive)
+ * A substring that matches more than one device is reported as ambiguous so the
+ * caller can list the candidates instead of silently picking one.
+ */
+export function resolveDevice<T extends DeviceRef>(devices: T[], ref: string): ResolveDeviceResult<T> {
+  const normMac = (s: string | undefined) => (s ?? '').toLowerCase().replace(/[^0-9a-f]/g, '')
+  const q = ref.trim().toLowerCase()
+  if (!q) return { kind: 'not_found' }
+
+  const qMac = normMac(q)
+  if (qMac.length === 12) {
+    const byMac = devices.find((d) => normMac(d.mac) === qMac)
+    if (byMac) return { kind: 'ok', device: byMac }
+  }
+
+  const byName = devices.filter((d) => (d.name ?? '').toLowerCase() === q)
+  if (byName.length === 1) return { kind: 'ok', device: byName[0]! }
+  if (byName.length > 1) return { kind: 'ambiguous', matches: byName }
+
+  const bySub = devices.filter((d) => (d.name ?? '').toLowerCase().includes(q))
+  if (bySub.length === 1) return { kind: 'ok', device: bySub[0]! }
+  if (bySub.length > 1) return { kind: 'ambiguous', matches: bySub }
+
+  return { kind: 'not_found' }
+}
+
 export async function getDevice(cfg: UnifiConfig, mac: string): Promise<unknown | null> {
   const body = await requestJson<{ data: unknown[] }>(
     `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/device/${encodeURIComponent(mac)}`,
