@@ -1,11 +1,12 @@
 import type { ModuleManifest } from '../../core/types'
 import { discover, readSonosConfig, summarizeGroups } from './client'
-import { playersList } from './commands/players'
-import { groupsList } from './commands/groups'
+import { playersList, playersGet } from './commands/players'
+import { groupsList, groupsGet } from './commands/groups'
 import { play, pause, next, prev, nowPlaying } from './commands/playback'
 import { volumeGet, volumeSet, mute } from './commands/volume'
 import { queueList, queueClear, queueAdd } from './commands/queue'
 import { playUri, favoritesList } from './commands/source'
+import { favoritesPlay } from './commands/favorites'
 import { notifyCmd } from './commands/notify'
 import { spotifyAccountsList } from './commands/spotify-accounts'
 import { validateCidr } from './scan'
@@ -27,7 +28,9 @@ export const manifest: ModuleManifest = {
   ],
   commands: [
     playersList,
+    playersGet,
     groupsList,
+    groupsGet,
     nowPlaying,
     play,
     pause,
@@ -41,6 +44,7 @@ export const manifest: ModuleManifest = {
     queueAdd,
     playUri,
     favoritesList,
+    favoritesPlay,
     notifyCmd,
     spotifyAccountsList,
   ],
