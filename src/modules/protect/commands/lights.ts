@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { readProtectConfig, withApi } from '../client'
+import { getBootstrap, patchDevice, readProtectConfig } from '../client'
 
 export const lights: CommandSpec = {
   path: ['lights'],
@@ -34,36 +34,35 @@ export const lights: CommandSpec = {
       return { ok: false, kind: 'user' as const, message: 'brightness must be 0-100', code: 'invalid_arg' }
     }
 
-    return withApi(cfg, async (api) => {
-      const lights = api.bootstrap?.lights ?? []
-      const light = lights.find((l) => l.id === ref) ?? lights.find((l) => l.name === ref)
-      if (!light) {
-        return { ok: false, kind: 'user' as const, message: `no light "${ref}" found`, code: 'not_found' }
-      }
+    const bootstrap = await getBootstrap(cfg)
+    const all = bootstrap.lights ?? []
+    const light = all.find((l) => l.id === ref) ?? all.find((l) => l.name === ref)
+    if (!light) {
+      return { ok: false, kind: 'user' as const, message: `no light "${ref}" found`, code: 'not_found' }
+    }
 
-      let isLightOn: boolean
-      if (action === 'toggle') {
-        isLightOn = !light.isLightOn
-      } else {
-        isLightOn = action === 'on'
-      }
+    let isLightOn: boolean
+    if (action === 'toggle') {
+      isLightOn = !light.isLightOn
+    } else {
+      isLightOn = action === 'on'
+    }
 
-      const payload: Record<string, unknown> = {
-        lightOnSettings: { isLedForceOn: isLightOn },
-      }
-      if (isLightOn && brightnessRaw !== undefined) {
-        payload.lightDeviceSettings = { ledLevel: brightnessRaw }
-      }
+    const payload: Record<string, unknown> = {
+      lightOnSettings: { isLedForceOn: isLightOn },
+    }
+    if (isLightOn && brightnessRaw !== undefined) {
+      payload.lightDeviceSettings = { ledLevel: brightnessRaw }
+    }
 
-      const updated = await api.updateDevice(light, payload as Record<string, unknown> as Parameters<typeof api.updateDevice>[1])
-      if (!updated) {
-        return { ok: false, kind: 'system' as const, message: `failed to update light "${light.name}"`, code: 'update_failed' }
-      }
+    const updated = await patchDevice(cfg, 'light', light.id ?? '', payload)
+    if (!updated) {
+      return { ok: false, kind: 'system' as const, message: `failed to update light "${light.name}"`, code: 'update_failed' }
+    }
 
-      const result: Record<string, unknown> = { light: light.name, action, on: isLightOn }
-      if (isLightOn && brightnessRaw !== undefined) result.brightness = brightnessRaw
+    const result: Record<string, unknown> = { light: light.name, action, on: isLightOn }
+    if (isLightOn && brightnessRaw !== undefined) result.brightness = brightnessRaw
 
-      return { ok: true as const, data: result }
-    })
+    return { ok: true as const, data: result }
   },
 }

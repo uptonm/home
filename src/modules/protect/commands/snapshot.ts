@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs'
 import type { CommandSpec } from '../../../core/types'
-import { readProtectConfig, withApi } from '../client'
+import { getBootstrap, getSnapshot, readProtectConfig } from '../client'
 
 export const snapshot: CommandSpec = {
   path: ['snapshot'],
@@ -21,23 +21,22 @@ export const snapshot: CommandSpec = {
     if (!ref) return { ok: false, kind: 'user', message: 'camera is required', code: 'missing_arg' }
     const toStdout = Boolean(ctx.args.stdout)
     const out = ctx.args.out ? String(ctx.args.out) : `./${ref.replace(/\s+/g, '_')}.jpg`
-    const result = await withApi(cfg, async (api) => {
-      const cameras = api.bootstrap?.cameras ?? []
-      const camera = cameras.find((c) => c.id === ref) ?? cameras.find((c) => c.name === ref)
-      if (!camera) return null
-      const buf = await api.getSnapshot(camera)
-      if (!buf) return null
-      if (toStdout) {
-        await new Promise<void>((resolve, reject) => {
-          process.stdout.write(buf, (err) => (err ? reject(err) : resolve()))
-        })
-        return { stdout: true, bytes: buf.length, camera: camera.name }
-      }
-      writeFileSync(out, buf)
-      return { path: out, bytes: buf.length, camera: camera.name }
-    })
-    if (!result) return { ok: false, kind: 'user', message: `no camera "${ref}" or snapshot failed`, code: 'snapshot_failed' }
-    if (toStdout) return { ok: true }
-    return { ok: true, data: result }
+
+    const bootstrap = await getBootstrap(cfg)
+    const cameras = bootstrap.cameras ?? []
+    const camera = cameras.find((c) => c.id === ref) ?? cameras.find((c) => c.name === ref)
+    if (!camera) return { ok: false, kind: 'user', message: `no camera "${ref}" found`, code: 'snapshot_failed' }
+
+    const buf = await getSnapshot(cfg, camera.id ?? '')
+    if (!buf) return { ok: false, kind: 'system', message: `snapshot failed for camera "${camera.name}"`, code: 'snapshot_failed' }
+
+    if (toStdout) {
+      await new Promise<void>((resolve, reject) => {
+        process.stdout.write(buf, (err) => (err ? reject(err) : resolve()))
+      })
+      return { ok: true }
+    }
+    writeFileSync(out, buf)
+    return { ok: true, data: { path: out, bytes: buf.length, camera: camera.name } }
   },
 }

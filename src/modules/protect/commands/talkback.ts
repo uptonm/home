@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { readProtectConfig, withApi } from '../client'
+import { getBootstrap, getTalkbackUrl, readProtectConfig } from '../client'
 
 export const camerasTalkback: CommandSpec = {
   path: ['cameras', 'talkback'],
@@ -14,34 +14,30 @@ export const camerasTalkback: CommandSpec = {
     const ref = String(ctx.args.camera ?? '')
     if (!ref) return { ok: false, kind: 'user' as const, message: 'camera is required', code: 'missing_arg' }
 
-    return withApi(cfg, async (api) => {
-      const cameras = api.bootstrap?.cameras ?? []
-      const camera =
-        cameras.find((c) => c.id === ref) ?? cameras.find((c) => c.name === ref)
-      if (!camera) {
-        return { ok: false, kind: 'user' as const, message: `no camera "${ref}" found`, code: 'not_found' }
-      }
+    const bootstrap = await getBootstrap(cfg)
+    const cameras = bootstrap.cameras ?? []
+    const camera = cameras.find((c) => c.id === ref) ?? cameras.find((c) => c.name === ref)
+    if (!camera) {
+      return { ok: false, kind: 'user' as const, message: `no camera "${ref}" found`, code: 'not_found' }
+    }
 
-      const params = new URLSearchParams({ camera: camera.id })
-      const wsUrl = await api.getWsEndpoint('talkback', params)
-
-      if (!wsUrl) {
-        return {
-          ok: false,
-          kind: 'system' as const,
-          message: `failed to get talkback endpoint for camera "${camera.name}"`,
-          code: 'talkback_failed',
-        }
-      }
-
+    const wsUrl = await getTalkbackUrl(cfg, camera.id ?? '')
+    if (!wsUrl) {
       return {
-        ok: true as const,
-        data: {
-          camera: camera.name,
-          url: wsUrl,
-          hint: 'Connect to this WebSocket and send AAC-encoded ADTS audio frames for two-way audio',
-        },
+        ok: false,
+        kind: 'system' as const,
+        message: `failed to get talkback endpoint for camera "${camera.name}"`,
+        code: 'talkback_failed',
       }
-    })
+    }
+
+    return {
+      ok: true as const,
+      data: {
+        camera: camera.name,
+        url: wsUrl,
+        hint: 'Connect to this WebSocket and send AAC-encoded ADTS audio frames for two-way audio',
+      },
+    }
   },
 }
