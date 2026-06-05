@@ -121,7 +121,7 @@ describe('getGoogleAccessToken', () => {
   })
 
   test('maps a 400 invalid_grant onto google_refresh_rejected', async () => {
-    globalThis.fetch = (async () => new Response('{"error":"invalid_grant"}', { status: 400 })) as typeof fetch
+    globalThis.fetch = (async (_url: string) => new Response('{"error":"invalid_grant"}', { status: 400 })) as typeof fetch
     await expect(getGoogleAccessToken(creds)).rejects.toThrow(/token refresh failed/)
   })
 
@@ -228,12 +228,12 @@ describe('exchangeCodeForTokens', () => {
   })
 
   test('throws when Google omits the refresh_token', async () => {
-    globalThis.fetch = (async () => new Response(JSON.stringify({ access_token: 'at', expires_in: 3600 }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch
+    globalThis.fetch = (async (_url: string) => new Response(JSON.stringify({ access_token: 'at', expires_in: 3600 }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch
     await expect(exchangeCodeForTokens({ clientId: 'c', clientSecret: 's', code: 'x', redirectUri: 'http://127.0.0.1/', codeVerifier: 'v' })).rejects.toThrow(/did not return a refresh_token/)
   })
 
   test('throws on a non-ok exchange', async () => {
-    globalThis.fetch = (async () => new Response('{"error":"invalid_grant"}', { status: 400 })) as typeof fetch
+    globalThis.fetch = (async (_url: string) => new Response('{"error":"invalid_grant"}', { status: 400 })) as typeof fetch
     await expect(exchangeCodeForTokens({ clientId: 'c', clientSecret: 's', code: 'x', redirectUri: 'http://127.0.0.1/', codeVerifier: 'v' })).rejects.toThrow(/code exchange failed/)
   })
 })
