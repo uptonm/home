@@ -14,6 +14,9 @@ import { doorlocksGet, doorlocksList } from './commands/doorlocks'
 import { chimesGet, chimesList } from './commands/chimes'
 import { viewersGet, viewersList } from './commands/viewers'
 import { bridgesGet, bridgesList } from './commands/bridges'
+import { liveviewsGet, liveviewsList } from './commands/liveviews'
+import { ringtonesList } from './commands/ringtones'
+import { usersGet, usersList } from './commands/users'
 
 export const manifest: ModuleManifest = {
   name: 'protect',
@@ -69,6 +72,11 @@ export const manifest: ModuleManifest = {
     viewersGet,
     bridgesList,
     bridgesGet,
+    liveviewsList,
+    liveviewsGet,
+    ringtonesList,
+    usersList,
+    usersGet,
   ],
   async status(cfg) {
     try {
