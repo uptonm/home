@@ -1,5 +1,5 @@
 import { describe, expect, mock, test } from 'bun:test'
-import { EMPTY_CTX, asDevice, data, errCode } from './sonos-fakes'
+import { EMPTY_CTX, asDevice, data, errCode, realSonosClient } from './sonos-fakes'
 
 interface Rec {
   setAv: Array<{ CurrentURI: string }>
@@ -48,9 +48,8 @@ function household(...specs: Array<[name: string, uuid: string, group: string, c
 
 // Mutable: each command test assigns the household the mocked `discover` returns.
 let current: ReturnType<typeof asDevice>[] = []
-const realClient = await import('../modules/sonos/client')
 mock.module('../modules/sonos/client', () => ({
-  ...realClient,
+  ...realSonosClient,
   discover: async () => ({ Devices: current }),
 }))
 

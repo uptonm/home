@@ -1,10 +1,9 @@
 import { describe, expect, mock, test } from 'bun:test'
-import { EMPTY_CTX, asDevice, data } from './sonos-fakes'
+import { EMPTY_CTX, asDevice, data, realSonosClient } from './sonos-fakes'
 
-const realClient = await import('../modules/sonos/client')
 let injected: ReturnType<typeof asDevice> | null = null
 mock.module('../modules/sonos/client', () => ({
-  ...realClient,
+  ...realSonosClient,
   withRoom: async (_ctx: unknown, _opts: unknown, fn: (d: ReturnType<typeof asDevice>) => unknown) => fn(injected!),
 }))
 

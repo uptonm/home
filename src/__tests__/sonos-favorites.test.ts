@@ -1,10 +1,9 @@
 import { describe, expect, mock, test } from 'bun:test'
-import { EMPTY_CTX, asDevice, data, errCode } from './sonos-fakes'
+import { EMPTY_CTX, asDevice, data, errCode, realSonosClient } from './sonos-fakes'
 
-const realClient = await import('../modules/sonos/client')
 let injected: ReturnType<typeof asDevice> | null = null
 mock.module('../modules/sonos/client', () => ({
-  ...realClient,
+  ...realSonosClient,
   // withRoom normally discovers + resolves a room; here we hand the command the
   // device we want to assert against. enqueueAndPlay stays the real impl so the
   // container path exercises the real AddURIToQueue→Seek→Play recipe.

@@ -7,6 +7,16 @@ import type { RunContext } from '../core/types'
  * import.
  */
 
+/**
+ * The genuine sonos client module, captured here — before any test file calls
+ * `mock.module('../modules/sonos/client', …)`. Every command test imports this
+ * module first (for EMPTY_CTX/asDevice), so this import runs while the registry
+ * is still clean. Test files spread THIS into their mock factory instead of a
+ * locally-imported copy, which would otherwise pick up an earlier file's mock
+ * (e.g. a leaked `withRoom`) and corrupt commands that should use the real one.
+ */
+export const realSonosClient = await import('../modules/sonos/client')
+
 /** A RunContext with no args — spread it and override `.args` per test. */
 export const EMPTY_CTX: RunContext = {
   config: {},
