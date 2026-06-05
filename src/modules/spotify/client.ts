@@ -443,6 +443,293 @@ export async function mapWithConcurrency<I, O>(items: I[], concurrency: number, 
 
 const RESOLVER_CONCURRENCY = 5
 
+// ---------------------------------------------------------------------------
+// Phase 1 — catalog list/get (client-credentials, no new auth).
+//
+// Every command below reuses `authedRequestJson` and emits the same match
+// shapes as `search` so the Sonos compose story is preserved: track-bearing
+// rows carry a directly-playable `spotify:track:<id>` `uri`, containers carry
+// their canonical `spotify:<type>:<id>` form.
+// ---------------------------------------------------------------------------
+
+const SPOTIFY_API = 'https://api.spotify.com/v1'
+
+/** A browse category (`/v1/browse/categories`). No playable `uri` — it is a
+ *  grouping, not a catalog entity, so callers list a category's contents via
+ *  search/new-releases rather than handing it to Sonos. */
+export interface CategoryMatch {
+  kind: 'category'
+  id: string
+  name: string
+}
+
+/** A single page of a Spotify paging object. `total`/`limit`/`offset` are
+ *  echoed straight from Spotify so callers can page without guessing. */
+export interface Paged<T> {
+  items: T[]
+  total?: number
+  limit?: number
+  offset?: number
+}
+
+export interface ListOptions {
+  market?: string
+  limit?: number
+  offset?: number
+}
+
+interface RawCategory {
+  id?: string
+  name?: string
+}
+
+interface RawPagingTracks {
+  items?: (RawTrack | null)[]
+  total?: number
+  limit?: number
+  offset?: number
+}
+
+interface RawPagingAlbums {
+  items?: (RawAlbum | null)[]
+  total?: number
+  limit?: number
+  offset?: number
+}
+
+interface RawPlaylistTrackPage {
+  items?: ({ track?: RawTrack | null } | null)[]
+  total?: number
+  limit?: number
+  offset?: number
+}
+
+interface RawArtistTopTracksFull {
+  tracks?: (RawTrack | null)[]
+}
+
+interface RawNewReleases {
+  albums?: RawPagingAlbums
+}
+
+interface RawCategoriesPage {
+  categories?: {
+    items?: (RawCategory | null)[]
+    total?: number
+    limit?: number
+    offset?: number
+  }
+}
+
+/** Map a raw `/v1/tracks/{id}`-style track into our playable `TrackMatch`. */
+export function shapeTrack(t: RawTrack): TrackMatch {
+  return {
+    kind: 'track',
+    uri: `spotify:track:${t.id}`,
+    title: t.name ?? '',
+    artist: artistName(t.artists),
+    album: t.album?.name ?? '',
+    releaseDate: t.album?.release_date,
+    durationMs: t.duration_ms,
+    explicit: t.explicit,
+  }
+}
+
+export function shapeAlbum(a: RawAlbum): AlbumMatch {
+  return {
+    kind: 'album',
+    uri: `spotify:album:${a.id}`,
+    title: a.name ?? '',
+    artist: artistName(a.artists),
+    releaseDate: a.release_date,
+    totalTracks: a.total_tracks,
+    albumType: a.album_type,
+  }
+}
+
+export function shapeArtist(a: RawArtist): ArtistMatch {
+  return {
+    kind: 'artist',
+    uri: `spotify:artist:${a.id}`,
+    name: a.name ?? '',
+    genres: a.genres ?? [],
+    popularity: a.popularity,
+    followers: a.followers?.total,
+  }
+}
+
+export function shapePlaylist(p: RawPlaylist): PlaylistMatch {
+  return {
+    kind: 'playlist',
+    uri: `spotify:playlist:${p.id}`,
+    title: p.name ?? '',
+    owner: p.owner?.display_name ?? p.owner?.id ?? '',
+    totalTracks: p.tracks?.total,
+    public: p.public,
+  }
+}
+
+export function shapeCategory(c: RawCategory): CategoryMatch {
+  return { kind: 'category', id: c.id ?? '', name: c.name ?? '' }
+}
+
+// --- Pure normalizers (exported & unit-tested separately from the fetch) -----
+// Splitting the network call from the response-shaping keeps the shaping
+// (null-row filtering, envelope unwrapping, paging passthrough) testable
+// without a live token, mirroring `normalizeSearchResponse`.
+
+export function normalizeTrackPage(raw: RawPagingTracks): Paged<TrackMatch> {
+  const items = (raw.items ?? []).filter((t): t is RawTrack => !!t && !!t.id).map(shapeTrack)
+  return { items, total: raw.total, limit: raw.limit, offset: raw.offset }
+}
+
+export function normalizeAlbumPage(raw: RawPagingAlbums): Paged<AlbumMatch> {
+  const items = (raw.items ?? []).filter((a): a is RawAlbum => !!a && !!a.id).map(shapeAlbum)
+  return { items, total: raw.total, limit: raw.limit, offset: raw.offset }
+}
+
+/** Playlist rows wrap the track in `{ track }`; entries can be null (a removed
+ *  track) or a non-track item (podcast episode with no id) — both are dropped. */
+export function normalizePlaylistTrackPage(raw: RawPlaylistTrackPage): Paged<TrackMatch> {
+  const items = (raw.items ?? [])
+    .map((row) => row?.track)
+    .filter((t): t is RawTrack => !!t && !!t.id)
+    .map(shapeTrack)
+  return { items, total: raw.total, limit: raw.limit, offset: raw.offset }
+}
+
+/** Artist top-tracks come back as a flat `{ tracks: [...] }` — not paged. */
+export function normalizeTopTracks(raw: RawArtistTopTracksFull): Paged<TrackMatch> {
+  const items = (raw.tracks ?? []).filter((t): t is RawTrack => !!t && !!t.id).map(shapeTrack)
+  return { items }
+}
+
+export function normalizeNewReleases(raw: RawNewReleases): Paged<AlbumMatch> {
+  const page = raw.albums
+  const items = (page?.items ?? []).filter((a): a is RawAlbum => !!a && !!a.id).map(shapeAlbum)
+  return { items, total: page?.total, limit: page?.limit, offset: page?.offset }
+}
+
+export function normalizeCategoryPage(raw: RawCategoriesPage): Paged<CategoryMatch> {
+  const page = raw.categories
+  const items = (page?.items ?? []).filter((c): c is RawCategory => !!c && !!c.id).map(shapeCategory)
+  return { items, total: page?.total, limit: page?.limit, offset: page?.offset }
+}
+
+/**
+ * Resolve a user-supplied catalog reference to a bare Spotify id. Accepts any
+ * of the three shapes a human (or LLM) is likely to paste:
+ *   - a bare 22-char base62 id (`7oK9VyNzrYvRFo7nQEYkWN`)
+ *   - a `spotify:<type>:<id>` URI (delegates to `extractSpotifyId`)
+ *   - an `open.spotify.com/<type>/<id>` share URL (with optional `intl-xx`
+ *     locale prefix and `?si=` query)
+ * Returns null for anything else so commands can reject malformed input at the
+ * boundary instead of issuing a doomed request.
+ */
+export function extractSpotifyRef(input: string): string | null {
+  const raw = input.trim()
+  if (/^[A-Za-z0-9]{22}$/.test(raw)) return raw
+  const fromUri = extractSpotifyId(raw)
+  if (fromUri) return fromUri
+  const url = raw.match(/^https?:\/\/open\.spotify\.com\/(?:intl-[a-z]+\/)?[a-zA-Z]+\/([A-Za-z0-9]{22})(?:[/?#].*)?$/i)
+  return url ? url[1]! : null
+}
+
+function pagingQuery(opts: ListOptions): string {
+  const params = new URLSearchParams()
+  if (opts.market) params.set('market', opts.market)
+  if (opts.limit !== undefined) params.set('limit', String(opts.limit))
+  if (opts.offset !== undefined && opts.offset > 0) params.set('offset', String(opts.offset))
+  const q = params.toString()
+  return q ? `?${q}` : ''
+}
+
+// --- URL builders (exported for unit tests) --------------------------------
+
+export function buildTrackGetUrl(id: string): string {
+  return `${SPOTIFY_API}/tracks/${encodeURIComponent(id)}`
+}
+export function buildAlbumGetUrl(id: string): string {
+  return `${SPOTIFY_API}/albums/${encodeURIComponent(id)}`
+}
+export function buildArtistGetUrl(id: string): string {
+  return `${SPOTIFY_API}/artists/${encodeURIComponent(id)}`
+}
+export function buildPlaylistGetUrl(id: string): string {
+  return `${SPOTIFY_API}/playlists/${encodeURIComponent(id)}`
+}
+export function buildAlbumTracksListUrl(id: string, opts: ListOptions): string {
+  return `${SPOTIFY_API}/albums/${encodeURIComponent(id)}/tracks${pagingQuery(opts)}`
+}
+export function buildArtistAlbumsUrl(id: string, opts: ListOptions): string {
+  return `${SPOTIFY_API}/artists/${encodeURIComponent(id)}/albums${pagingQuery(opts)}`
+}
+export function buildPlaylistTracksListUrl(id: string, opts: ListOptions): string {
+  return `${SPOTIFY_API}/playlists/${encodeURIComponent(id)}/tracks${pagingQuery(opts)}`
+}
+export function buildNewReleasesUrl(opts: ListOptions): string {
+  return `${SPOTIFY_API}/browse/new-releases${pagingQuery(opts)}`
+}
+export function buildCategoriesUrl(opts: ListOptions): string {
+  return `${SPOTIFY_API}/browse/categories${pagingQuery(opts)}`
+}
+export function buildCategoryGetUrl(id: string): string {
+  return `${SPOTIFY_API}/browse/categories/${encodeURIComponent(id)}`
+}
+
+// --- Tier 1: get-by-id ------------------------------------------------------
+
+export async function getTrack(cfg: SpotifyConfig, id: string): Promise<TrackMatch> {
+  return shapeTrack(await authedRequestJson<RawTrack>(cfg, buildTrackGetUrl(id)))
+}
+
+export async function getAlbum(cfg: SpotifyConfig, id: string): Promise<AlbumMatch> {
+  return shapeAlbum(await authedRequestJson<RawAlbum>(cfg, buildAlbumGetUrl(id)))
+}
+
+export async function getArtist(cfg: SpotifyConfig, id: string): Promise<ArtistMatch> {
+  return shapeArtist(await authedRequestJson<RawArtist>(cfg, buildArtistGetUrl(id)))
+}
+
+export async function getPlaylist(cfg: SpotifyConfig, id: string): Promise<PlaylistMatch> {
+  return shapePlaylist(await authedRequestJson<RawPlaylist>(cfg, buildPlaylistGetUrl(id)))
+}
+
+// --- Tier 2: children listings ---------------------------------------------
+
+export async function getAlbumTracks(cfg: SpotifyConfig, id: string, opts: ListOptions): Promise<Paged<TrackMatch>> {
+  // Album-track rows are simplified objects without an `album` field (the
+  // album is the parent) — `shapeTrack` tolerates the absence and still emits
+  // a playable `spotify:track:<id>` uri.
+  return normalizeTrackPage(await authedRequestJson<RawPagingTracks>(cfg, buildAlbumTracksListUrl(id, opts)))
+}
+
+export async function getArtistAlbums(cfg: SpotifyConfig, id: string, opts: ListOptions): Promise<Paged<AlbumMatch>> {
+  return normalizeAlbumPage(await authedRequestJson<RawPagingAlbums>(cfg, buildArtistAlbumsUrl(id, opts)))
+}
+
+export async function getArtistTopTracks(cfg: SpotifyConfig, id: string, market: string): Promise<Paged<TrackMatch>> {
+  return normalizeTopTracks(await authedRequestJson<RawArtistTopTracksFull>(cfg, buildArtistTopTracksUrl(id, market)))
+}
+
+export async function getPlaylistTracks(cfg: SpotifyConfig, id: string, opts: ListOptions): Promise<Paged<TrackMatch>> {
+  return normalizePlaylistTrackPage(await authedRequestJson<RawPlaylistTrackPage>(cfg, buildPlaylistTracksListUrl(id, opts)))
+}
+
+// --- Tier 3: browse ---------------------------------------------------------
+
+export async function listNewReleases(cfg: SpotifyConfig, opts: ListOptions): Promise<Paged<AlbumMatch>> {
+  return normalizeNewReleases(await authedRequestJson<RawNewReleases>(cfg, buildNewReleasesUrl(opts)))
+}
+
+export async function listCategories(cfg: SpotifyConfig, opts: ListOptions): Promise<Paged<CategoryMatch>> {
+  return normalizeCategoryPage(await authedRequestJson<RawCategoriesPage>(cfg, buildCategoriesUrl(opts)))
+}
+
+export async function getCategory(cfg: SpotifyConfig, id: string): Promise<CategoryMatch> {
+  return shapeCategory(await authedRequestJson<RawCategory>(cfg, buildCategoryGetUrl(id)))
+}
+
 export async function search(cfg: SpotifyConfig, opts: SearchOptions): Promise<SpotifySearchResult> {
   const raw = await authedRequestJson<RawSearchResponse>(cfg, buildSearchUrl(opts))
   const normalized = normalizeSearchResponse(raw)
