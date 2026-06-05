@@ -1,6 +1,9 @@
 import type { ModuleManifest } from '../../core/types'
 import { getAccessToken, getCachedTokenExpiry, readSpotifyConfig } from './client'
 import { searchCmd } from './commands/search'
+import { albumGet, artistGet, playlistGet, trackGet } from './commands/get'
+import { albumTracks, artistAlbums, artistTopTracks, playlistTracks } from './commands/children'
+import { categoriesGet, categoriesList, newReleases } from './commands/browse'
 
 export const manifest: ModuleManifest = {
   name: 'spotify',
@@ -23,7 +26,20 @@ export const manifest: ModuleManifest = {
       help: 'Same Spotify developer-app page — the "Client Secret" field',
     },
   ],
-  commands: [searchCmd],
+  commands: [
+    searchCmd,
+    trackGet,
+    albumGet,
+    artistGet,
+    playlistGet,
+    albumTracks,
+    artistAlbums,
+    artistTopTracks,
+    playlistTracks,
+    newReleases,
+    categoriesList,
+    categoriesGet,
+  ],
   async status(cfg) {
     try {
       await getAccessToken(readSpotifyConfig(cfg))
