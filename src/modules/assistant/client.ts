@@ -21,6 +21,12 @@ function headers(cfg: AssistantConfig): Record<string, string> {
   }
 }
 
+/** Auth-only headers for binary/text GETs (camera JPEG, error log) where the
+ * `application/json` Accept header would be semantically wrong. */
+function authHeaders(cfg: AssistantConfig): Record<string, string> {
+  return { Authorization: `Bearer ${cfg.token}` }
+}
+
 export async function info(cfg: AssistantConfig): Promise<{ message?: string; version?: string }> {
   return requestJson(`${cfg.url}/api/`, { headers: headers(cfg) })
 }
@@ -209,5 +215,129 @@ export async function logbook(
   return requestJson<unknown[]>(
     `${cfg.url}/api/logbook/${encodeURIComponent(startIso)}${qs}`,
     { headers: headers(cfg) },
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1 — REST gap closure: services / events / calendars / template /
+// camera / error-log / config / state set
+// ---------------------------------------------------------------------------
+
+export interface HassServiceDomain {
+  domain: string
+  services: Record<string, unknown>
+}
+
+/**
+ * List every service domain and its services (with field schemas) so callers
+ * can *discover* what's callable, not just call it. When `domain` is given the
+ * result is scoped to that single domain.
+ */
+export async function listServices(
+  cfg: AssistantConfig,
+  domain?: string,
+): Promise<HassServiceDomain[]> {
+  const all = await requestJson<HassServiceDomain[]>(`${cfg.url}/api/services`, {
+    headers: headers(cfg),
+  })
+  if (!domain) return all
+  return all.filter((s) => s.domain === domain)
+}
+
+export interface HassEvent {
+  event: string
+  listener_count: number
+}
+
+/** List event types fired on the bus and their listener counts. */
+export async function listEvents(cfg: AssistantConfig): Promise<HassEvent[]> {
+  return requestJson<HassEvent[]>(`${cfg.url}/api/events`, { headers: headers(cfg) })
+}
+
+export interface HassCalendar {
+  entity_id: string
+  name?: string
+}
+
+/** List calendar entities. */
+export async function listCalendars(cfg: AssistantConfig): Promise<HassCalendar[]> {
+  return requestJson<HassCalendar[]>(`${cfg.url}/api/calendars`, { headers: headers(cfg) })
+}
+
+/**
+ * Fetch events for a single calendar within a [start, end] window. Both
+ * timestamps are required by HA and passed as ISO-8601 query params.
+ */
+export async function getCalendar(
+  cfg: AssistantConfig,
+  entityId: string,
+  startIso: string,
+  endIso: string,
+): Promise<unknown[]> {
+  const qs = `?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`
+  return requestJson<unknown[]>(
+    `${cfg.url}/api/calendars/${encodeURIComponent(entityId)}${qs}`,
+    { headers: headers(cfg) },
+  )
+}
+
+/**
+ * Render a Jinja template server-side. HA returns the rendered result as plain
+ * text (not JSON), so this reads the body directly. A bad template comes back
+ * as a 400 whose body carries the error — surfaced in the thrown message.
+ */
+export async function renderTemplate(cfg: AssistantConfig, template: string): Promise<string> {
+  const res = await request(`${cfg.url}/api/template`, {
+    method: 'POST',
+    headers: headers(cfg),
+    body: JSON.stringify({ template }),
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`)
+  }
+  return res.text()
+}
+
+/** Grab a camera's current frame as JPEG bytes via the camera proxy. */
+export async function cameraSnapshot(cfg: AssistantConfig, entityId: string): Promise<Buffer> {
+  const res = await request(
+    `${cfg.url}/api/camera_proxy/${encodeURIComponent(entityId)}`,
+    { headers: authHeaders(cfg) },
+  )
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`)
+  }
+  return Buffer.from(await res.arrayBuffer())
+}
+
+/** Tail the controller error log (plain text). */
+export async function errorLog(cfg: AssistantConfig): Promise<string> {
+  const res = await request(`${cfg.url}/api/error_log`, { headers: authHeaders(cfg) })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`)
+  }
+  return res.text()
+}
+
+/**
+ * Override an entity's state in HA's state machine. This is a virtual write —
+ * it does NOT command the underlying device and is overwritten on the next
+ * update from the owning integration. Returns the resulting state object
+ * (HTTP 200 if the entity existed, 201 if newly created).
+ */
+export async function setState(
+  cfg: AssistantConfig,
+  entityId: string,
+  state: string,
+  attributes?: Record<string, unknown>,
+): Promise<HassState> {
+  const body: Record<string, unknown> = { state }
+  if (attributes) body.attributes = attributes
+  return requestJson<HassState>(
+    `${cfg.url}/api/states/${encodeURIComponent(entityId)}`,
+    { method: 'POST', headers: headers(cfg), body: JSON.stringify(body) },
   )
 }
