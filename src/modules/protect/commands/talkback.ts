@@ -1,5 +1,6 @@
 import type { CommandSpec } from '../../../core/types'
 import { getBootstrap, getTalkbackUrl, readProtectConfig } from '../client'
+import { pickOne } from './shared'
 
 export const camerasTalkback: CommandSpec = {
   path: ['cameras', 'talkback'],
@@ -15,11 +16,9 @@ export const camerasTalkback: CommandSpec = {
     if (!ref) return { ok: false, kind: 'user' as const, message: 'camera is required', code: 'missing_arg' }
 
     const bootstrap = await getBootstrap(cfg)
-    const cameras = bootstrap.cameras ?? []
-    const camera = cameras.find((c) => c.id === ref) ?? cameras.find((c) => c.name === ref)
-    if (!camera) {
-      return { ok: false, kind: 'user' as const, message: `no camera "${ref}" found`, code: 'not_found' }
-    }
+    const picked = pickOne(bootstrap.cameras ?? [], ref, 'camera')
+    if (!picked.ok) return picked.error
+    const camera = picked.item
 
     const wsUrl = await getTalkbackUrl(cfg, camera.id ?? '')
     if (!wsUrl) {

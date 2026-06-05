@@ -1,5 +1,6 @@
 import type { CommandSpec } from '../../../core/types'
 import { getBootstrap, protectRequest, readProtectConfig } from '../client'
+import { pickOne } from './shared'
 
 const DIRECTIONS = ['left', 'right', 'up', 'down', 'home'] as const
 type PtzDirection = (typeof DIRECTIONS)[number]
@@ -33,11 +34,9 @@ export const camerasPtz: CommandSpec = {
     }
 
     const bootstrap = await getBootstrap(cfg)
-    const cameras = bootstrap.cameras ?? []
-    const camera = cameras.find((c) => c.id === ref) ?? cameras.find((c) => c.name === ref)
-    if (!camera) {
-      return { ok: false, kind: 'user' as const, message: `no camera "${ref}" found`, code: 'not_found' }
-    }
+    const picked = pickOne(bootstrap.cameras ?? [], ref, 'camera')
+    if (!picked.ok) return picked.error
+    const camera = picked.item
     if (!camera.ptzControlEnabled) {
       return { ok: false, kind: 'user' as const, message: `camera "${camera.name}" does not support PTZ`, code: 'not_supported' }
     }

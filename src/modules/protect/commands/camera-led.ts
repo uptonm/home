@@ -1,5 +1,6 @@
 import type { CommandSpec } from '../../../core/types'
 import { getBootstrap, patchDevice, readProtectConfig } from '../client'
+import { pickOne } from './shared'
 
 export const camerasLed: CommandSpec = {
   path: ['cameras', 'led'],
@@ -42,11 +43,9 @@ export const camerasLed: CommandSpec = {
     }
 
     const bootstrap = await getBootstrap(cfg)
-    const cameras = bootstrap.cameras ?? []
-    const camera = cameras.find((c) => c.id === ref) ?? cameras.find((c) => c.name === ref)
-    if (!camera) {
-      return { ok: false, kind: 'user' as const, message: `no camera "${ref}" found`, code: 'not_found' }
-    }
+    const picked = pickOne(bootstrap.cameras ?? [], ref, 'camera')
+    if (!picked.ok) return picked.error
+    const camera = picked.item
 
     let payload: Record<string, unknown>
     if (feature === 'spotlight') {

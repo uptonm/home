@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs'
 import type { CommandSpec } from '../../../core/types'
 import { getBootstrap, getSnapshot, readProtectConfig } from '../client'
+import { pickOne } from './shared'
 
 export const snapshot: CommandSpec = {
   path: ['snapshot'],
@@ -23,9 +24,9 @@ export const snapshot: CommandSpec = {
     const out = ctx.args.out ? String(ctx.args.out) : `./${ref.replace(/\s+/g, '_')}.jpg`
 
     const bootstrap = await getBootstrap(cfg)
-    const cameras = bootstrap.cameras ?? []
-    const camera = cameras.find((c) => c.id === ref) ?? cameras.find((c) => c.name === ref)
-    if (!camera) return { ok: false, kind: 'user', message: `no camera "${ref}" found`, code: 'snapshot_failed' }
+    const picked = pickOne(bootstrap.cameras ?? [], ref, 'camera')
+    if (!picked.ok) return picked.error
+    const camera = picked.item
 
     const buf = await getSnapshot(cfg, camera.id ?? '')
     if (!buf) return { ok: false, kind: 'system', message: `snapshot failed for camera "${camera.name}"`, code: 'snapshot_failed' }
