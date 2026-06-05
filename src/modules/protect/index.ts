@@ -11,6 +11,9 @@ import { snapshot } from './commands/snapshot'
 import { sensorsGet, sensorsList } from './commands/sensors'
 import { nvrInfo } from './commands/nvr'
 import { doorlocksGet, doorlocksList } from './commands/doorlocks'
+import { chimesGet, chimesList } from './commands/chimes'
+import { viewersGet, viewersList } from './commands/viewers'
+import { bridgesGet, bridgesList } from './commands/bridges'
 
 export const manifest: ModuleManifest = {
   name: 'protect',
@@ -60,6 +63,12 @@ export const manifest: ModuleManifest = {
     nvrInfo,
     doorlocksList,
     doorlocksGet,
+    chimesList,
+    chimesGet,
+    viewersList,
+    viewersGet,
+    bridgesList,
+    bridgesGet,
   ],
   async status(cfg) {
     try {
