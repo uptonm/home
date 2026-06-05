@@ -1,7 +1,7 @@
 import type { ModuleManifest } from '../../core/types'
 import { discover, readSonosConfig, summarizeGroups } from './client'
 import { playersList, playersGet } from './commands/players'
-import { groupsList, groupsGet } from './commands/groups'
+import { groupsList, groupsGet, groupsJoin, groupsLeave, groupsParty, groupsUngroup } from './commands/groups'
 import { play, pause, next, prev, nowPlaying } from './commands/playback'
 import { volumeGet, volumeSet, mute } from './commands/volume'
 import { queueList, queueClear, queueAdd } from './commands/queue'
@@ -31,6 +31,10 @@ export const manifest: ModuleManifest = {
     playersGet,
     groupsList,
     groupsGet,
+    groupsJoin,
+    groupsLeave,
+    groupsParty,
+    groupsUngroup,
     nowPlaying,
     play,
     pause,
