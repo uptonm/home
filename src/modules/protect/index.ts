@@ -8,6 +8,9 @@ import { camerasTalkback } from './commands/talkback'
 import { eventsList, eventsRecent } from './commands/events'
 import { lights } from './commands/lights'
 import { snapshot } from './commands/snapshot'
+import { sensorsGet, sensorsList } from './commands/sensors'
+import { nvrInfo } from './commands/nvr'
+import { doorlocksGet, doorlocksList } from './commands/doorlocks'
 
 export const manifest: ModuleManifest = {
   name: 'protect',
@@ -42,7 +45,22 @@ export const manifest: ModuleManifest = {
       required: true,
     },
   ],
-  commands: [camerasList, camerasGet, camerasPtz, camerasLed, camerasTalkback, eventsList, eventsRecent, lights, snapshot],
+  commands: [
+    camerasList,
+    camerasGet,
+    camerasPtz,
+    camerasLed,
+    camerasTalkback,
+    eventsList,
+    eventsRecent,
+    lights,
+    snapshot,
+    sensorsList,
+    sensorsGet,
+    nvrInfo,
+    doorlocksList,
+    doorlocksGet,
+  ],
   async status(cfg) {
     try {
       const bootstrap = await getBootstrap(readProtectConfig(cfg))
