@@ -1,5 +1,7 @@
 # `home`
 
+> **Workstream test** — this is a pipeline validation edit.
+
 A monolith CLI that gives you (and your local LLMs) uniform access to your
 homelab services. One binary, one config root, one Claude skill per module.
 
