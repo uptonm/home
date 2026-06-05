@@ -1,6 +1,6 @@
 import type { ModuleManifest } from '../../core/types'
 import { defaultControllerUrl } from '../../core/net'
-import { connect, readProtectConfig } from './client'
+import { getBootstrap, readProtectConfig } from './client'
 import { camerasGet, camerasList } from './commands/cameras'
 import { camerasLed } from './commands/camera-led'
 import { camerasPtz } from './commands/ptz'
@@ -45,8 +45,8 @@ export const manifest: ModuleManifest = {
   commands: [camerasList, camerasGet, camerasPtz, camerasLed, camerasTalkback, eventsList, eventsRecent, lights, snapshot],
   async status(cfg) {
     try {
-      const api = await connect(readProtectConfig(cfg))
-      const cameras = api.bootstrap?.cameras ?? []
+      const bootstrap = await getBootstrap(readProtectConfig(cfg))
+      const cameras = bootstrap.cameras ?? []
       return { ok: true, data: { cameras: cameras.length, status: 'reachable' } }
     } catch (err) {
       return { ok: false, kind: 'system', message: (err as Error).message, code: 'status_failed' }

@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { readProtectConfig, withApi } from '../client'
+import { getEvents, readProtectConfig } from '../client'
 
 function parseSince(value: string | undefined): number {
   if (!value) return Date.now() - 60 * 60 * 1000
@@ -25,15 +25,9 @@ interface ProtectEvent {
 }
 
 async function fetchEvents(cfg: ReturnType<typeof readProtectConfig>, since: string | undefined): Promise<ProtectEvent[]> {
-  return withApi(cfg, async (api) => {
-    const start = parseSince(since)
-    const end = Date.now()
-    const url = `https://${cfg.host}/proxy/protect/api/events?start=${start}&end=${end}`
-    const res = await api.retrieve(url, { method: 'GET' })
-    if (!res) throw new Error('events request returned no response')
-    const events = (await res.body.json()) as ProtectEvent[]
-    return events ?? []
-  })
+  const start = parseSince(since)
+  const end = Date.now()
+  return (await getEvents(cfg, start, end)) as ProtectEvent[]
 }
 
 export const eventsList: CommandSpec = {
