@@ -1,10 +1,11 @@
 import type { ModuleManifest } from '../../core/types'
 import { defaultControllerUrl } from '../../core/net'
 import { listSites, readUnifiConfig } from './client'
-import { devicesGet, devicesList, devicesStats } from './commands/devices'
+import { devicesGet, devicesList, devicesRestart, devicesStats } from './commands/devices'
 import { devicesPoeCycle } from './commands/poe-cycle'
 import { clientsList, clientsGet } from './commands/clients'
-import { clientsControl } from './commands/client-control'
+import { clientsControl, clientsAuthorizeGuest } from './commands/client-control'
+import { vouchersCreate, vouchersDelete, vouchersGet, vouchersList } from './commands/vouchers'
 import { siteHealthCmd, siteInfoCmd } from './commands/site'
 import { networksList, networksGet } from './commands/networks'
 import { reservationsGet, reservationsList } from './commands/reservations'
@@ -31,9 +32,9 @@ import { healthCmd } from './commands/health'
 export const manifest: ModuleManifest = {
   name: 'unifi',
   description:
-    'Query the UniFi Network controller (devices, clients, networks/VLANs, fixed-IP reservations, SSIDs, port forwards, firewall rules, health)',
+    'Query and act on the UniFi Network controller (devices, clients, networks/VLANs, fixed-IP reservations, SSIDs, port forwards, firewall rules, health, hotspot guest vouchers, and device/client actions)',
   whenToUse:
-    'Use when the user asks about their home network, wifi, APs, switches, the gateway, wired/wireless clients, VLANs/subnets, fixed-IP (DHCP) reservations, SSIDs, port forwards, or firewall rules. Do not use for cameras (that is `home-protect`) or sensors/automations (that is `home-assistant`).',
+    'Use when the user asks about their home network, wifi, APs, switches, the gateway, wired/wireless clients, VLANs/subnets, fixed-IP (DHCP) reservations, SSIDs, port forwards, or firewall rules; or wants to restart a device, power-cycle a PoE port, authorize a guest client, or manage hotspot guest vouchers. Do not use for cameras (that is `home-protect`) or sensors/automations (that is `home-assistant`).',
   configSchema: [
     {
       key: 'url',
@@ -85,10 +86,16 @@ export const manifest: ModuleManifest = {
     devicesList,
     devicesGet,
     devicesStats,
+    devicesRestart,
     devicesPoeCycle,
     clientsList,
     clientsGet,
     clientsControl,
+    clientsAuthorizeGuest,
+    vouchersList,
+    vouchersGet,
+    vouchersCreate,
+    vouchersDelete,
     siteInfoCmd,
     siteHealthCmd,
     networksList,
