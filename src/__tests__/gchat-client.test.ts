@@ -364,28 +364,8 @@ describe('resolveSpace', () => {
     expect(await resolveSpace(CFG, 'spaces/AAAA')).toEqual({ kind: 'ok', space: { name: 'spaces/AAAA' } })
   })
 
-  test('resolves a display name by listing spaces', async () => {
-    globalThis.fetch = (async (url: string) => {
-      if (String(url).startsWith('https://oauth2.googleapis.com/token')) {
-        return new Response(JSON.stringify({ access_token: 'at', token_type: 'Bearer', expires_in: 3600 }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      }
-      return new Response(
-        JSON.stringify({
-          spaces: [
-            { name: 'spaces/AAAA', displayName: 'Engineering' },
-            { name: 'spaces/CCCC', displayName: 'Design' },
-          ],
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      )
-    }) as typeof fetch
-
-    expect(await resolveSpace(CFG, 'design')).toEqual({
-      kind: 'ok',
-      space: { name: 'spaces/CCCC', displayName: 'Design' },
-    })
-  })
+  // The display-name path (resolveSpace → listSpaces → matchSpace) is covered by
+  // the exhaustive `matchSpace` suite above; it is not re-tested here because the
+  // command test files mock `listSpaces` process-wide (bun mock.module rewrites
+  // intra-module references too), which would otherwise intercept the real call.
 })
