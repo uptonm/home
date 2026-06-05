@@ -1,6 +1,6 @@
 import type { CommandSpec } from '../../../core/types'
 import { getDevice, listDevices, readUnifiConfig } from '../client'
-import { integrationGetDeviceStats } from '../integration-client'
+import { integrationDeviceAction, integrationGetDeviceStats } from '../integration-client'
 
 export const devicesList: CommandSpec = {
   path: ['devices', 'list'],

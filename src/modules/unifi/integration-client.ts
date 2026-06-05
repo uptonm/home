@@ -1,6 +1,7 @@
 import type { UnifiConfig } from './client'
 import { readUnifiConfig } from './client'
-import { requestJson } from '../../core/http'
+import { request, requestJson } from '../../core/http'
+import { SystemError } from '../../core/errors'
 
 // ── Integration API client ────────────────────────────────────────────────
 // Official UniFi Network Integration API (v9.x+)
@@ -162,4 +163,142 @@ export async function integrationGetDeviceStats(cfg: UnifiConfig, id: string): P
   } catch {
     return null
   }
+}
+
+// ── Write helper (POST / DELETE) ──────────────────────────────────────────
+// The integration API returns a JSON envelope on most writes, but DELETE (and
+// some actions) may reply 204/empty — tolerate that instead of letting
+// res.json() throw. Errors surface with an `http_<status>` code so they read
+// cleanly and so withSource() can detect 401/403/404 for fallback.
+
+async function integrationMutate<T = unknown>(
+  cfg: UnifiConfig,
+  path: string,
+  method: 'POST' | 'DELETE',
+  body?: Record<string, unknown>,
+): Promise<T | null> {
+  const res = await request(
+    `${integrationBase(cfg)}${path}`,
+    {
+      method,
+      headers: {
+        ...integrationHeaders(cfg),
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new SystemError(
+      `HTTP ${res.status} ${res.statusText} from integration API${text ? `: ${text.slice(0, 200)}` : ''}`,
+      `http_${res.status}`,
+    )
+  }
+  const text = await res.text().catch(() => '')
+  if (!text) return null
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    return null
+  }
+}
+
+// ── Vouchers (integration-only) ───────────────────────────────────────────
+
+export interface VoucherCreateOptions {
+  /** How many vouchers to mint in this batch (defaults to 1). */
+  count?: number
+  /** Free-text note attached to the batch. */
+  name?: string
+  /** Validity window in minutes (the API's timeLimitMinutes). */
+  timeLimitMinutes?: number
+  /** Max number of devices that may redeem each voucher (authorizedGuestLimit). */
+  authorizedGuestLimit?: number
+}
+
+export async function integrationListVouchers(cfg: UnifiConfig): Promise<unknown[]> {
+  const siteId = await resolveIntegrationSiteId(cfg)
+  return paginate(cfg, `/sites/${encodeURIComponent(siteId)}/hotspot/vouchers`)
+}
+
+export async function integrationGetVoucher(cfg: UnifiConfig, id: string): Promise<unknown | null> {
+  const siteId = await resolveIntegrationSiteId(cfg)
+  const body = await requestJson<{ data: unknown }>(
+    `${integrationBase(cfg)}/sites/${encodeURIComponent(siteId)}/hotspot/vouchers/${encodeURIComponent(id)}`,
+    { headers: integrationHeaders(cfg) },
+    { insecureTLS: cfg.insecureTLS },
+  )
+  return body.data ?? null
+}
+
+export async function integrationCreateVouchers(
+  cfg: UnifiConfig,
+  options: VoucherCreateOptions,
+): Promise<unknown> {
+  const siteId = await resolveIntegrationSiteId(cfg)
+  const body: Record<string, unknown> = { count: options.count ?? 1 }
+  if (options.name !== undefined) body.name = options.name
+  if (options.timeLimitMinutes !== undefined) body.timeLimitMinutes = options.timeLimitMinutes
+  if (options.authorizedGuestLimit !== undefined) body.authorizedGuestLimit = options.authorizedGuestLimit
+  return integrationMutate(cfg, `/sites/${encodeURIComponent(siteId)}/hotspot/vouchers`, 'POST', body)
+}
+
+export async function integrationDeleteVoucher(cfg: UnifiConfig, id: string): Promise<unknown> {
+  const siteId = await resolveIntegrationSiteId(cfg)
+  return integrationMutate(
+    cfg,
+    `/sites/${encodeURIComponent(siteId)}/hotspot/vouchers/${encodeURIComponent(id)}`,
+    'DELETE',
+  )
+}
+
+// ── Device / client actions (integration-only) ────────────────────────────
+// The integration `id` matches the private API `_id` for both devices and
+// clients, so callers resolve a friendly ref → `_id` via the private list and
+// pass it straight through (same assumption integrationGetDeviceStats relies on).
+
+export async function integrationDeviceAction(
+  cfg: UnifiConfig,
+  deviceId: string,
+  action: string,
+): Promise<unknown> {
+  const siteId = await resolveIntegrationSiteId(cfg)
+  return integrationMutate(
+    cfg,
+    `/sites/${encodeURIComponent(siteId)}/devices/${encodeURIComponent(deviceId)}/actions`,
+    'POST',
+    { action },
+  )
+}
+
+export async function integrationPortAction(
+  cfg: UnifiConfig,
+  deviceId: string,
+  portIdx: number,
+  action: string,
+): Promise<unknown> {
+  const siteId = await resolveIntegrationSiteId(cfg)
+  return integrationMutate(
+    cfg,
+    `/sites/${encodeURIComponent(siteId)}/devices/${encodeURIComponent(deviceId)}/interfaces/ports/${encodeURIComponent(String(portIdx))}/actions`,
+    'POST',
+    { action },
+  )
+}
+
+export async function integrationClientAction(
+  cfg: UnifiConfig,
+  clientId: string,
+  action: string,
+  extra?: Record<string, unknown>,
+): Promise<unknown> {
+  const siteId = await resolveIntegrationSiteId(cfg)
+  return integrationMutate(
+    cfg,
+    `/sites/${encodeURIComponent(siteId)}/clients/${encodeURIComponent(clientId)}/actions`,
+    'POST',
+    { action, ...(extra ?? {}) },
+  )
 }
