@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { getEvents, readProtectConfig } from '../client'
+import { getEvent, getEvents, readProtectConfig } from '../client'
 
 function parseSince(value: string | undefined): number {
   if (!value) return Date.now() - 60 * 60 * 1000
@@ -45,6 +45,21 @@ export const eventsList: CommandSpec = {
     const events = await fetchEvents(cfg, since)
     const sliced = events.slice(-limit).reverse()
     return { ok: true, data: sliced }
+  },
+}
+
+export const eventsGet: CommandSpec = {
+  path: ['events', 'get'],
+  description: 'Fetch a single event by id',
+  args: [{ name: 'id', kind: 'positional', description: 'Event id', required: true }],
+  examples: ['home protect events get <id> --json'],
+  async run(ctx) {
+    const cfg = readProtectConfig(ctx.config)
+    const id = String(ctx.args.id ?? '')
+    if (!id) return { ok: false, kind: 'user', message: 'id is required', code: 'missing_arg' }
+    const event = await getEvent(cfg, id)
+    if (!event) return { ok: false, kind: 'user', message: `no event with id ${id}`, code: 'not_found' }
+    return { ok: true, data: event }
   },
 }
 

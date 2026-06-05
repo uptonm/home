@@ -5,8 +5,8 @@ import { camerasGet, camerasList } from './commands/cameras'
 import { camerasLed } from './commands/camera-led'
 import { camerasPtz } from './commands/ptz'
 import { camerasTalkback } from './commands/talkback'
-import { eventsList, eventsRecent } from './commands/events'
-import { lights } from './commands/lights'
+import { eventsGet, eventsList, eventsRecent } from './commands/events'
+import { lightsGet, lightsList, lightsOff, lightsOn, lightsToggle } from './commands/lights'
 import { snapshot } from './commands/snapshot'
 import { sensorsGet, sensorsList } from './commands/sensors'
 import { nvrInfo } from './commands/nvr'
@@ -17,6 +17,7 @@ import { bridgesGet, bridgesList } from './commands/bridges'
 import { liveviewsGet, liveviewsList } from './commands/liveviews'
 import { ringtonesList } from './commands/ringtones'
 import { usersGet, usersList } from './commands/users'
+import { groupsGet, groupsList } from './commands/groups'
 
 export const manifest: ModuleManifest = {
   name: 'protect',
@@ -58,8 +59,13 @@ export const manifest: ModuleManifest = {
     camerasLed,
     camerasTalkback,
     eventsList,
+    eventsGet,
     eventsRecent,
-    lights,
+    lightsOn,
+    lightsOff,
+    lightsToggle,
+    lightsList,
+    lightsGet,
     snapshot,
     sensorsList,
     sensorsGet,
@@ -77,6 +83,8 @@ export const manifest: ModuleManifest = {
     ringtonesList,
     usersList,
     usersGet,
+    groupsList,
+    groupsGet,
   ],
   async status(cfg) {
     try {
