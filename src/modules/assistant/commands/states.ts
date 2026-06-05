@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { getState, listStates, readAssistantConfig, searchEntities } from '../client'
+import { getState, listStates, readAssistantConfig, searchEntities, setState } from '../client'
 
 export const statesList: CommandSpec = {
   path: ['states', 'list'],
@@ -118,5 +118,51 @@ export const stateGet: CommandSpec = {
     await poll()
 
     return promise
+  },
+}
+
+export const stateSet: CommandSpec = {
+  path: ['state', 'set'],
+  description: 'Override an entity state in the HA state machine (virtual write — requires --confirm)',
+  args: [
+    { name: 'entity', kind: 'positional', description: 'entity_id (e.g. sensor.virtual)', required: true },
+    { name: 'state', kind: 'positional', description: 'New state value', required: true },
+    { name: 'attributes', kind: 'string', description: 'JSON attributes object (optional)' },
+    { name: 'confirm', kind: 'boolean', description: 'Required: acknowledge this is a direct state-machine override' },
+  ],
+  examples: [
+    'home assistant state set sensor.virtual 42 --confirm',
+    'home assistant state set sensor.virtual 42 --attributes \'{"unit_of_measurement":"°C"}\' --confirm',
+  ],
+  async run(ctx) {
+    const cfg = readAssistantConfig(ctx.config)
+    const entity = String(ctx.args.entity ?? '')
+    if (!entity) return { ok: false, kind: 'user', message: 'entity is required', code: 'missing_arg' }
+    if (ctx.args.state === undefined || ctx.args.state === null || String(ctx.args.state) === '') {
+      return { ok: false, kind: 'user', message: 'state is required', code: 'missing_arg' }
+    }
+    const state = String(ctx.args.state)
+
+    if (!ctx.args.confirm) {
+      return {
+        ok: false,
+        kind: 'user',
+        message:
+          'state set is a direct override of HA\'s state machine — it does not command the device and is overwritten on the next integration update. Re-run with --confirm to proceed.',
+        code: 'confirmation_required',
+      }
+    }
+
+    let attributes: Record<string, unknown> | undefined
+    if (ctx.args.attributes) {
+      try {
+        attributes = JSON.parse(String(ctx.args.attributes)) as Record<string, unknown>
+      } catch {
+        return { ok: false, kind: 'user', message: '--attributes must be valid JSON', code: 'bad_json' }
+      }
+    }
+
+    const data = await setState(cfg, entity, state, attributes)
+    return { ok: true, data }
   },
 }
