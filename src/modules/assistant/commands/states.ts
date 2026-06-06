@@ -4,7 +4,7 @@ import { getState, listStates, readAssistantConfig, searchEntities, setState } f
 export const statesList: CommandSpec = {
   path: ['states', 'list'],
   description: 'List Home Assistant entity states, optionally filtered by domain',
-  args: [{ name: 'domain', kind: 'string', description: 'Filter by domain prefix (e.g. light, sensor)' }],
+  args: [{ name: 'domain', kind: 'string', description: 'Limit to domain (e.g. light, sensor)' }],
   examples: [
     'home assistant states list --json',
     'home assistant states list --domain sensor --json | jq \'.[] | {entity_id, state}\'',

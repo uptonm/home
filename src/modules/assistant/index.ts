@@ -17,7 +17,7 @@ import { sceneActivate, scriptRun } from './commands/scene-script'
 
 export const manifest: ModuleManifest = {
   name: 'assistant',
-  description: 'Read and control Home Assistant — states, services, automations, history, logbook',
+  description: 'Read and control Home Assistant — states, services, events, calendars, automations, history, logbook, cameras, templates, error log, config',
   whenToUse:
     'Use when the user asks about sensors, lights, switches, climate, automations, scenes, scripts, or any Home Assistant entity. Do not use for network gear (`home-unifi`) or cameras (`home-protect`).',
   configSchema: [
