@@ -225,12 +225,17 @@ export async function integrationListVouchers(cfg: UnifiConfig): Promise<unknown
 
 export async function integrationGetVoucher(cfg: UnifiConfig, id: string): Promise<unknown | null> {
   const siteId = await resolveIntegrationSiteId(cfg)
-  const body = await requestJson<{ data: unknown }>(
-    `${integrationBase(cfg)}/sites/${encodeURIComponent(siteId)}/hotspot/vouchers/${encodeURIComponent(id)}`,
-    { headers: integrationHeaders(cfg) },
-    { insecureTLS: cfg.insecureTLS },
-  )
-  return body.data ?? null
+  try {
+    const body = await requestJson<{ data: unknown }>(
+      `${integrationBase(cfg)}/sites/${encodeURIComponent(siteId)}/hotspot/vouchers/${encodeURIComponent(id)}`,
+      { headers: integrationHeaders(cfg) },
+      { insecureTLS: cfg.insecureTLS },
+    )
+    return body.data ?? null
+  } catch (e: any) {
+    if (e?.code === 'http_404') return null
+    throw e
+  }
 }
 
 export async function integrationCreateVouchers(
