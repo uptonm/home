@@ -231,9 +231,9 @@ describe('listParamsFromArgs', () => {
   })
 
   test('only reads orderBy when enabled', () => {
-    expect(listParamsFromArgs({ orderBy: 'createTime desc' })).toEqual({ params: {} })
+    expect(listParamsFromArgs({ orderBy: 'createTime desc' })).toEqual({ params: { pageSize: 100 } })
     expect(listParamsFromArgs({ orderBy: 'createTime desc' }, { orderBy: true })).toEqual({
-      params: { orderBy: 'createTime desc' },
+      params: { pageSize: 100, orderBy: 'createTime desc' },
     })
   })
 })

@@ -34,6 +34,8 @@ export function listParamsFromArgs(
       return { error: 'pageSize must be a positive number' }
     }
     params.pageSize = Math.min(Math.floor(n), MAX_PAGE_SIZE)
+  } else {
+    params.pageSize = DEFAULT_PAGE_SIZE
   }
   if (args.pageToken !== undefined) params.pageToken = String(args.pageToken)
   if (args.filter !== undefined) params.filter = String(args.filter)
