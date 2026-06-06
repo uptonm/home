@@ -167,6 +167,7 @@ export const EXPORT_MIME_ALIASES: Record<string, string> = {
   odp: 'application/vnd.oasis.opendocument.presentation',
   epub: 'application/epub+zip',
   json: 'application/vnd.google-apps.script+json',
+  zip: 'application/zip',
   png: 'image/png',
   jpeg: 'image/jpeg',
   jpg: 'image/jpeg',
