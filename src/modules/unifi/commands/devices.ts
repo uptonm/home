@@ -1,6 +1,6 @@
 import type { CommandSpec } from '../../../core/types'
 import { getDevice, listDevices, readUnifiConfig } from '../client'
-import { integrationGetDeviceStats } from '../integration-client'
+import { integrationDeviceAction, integrationGetDeviceStats } from '../integration-client'
 
 export const devicesList: CommandSpec = {
   path: ['devices', 'list'],
@@ -48,5 +48,42 @@ export const devicesStats: CommandSpec = {
     const stats = await integrationGetDeviceStats(cfg, device._id)
     if (!stats) return { ok: false, kind: 'user', message: `stats not available for ${ref}`, code: 'not_found' }
     return { ok: true, data: stats }
+  },
+}
+
+export const devicesRestart: CommandSpec = {
+  path: ['devices', 'restart'],
+  description: 'Restart (reboot) a device by MAC or name via the Integration API (write — requires --yes)',
+  args: [
+    { name: 'device', kind: 'positional', description: 'Device MAC or name', required: true },
+    { name: 'yes', kind: 'boolean', description: 'Confirm the restart — this reboots the device' },
+  ],
+  examples: [
+    'home unifi devices restart "Living Room AP" --yes',
+    'home unifi devices restart 78:8a:20:11:22:33 --yes',
+  ],
+  async run(ctx) {
+    const cfg = readUnifiConfig(ctx.config)
+    const ref = String(ctx.args.device ?? '').trim()
+    if (!ref) return { ok: false, kind: 'user', message: 'device is required', code: 'missing_arg' }
+
+    if (!ctx.args.yes) {
+      return {
+        ok: false,
+        kind: 'user',
+        message: `refusing to restart ${JSON.stringify(ref)} without confirmation — re-run with --yes`,
+        code: 'confirmation_required',
+      }
+    }
+
+    // Resolve MAC/name → integration device id via the private API (the integration
+    // `id` matches the private `_id`).
+    const ql = ref.toLowerCase()
+    const devices = (await listDevices(cfg)) as Array<{ mac: string; name?: string; _id: string }>
+    const device = devices.find((d) => d.mac?.toLowerCase() === ql || d.name?.toLowerCase() === ql)
+    if (!device) return { ok: false, kind: 'user', message: `no device matching ${JSON.stringify(ref)}`, code: 'not_found' }
+
+    const result = await integrationDeviceAction(cfg, device._id, 'RESTART')
+    return { ok: true, data: { device: device.name || device.mac, action: 'RESTART', result } }
   },
 }

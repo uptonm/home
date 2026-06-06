@@ -6,6 +6,8 @@ export interface UnifiConfig {
   site: string
   apiKey: string
   insecureTLS?: boolean
+  /** Transport preference: 'auto' (default), 'network', or 'integration'. */
+  source?: string
 }
 
 export function readUnifiConfig(cfg: ModuleConfig): UnifiConfig {
@@ -14,6 +16,7 @@ export function readUnifiConfig(cfg: ModuleConfig): UnifiConfig {
     site: String(cfg.site ?? 'default'),
     apiKey: String(cfg.apiKey ?? ''),
     insecureTLS: Boolean(cfg.insecureTLS),
+    source: cfg.source !== undefined ? String(cfg.source) : undefined,
   }
 }
 
