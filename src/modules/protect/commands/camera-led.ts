@@ -1,5 +1,6 @@
 import type { CommandSpec } from '../../../core/types'
-import { readProtectConfig, withApi } from '../client'
+import { getBootstrap, patchDevice, readProtectConfig } from '../client'
+import { pickOne } from './shared'
 
 export const camerasLed: CommandSpec = {
   path: ['cameras', 'led'],
@@ -41,52 +42,46 @@ export const camerasLed: CommandSpec = {
       return { ok: false, kind: 'user' as const, message: 'spotlight state must be on or off', code: 'invalid_arg' }
     }
 
-    return withApi(cfg, async (api) => {
-      const cameras = api.bootstrap?.cameras ?? []
-      const camera =
-        cameras.find((c) => c.id === ref) ?? cameras.find((c) => c.name === ref)
-      if (!camera) {
-        return { ok: false, kind: 'user' as const, message: `no camera "${ref}" found`, code: 'not_found' }
-      }
+    const bootstrap = await getBootstrap(cfg)
+    const picked = pickOne(bootstrap.cameras ?? [], ref, 'camera')
+    if (!picked.ok) return picked.error
+    const camera = picked.item
 
-      let payload: Record<string, unknown>
-      if (feature === 'spotlight') {
-        // Flood light / spotlight on camera
-        payload = {
-          ledSettings: {
-            isEnabled: state === 'on',
-            // Preserve existing floodLed/welcomeLed values
-            ...(camera.ledSettings && 'floodLed' in camera.ledSettings ? { floodLed: state === 'on' } : {}),
-          } as Record<string, unknown>,
-        }
-      } else {
-        // IR control
-        payload = {
-          ispSettings: {
-            ...camera.ispSettings,
-            // 'auto' maps to irLedMode: 'auto', 'on' → 'manual_on', 'off' → 'manual_off'
-            irLedMode: state === 'auto' ? 'auto' : state === 'on' ? 'manual_on' : 'manual_off',
-          } as Record<string, unknown>,
-        }
+    let payload: Record<string, unknown>
+    if (feature === 'spotlight') {
+      // Flood light / spotlight on camera
+      const ledSettings = camera.ledSettings as Record<string, unknown> | undefined
+      payload = {
+        ledSettings: {
+          isEnabled: state === 'on',
+          // Preserve existing floodLed/welcomeLed values
+          ...(ledSettings && 'floodLed' in ledSettings ? { floodLed: state === 'on' } : {}),
+        } as Record<string, unknown>,
       }
-
-      const updated = await api.updateDevice(
-        camera,
-        payload as Record<string, unknown> as Parameters<typeof api.updateDevice>[1],
-      )
-      if (!updated) {
-        return {
-          ok: false,
-          kind: 'system' as const,
-          message: `failed to update ${feature} on camera "${camera.name}"`,
-          code: 'update_failed',
-        }
+    } else {
+      // IR control
+      payload = {
+        ispSettings: {
+          ...(camera.ispSettings as Record<string, unknown> | undefined),
+          // 'auto' maps to irLedMode: 'auto', 'on' → 'manual_on', 'off' → 'manual_off'
+          irLedMode: state === 'auto' ? 'auto' : state === 'on' ? 'manual_on' : 'manual_off',
+        } as Record<string, unknown>,
       }
+    }
 
+    const updated = await patchDevice(cfg, 'camera', camera.id ?? '', payload)
+    if (!updated) {
       return {
-        ok: true as const,
-        data: { camera: camera.name, feature, state },
+        ok: false,
+        kind: 'system' as const,
+        message: `failed to update ${feature} on camera "${camera.name}"`,
+        code: 'update_failed',
       }
-    })
+    }
+
+    return {
+      ok: true as const,
+      data: { camera: camera.name, feature, state },
+    }
   },
 }

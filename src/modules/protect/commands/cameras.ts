@@ -1,5 +1,6 @@
 import type { CommandSpec } from '../../../core/types'
-import { readProtectConfig, withApi } from '../client'
+import { getBootstrap, readProtectConfig } from '../client'
+import { pickOne } from './shared'
 
 export const camerasList: CommandSpec = {
   path: ['cameras', 'list'],
@@ -11,22 +12,23 @@ export const camerasList: CommandSpec = {
   ],
   async run(ctx) {
     const cfg = readProtectConfig(ctx.config)
-    const cameras = await withApi(cfg, async (api) => api.bootstrap?.cameras ?? [])
-    return { ok: true, data: cameras }
+    const bootstrap = await getBootstrap(cfg)
+    return { ok: true, data: bootstrap.cameras ?? [] }
   },
 }
 
 export const camerasGet: CommandSpec = {
   path: ['cameras', 'get'],
-  description: 'Get a single camera by id',
-  args: [{ name: 'id', kind: 'positional', description: 'Camera id', required: true }],
-  examples: ['home protect cameras get <id> --json'],
+  description: 'Get a single camera by id or name',
+  args: [{ name: 'id', kind: 'positional', description: 'Camera id or name (substring ok)', required: true }],
+  examples: ['home protect cameras get <id> --json', 'home protect cameras get "Front Door" --json'],
   async run(ctx) {
     const cfg = readProtectConfig(ctx.config)
-    const id = String(ctx.args.id ?? '')
-    if (!id) return { ok: false, kind: 'user', message: 'id is required', code: 'missing_arg' }
-    const camera = await withApi(cfg, async (api) => api.bootstrap?.cameras?.find((c) => c.id === id) ?? null)
-    if (!camera) return { ok: false, kind: 'user', message: `no camera with id ${id}`, code: 'not_found' }
-    return { ok: true, data: camera }
+    const ref = String(ctx.args.id ?? '')
+    if (!ref) return { ok: false, kind: 'user', message: 'id is required', code: 'missing_arg' }
+    const bootstrap = await getBootstrap(cfg)
+    const picked = pickOne(bootstrap.cameras ?? [], ref, 'camera')
+    if (!picked.ok) return picked.error
+    return { ok: true, data: picked.item }
   },
 }

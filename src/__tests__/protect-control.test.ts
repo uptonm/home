@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { camerasPtz } from '../modules/protect/commands/ptz'
 import { camerasLed } from '../modules/protect/commands/camera-led'
 import { camerasTalkback } from '../modules/protect/commands/talkback'
-import { lights } from '../modules/protect/commands/lights'
+import { lightsOn } from '../modules/protect/commands/lights'
 
 const EMPTY_CTX = { config: {}, json: false, quiet: true, verbose: false, log: null as unknown as ReturnType<typeof import('consola').createConsola>, args: {} }
 
@@ -41,19 +41,15 @@ describe('protect cameras talkback', () => {
 })
 
 describe('protect lights', () => {
-  test('rejects invalid action', async () => {
-    expect(errCode(await lights.run({ ...EMPTY_CTX, args: { action: 'dim', light: 'test' } }))).toBe('invalid_arg')
-  })
-
   test('rejects missing light', async () => {
-    expect(errCode(await lights.run({ ...EMPTY_CTX, args: { action: 'on' } }))).toBe('missing_arg')
+    expect(errCode(await lightsOn.run({ ...EMPTY_CTX, args: {} }))).toBe('missing_arg')
   })
 
   test('rejects invalid brightness', async () => {
-    expect(errCode(await lights.run({ ...EMPTY_CTX, args: { action: 'on', light: 'test', brightness: '150' } }))).toBe('invalid_arg')
+    expect(errCode(await lightsOn.run({ ...EMPTY_CTX, args: { light: 'test', brightness: '150' } }))).toBe('invalid_arg')
   })
 
   test('rejects negative brightness', async () => {
-    expect(errCode(await lights.run({ ...EMPTY_CTX, args: { action: 'on', light: 'test', brightness: '-5' } }))).toBe('invalid_arg')
+    expect(errCode(await lightsOn.run({ ...EMPTY_CTX, args: { light: 'test', brightness: '-5' } }))).toBe('invalid_arg')
   })
 })
