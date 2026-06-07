@@ -1,5 +1,7 @@
 import type { ModuleManifest } from '../../core/types'
 import { requestJson, readDiscordConfig } from './client'
+import { listChannelsCmd } from './commands/list-channels'
+import { getMessagesCmd } from './commands/get-messages'
 import { sendMessageCmd } from './commands/send-message'
 
 export const manifest: ModuleManifest = {
@@ -23,6 +25,8 @@ export const manifest: ModuleManifest = {
     },
   ],
   commands: [
+    listChannelsCmd,
+    getMessagesCmd,
     sendMessageCmd,
   ],
   async status(cfg) {
