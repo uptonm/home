@@ -152,3 +152,41 @@ export const queueAdd: CommandSpec = {
     })
   },
 }
+
+export const queueRemove: CommandSpec = {
+  path: ['queue', 'remove'],
+  description: 'Remove a track from the queue by its 1-based position (see `queue list`)',
+  args: [
+    roomArg,
+    { name: 'pos', kind: 'positional', description: 'Queue position to remove (1-based)', required: true },
+  ],
+  examples: ['home sonos queue remove "Dining Room" 3'],
+  async run(ctx): Promise<RunResult> {
+    const pos = Number(ctx.args.pos)
+    if (!Number.isInteger(pos) || pos < 1) {
+      return { ok: false, kind: 'user', message: 'pos must be a whole number >= 1', code: 'bad_arg' }
+    }
+    return withRoom(ctx, { pick: 'coordinator', required: true }, async (d) => {
+      await d.AVTransportService.RemoveTrackRangeFromQueue({ InstanceID: 0, UpdateID: 0, StartingIndex: pos, NumberOfTracks: 1 })
+      return { ok: true, data: { room: d.Name, action: 'queue_remove', pos } }
+    })
+  },
+}
+
+export const queueSave: CommandSpec = {
+  path: ['queue', 'save'],
+  description: 'Save the current queue as a Sonos playlist',
+  args: [
+    roomArg,
+    { name: 'name', kind: 'positional', description: 'Playlist title to save the queue as', required: true },
+  ],
+  examples: ['home sonos queue save "Dining Room" "Friday Night"'],
+  async run(ctx): Promise<RunResult> {
+    const name = ctx.args.name ? String(ctx.args.name) : undefined
+    if (!name) return { ok: false, kind: 'user', message: 'name is required', code: 'missing_arg' }
+    return withRoom(ctx, { pick: 'coordinator', required: true }, async (d) => {
+      const r = await d.AVTransportService.SaveQueue({ InstanceID: 0, Title: name, ObjectID: '' })
+      return { ok: true, data: { room: d.Name, action: 'queue_save', title: name, objectId: r.AssignedObjectID } }
+    })
+  },
+}

@@ -1,11 +1,22 @@
 import type { ModuleManifest } from '../../core/types'
 import { discover, readSonosConfig, summarizeGroups } from './client'
-import { playersList } from './commands/players'
-import { groupsList } from './commands/groups'
+import { playersList, playersGet } from './commands/players'
+import { groupsList, groupsGet, groupsJoin, groupsLeave, groupsParty, groupsUngroup } from './commands/groups'
 import { play, pause, next, prev, nowPlaying } from './commands/playback'
 import { volumeGet, volumeSet, mute } from './commands/volume'
-import { queueList, queueClear, queueAdd } from './commands/queue'
+import { queueList, queueClear, queueAdd, queueRemove, queueSave } from './commands/queue'
 import { playUri, favoritesList } from './commands/source'
+import { favoritesPlay } from './commands/favorites'
+import { playModeGet, playModeSet } from './commands/play-mode'
+import { sleepTimerGet, sleepTimerSet } from './commands/sleep-timer'
+import { eqGet, eqSet } from './commands/eq'
+import { groupVolumeGet, groupVolumeSet, groupMute } from './commands/group-volume'
+import { seek } from './commands/seek'
+import { playlistsList, playlistsGet, playlistsPlay } from './commands/playlists'
+import { libraryBrowse, librarySearch } from './commands/library'
+import { musicServicesList } from './commands/music-services'
+import { alarmsList, alarmsGet, alarmsEnable, alarmsDisable } from './commands/alarms'
+import { lineIn } from './commands/line-in'
 import { notifyCmd } from './commands/notify'
 import { spotifyAccountsList } from './commands/spotify-accounts'
 import { validateCidr } from './scan'
@@ -27,7 +38,13 @@ export const manifest: ModuleManifest = {
   ],
   commands: [
     playersList,
+    playersGet,
     groupsList,
+    groupsGet,
+    groupsJoin,
+    groupsLeave,
+    groupsParty,
+    groupsUngroup,
     nowPlaying,
     play,
     pause,
@@ -39,8 +56,32 @@ export const manifest: ModuleManifest = {
     queueList,
     queueClear,
     queueAdd,
+    queueRemove,
+    queueSave,
     playUri,
     favoritesList,
+    favoritesPlay,
+    playModeGet,
+    playModeSet,
+    sleepTimerGet,
+    sleepTimerSet,
+    eqGet,
+    eqSet,
+    groupVolumeGet,
+    groupVolumeSet,
+    groupMute,
+    seek,
+    playlistsList,
+    playlistsGet,
+    playlistsPlay,
+    libraryBrowse,
+    librarySearch,
+    musicServicesList,
+    alarmsList,
+    alarmsGet,
+    alarmsEnable,
+    alarmsDisable,
+    lineIn,
     notifyCmd,
     spotifyAccountsList,
   ],
