@@ -23,14 +23,14 @@ export const authLogin: CommandSpec = {
       }
     }
 
-    const tokens = await runLoopbackOAuth({
+    const tokens = await runInstalledAppOAuth({
       clientId,
       clientSecret,
       scopes: GMAIL_SCOPES,
       loginHint: ctx.args['login-hint'] ? String(ctx.args['login-hint']) : undefined,
     })
 
-    // runLoopbackOAuth guarantees a refresh token or throws.
+    // runInstalledAppOAuth guarantees a refresh token or throws.
     setSecret(GMAIL_MODULE, GMAIL_REFRESH_TOKEN_KEY, tokens.refreshToken!)
 
     // Confirm the grant works end-to-end before declaring success.

@@ -33,6 +33,7 @@ export const messagesList: CommandSpec = {
   async run(ctx) {
     const max = parseMax(ctx)
     if (max.error) return { ok: false, kind: 'user', message: max.error, code: 'bad_arg' }
+    if (max.warning && ctx.log) ctx.log.warn(max.warning)
 
     const opts = {
       q: optionalString(ctx, 'q'),

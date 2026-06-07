@@ -237,6 +237,8 @@ export interface MessageSummary {
   date?: string
   snippet?: string
   labelIds?: string[]
+  /** Present when the metadata fetch for this message failed (e.g. message deleted between list and get). */
+  error?: string
 }
 
 /**
@@ -315,11 +317,19 @@ export async function listMessagesHydrated(
   const page = await listMessages(cfg, opts)
   const refs = page.messages ?? []
   const messages = await mapWithConcurrency(refs, HYDRATE_CONCURRENCY, async (ref) => {
-    const full = await getMessage(cfg, ref.id, {
-      format: 'metadata',
-      metadataHeaders: SUMMARY_HEADERS,
-    })
-    return summarizeMessage(full)
+    try {
+      const full = await getMessage(cfg, ref.id, {
+        format: 'metadata',
+        metadataHeaders: SUMMARY_HEADERS,
+      })
+      return summarizeMessage(full)
+    } catch (err) {
+      return {
+        id: ref.id,
+        threadId: ref.threadId,
+        error: (err as Error).message,
+      } satisfies MessageSummary
+    }
   })
   return {
     messages,

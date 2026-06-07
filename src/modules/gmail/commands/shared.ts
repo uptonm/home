@@ -7,6 +7,7 @@ export const MAX_MAX_RESULTS = 500
 export interface ParseResult<T> {
   value?: T
   error?: string
+  warning?: string
 }
 
 /** Parse `--max <n>` into a 1..500 page size, defaulting when absent. */
@@ -16,7 +17,11 @@ export function parseMax(ctx: RunContext): ParseResult<number> {
   if (!Number.isFinite(n) || n < 1) {
     return { error: 'max must be a positive number' }
   }
-  return { value: Math.min(Math.floor(n), MAX_MAX_RESULTS) }
+  const clamped = Math.min(Math.floor(n), MAX_MAX_RESULTS)
+  if (clamped < n) {
+    return { value: clamped, warning: `max capped at ${MAX_MAX_RESULTS} (Gmail API limit)` }
+  }
+  return { value: clamped }
 }
 
 /** Parse `--label a,b,c` into a label-id array (undefined when absent). */

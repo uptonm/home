@@ -18,6 +18,7 @@ export const draftsList: CommandSpec = {
   async run(ctx) {
     const max = parseMax(ctx)
     if (max.error) return { ok: false, kind: 'user', message: max.error, code: 'bad_arg' }
+    if (max.warning && ctx.log) ctx.log.warn(max.warning)
 
     const cfg = readGmailConfig(ctx.config)
     const data = await listDrafts(cfg, {

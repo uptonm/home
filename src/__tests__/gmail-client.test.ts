@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { resetTokenCache } from '../core/google-auth'
+import { resetGoogleTokenCache } from '../core/google-auth'
 import {
   GMAIL_API_BASE,
   draftGetUrl,
@@ -190,10 +190,10 @@ describe('network functions over mocked fetch', () => {
       headers: { 'Content-Type': 'application/json' },
     })
 
-  beforeEach(() => resetTokenCache())
+  beforeEach(() => resetGoogleTokenCache())
   afterEach(() => {
     globalThis.fetch = originalFetch
-    resetTokenCache()
+    resetGoogleTokenCache()
   })
 
   test('getMessage hits the per-message endpoint with a bearer token', async () => {
