@@ -1,7 +1,14 @@
 import type { ModuleManifest } from '../../core/types'
 import { getConfig, readAssistantConfig } from './client'
-import { stateGet, statesList, statesSearch } from './commands/states'
+import { stateGet, stateSet, statesList, statesSearch } from './commands/states'
 import { serviceCall } from './commands/service'
+import { servicesList } from './commands/services'
+import { eventsList } from './commands/events'
+import { calendarsGet, calendarsList } from './commands/calendars'
+import { templateRender } from './commands/template'
+import { cameraSnapshotCmd } from './commands/camera'
+import { errorLogCmd } from './commands/error-log'
+import { configGet } from './commands/config'
 import { lightCmd, switchCmd, climateCmd } from './commands/control'
 import { automationTrigger } from './commands/automation'
 import { historyGet } from './commands/history'
@@ -10,7 +17,7 @@ import { sceneActivate, scriptRun } from './commands/scene-script'
 
 export const manifest: ModuleManifest = {
   name: 'assistant',
-  description: 'Read and control Home Assistant — states, services, automations, history, logbook',
+  description: 'Read and control Home Assistant — states, services, events, calendars, automations, history, logbook, cameras, templates, error log, config',
   whenToUse:
     'Use when the user asks about sensors, lights, switches, climate, automations, scenes, scripts, or any Home Assistant entity. Do not use for network gear (`home-unifi`) or cameras (`home-protect`).',
   configSchema: [
@@ -28,7 +35,21 @@ export const manifest: ModuleManifest = {
       help: 'Profile → Security → Long-lived access tokens → Create',
     },
   ],
-  commands: [statesList, statesSearch, stateGet, lightCmd, switchCmd, climateCmd, sceneActivate, scriptRun, serviceCall, automationTrigger, historyGet, logbookList],
+  commands: [
+    statesList, statesSearch, stateGet, stateSet,
+    lightCmd, switchCmd, climateCmd,
+    sceneActivate, scriptRun,
+    serviceCall, servicesList,
+    eventsList,
+    calendarsList, calendarsGet,
+    templateRender,
+    cameraSnapshotCmd,
+    errorLogCmd,
+    configGet,
+    automationTrigger,
+    historyGet,
+    logbookList,
+  ],
   async status(cfg) {
     try {
       const data = await getConfig(readAssistantConfig(cfg))
