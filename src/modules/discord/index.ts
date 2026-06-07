@@ -1,5 +1,6 @@
 import type { ModuleManifest } from '../../core/types'
 import { requestJson, readDiscordConfig } from './client'
+import { sendMessageCmd } from './commands/send-message'
 
 export const manifest: ModuleManifest = {
   name: 'discord',
@@ -21,7 +22,9 @@ export const manifest: ModuleManifest = {
       help: 'Right-click your server -> Copy Server ID',
     },
   ],
-  commands: [],
+  commands: [
+    sendMessageCmd,
+  ],
   async status(cfg) {
     try {
       const user = await requestJson<{ username: string }>('/users/@me', {}, readDiscordConfig(cfg))
