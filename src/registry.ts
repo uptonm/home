@@ -7,8 +7,9 @@ import sonosManifest from './modules/sonos'
 import ttsManifest from './modules/tts'
 import gdriveManifest from './modules/gdrive'
 import gmailManifest from './modules/gmail'
+import discordManifest from './modules/discord'
 
-export const modules: ModuleManifest[] = [unifiManifest, protectManifest, assistantManifest, spotifyManifest, sonosManifest, ttsManifest, gdriveManifest, gmailManifest]
+export const modules: ModuleManifest[] = [unifiManifest, protectManifest, assistantManifest, spotifyManifest, sonosManifest, ttsManifest, gdriveManifest, gmailManifest, discordManifest]
 
 export const moduleByName: Record<string, ModuleManifest> = Object.fromEntries(
   modules.map((m) => [m.name, m] as const),
