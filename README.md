@@ -13,13 +13,12 @@ Modules:
 - **`tts`** — text-to-speech to an MP3 (macOS `say` / Linux `espeak-ng`), for hand-off to Sonos notify
 - **`gmail`** — Google Gmail (read-only: search messages/threads, list labels/drafts, mailbox profile)
 - **`gdrive`** — Google Drive (list/get/download/export files)
-- **`gchat`** — Google Chat (read-only: spaces, members, messages)
 
 `spotify`, `sonos`, and `tts` are designed to pair: search the catalog with
 `spotify` and hand the URI to `sonos play-uri`, or synthesize an announcement
 with `tts` and push it through `sonos notify`.
 
-`gmail`, `gdrive`, and `gchat` share a Google OAuth flow via `home <module> auth login`.
+`gmail` and `gdrive` share a Google OAuth flow via `home <module> auth login`.
 
 ## Install
 
@@ -60,7 +59,6 @@ home spotify search "midnight city" --type track --json
 home sonos players list --json
 home gmail messages list --q "is:unread newer_than:2d" --hydrate --json
 home gdrive files list --q "name contains 'report'" --json
-home gchat spaces list --json
 ```
 
 Pair `spotify` with `sonos` to turn a search into playback:
@@ -311,20 +309,6 @@ Setup: `home gdrive configure` (set clientId/clientSecret), then `home gdrive au
 | `home gdrive files export <id> [--mime <type>] [--out <path>] [--stdout]` | Export a Google-native doc to another format. `--mime` accepts friendly aliases (`pdf`, `docx`, `xlsx`) or full MIME types. |
 | `home gdrive auth login` | OAuth browser flow — store the refresh token |
 | `home gdrive auth logout` | Forget the stored refresh token (revokes nothing server-side) |
-
-### `gchat`
-
-Read-only Google Chat access using the Chat API and Google OAuth.
-**Requires a Google Workspace account** — the Chat API rejects consumer `@gmail.com` accounts.
-
-| Command | Purpose |
-| --- | --- |
-| `home gchat spaces list [--filter <type>] [--limit N]` | List spaces the authenticated user belongs to |
-| `home gchat spaces get <name>` | Get a single space by resource name or display-name match |
-| `home gchat members list <space> [--limit N]` | List memberships (people and apps) in a space |
-| `home gchat members get <space> <member>` | Get a single membership by resource name |
-| `home gchat messages list <space> [--filter <f>] [--orderBy <o>] [--limit N]` | List messages in a space |
-| `home gchat messages get <space> <message>` | Get a single message by resource name |
 
 ## Development
 
