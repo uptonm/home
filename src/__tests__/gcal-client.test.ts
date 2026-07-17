@@ -7,11 +7,15 @@ import {
   checkGcalStatus,
   eventGetUrl,
   eventsListUrl,
+  freeBusyBody,
+  freeBusyUrl,
   getEvent,
   listCalendars,
+  queryFreeBusy,
   readGcalConfig,
   summarizeCalendar,
   summarizeEvent,
+  summarizeFreeBusy,
   type GcalEvent,
 } from '../modules/gcal/client'
 
@@ -76,6 +80,40 @@ describe('eventGetUrl', () => {
   test('URL-encodes both ids', () => {
     expect(eventGetUrl('primary', 'ev1')).toBe(`${GCAL_API_BASE}/calendars/primary/events/ev1`)
     expect(eventGetUrl('a@b.com', 'e/1')).toContain('/calendars/a%40b.com/events/e%2F1')
+  })
+})
+
+describe('freeBusyBody', () => {
+  test('maps the range to timeMin/timeMax and calendar ids to items', () => {
+    expect(freeBusyBody('2026-07-17T09:00:00Z', '2026-07-17T17:00:00Z', ['primary', 'a@b.com'])).toEqual({
+      timeMin: '2026-07-17T09:00:00Z',
+      timeMax: '2026-07-17T17:00:00Z',
+      items: [{ id: 'primary' }, { id: 'a@b.com' }],
+    })
+  })
+})
+
+describe('summarizeFreeBusy', () => {
+  test('flattens the calendars map, defaulting busy and errors to empty arrays', () => {
+    expect(
+      summarizeFreeBusy({
+        calendars: {
+          primary: { busy: [{ start: '2026-07-17T13:00:00Z', end: '2026-07-17T13:30:00Z' }] },
+          'nope@example.com': { errors: [{ domain: 'global', reason: 'notFound' }] },
+        },
+      }),
+    ).toEqual([
+      {
+        calendarId: 'primary',
+        busy: [{ start: '2026-07-17T13:00:00Z', end: '2026-07-17T13:30:00Z' }],
+        errors: [],
+      },
+      { calendarId: 'nope@example.com', busy: [], errors: [{ domain: 'global', reason: 'notFound' }] },
+    ])
+  })
+
+  test('tolerates a response with no calendars map', () => {
+    expect(summarizeFreeBusy({})).toEqual([])
   })
 })
 
@@ -223,6 +261,31 @@ describe('network functions over mocked fetch', () => {
     expect(event).toEqual({ id: 'ev1', summary: 'Standup' })
     expect(seenUrl).toBe(`${GCAL_API_BASE}/calendars/primary/events/ev1`)
     expect(seenAuth).toBe('Bearer tok')
+  })
+
+  test('queryFreeBusy POSTs the JSON body to the freeBusy endpoint', async () => {
+    let seenUrl = ''
+    let seenMethod: string | undefined
+    let seenHeaders: Record<string, string> = {}
+    let seenBody: unknown
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      if (String(url).includes('oauth2.googleapis.com')) return tokenResponse()
+      seenUrl = String(url)
+      seenMethod = init?.method
+      seenHeaders = (init?.headers as Record<string, string>) ?? {}
+      seenBody = JSON.parse(String(init?.body))
+      return jsonResponse({ calendars: { primary: { busy: [] } } })
+    }) as typeof fetch
+
+    const body = freeBusyBody('2026-07-17T09:00:00Z', '2026-07-17T17:00:00Z', ['primary'])
+    const res = await queryFreeBusy(cfg, body)
+    expect(res).toEqual({ calendars: { primary: { busy: [] } } })
+    expect(seenUrl).toBe(freeBusyUrl())
+    expect(seenUrl).toBe(`${GCAL_API_BASE}/freeBusy`)
+    expect(seenMethod).toBe('POST')
+    expect(seenHeaders['Content-Type']).toBe('application/json')
+    expect(seenHeaders.Authorization).toBe('Bearer tok')
+    expect(seenBody).toEqual(body)
   })
 
   test('listCalendars surfaces the nextPageToken pagination boundary', async () => {

@@ -12,7 +12,7 @@ Modules:
 - **`sonos`** — Sonos players (playback, volume, groups, queue, favorites, playlists, library, EQ, alarms, notifications)
 - **`tts`** — text-to-speech to an MP3 (macOS `say` / Linux `espeak-ng`), for hand-off to Sonos notify
 - **`gmail`** — Google Gmail (read-only: search messages/threads, list labels/drafts, mailbox profile)
-- **`gcal`** — Google Calendar (read-only: list calendars, list/get events with recurring expansion)
+- **`gcal`** — Google Calendar (read-only: calendars, events with recurring expansion, merged agenda, free/busy)
 - **`gdrive`** — Google Drive (list/get/download/export files)
 
 `spotify`, `sonos`, and `tts` are designed to pair: search the catalog with
@@ -380,6 +380,8 @@ a different surface — use `home assistant calendars` for those.
 | `home gcal calendars list [--max N]` | List calendars on the account — owned, shared, and subscribed — with id, summary, primary flag, access role, and time zone |
 | `home gcal events list [calendarId] [--from <t>] [--to <t>] [--q <text>] [--max N]` | List events ordered by start time, recurring events expanded to individual instances. Calendar defaults to `primary`; `--from`/`--to` take RFC 3339 or bare `YYYY-MM-DD` (local midnight). |
 | `home gcal events get <calendarId> <eventId>` | Get a single event by id (full payload) |
+| `home gcal agenda [--days N] [--calendars id,…] [--max N]` | Merged chronological briefing across calendars for the next N days (default 1, max 14). Defaults to every calendar on the account; all-day events sort ahead of timed ones on the same day. `truncated: true` when rows were cut at `--max`. |
+| `home gcal freebusy --from <t> --to <t> [--calendars id,…]` | Busy intervals per calendar over a time range (max 90 days; calendars default `primary`). Per-calendar lookup failures (e.g. notFound) come back as data in `errors[]`, not as a command failure. |
 | `home gcal auth login` | OAuth browser flow — store the refresh token |
 | `home gcal auth status` | Probe the stored credentials with one bounded calendar-list request; reports the authenticated account |
 

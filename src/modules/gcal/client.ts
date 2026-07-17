@@ -87,6 +87,21 @@ export function eventGetUrl(calendarId: string, eventId: string): string {
   return `${GCAL_API_BASE}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`
 }
 
+export function freeBusyUrl(): string {
+  return `${GCAL_API_BASE}/freeBusy`
+}
+
+export interface FreeBusyRequestBody {
+  timeMin: string
+  timeMax: string
+  items: { id: string }[]
+}
+
+/** Build the freeBusy POST body — the query's only inputs are the range and the calendar ids. */
+export function freeBusyBody(timeMin: string, timeMax: string, calendarIds: string[]): FreeBusyRequestBody {
+  return { timeMin, timeMax, items: calendarIds.map((id) => ({ id })) }
+}
+
 // --- Response shapes -----------------------------------------------------
 
 export interface CalendarListEntry {
@@ -149,6 +164,28 @@ export interface EventsListResponse {
   timeZone?: string
   items?: GcalEvent[]
   nextPageToken?: string
+}
+
+export interface FreeBusyInterval {
+  start: string
+  end: string
+}
+
+export interface FreeBusyError {
+  domain?: string
+  reason?: string
+}
+
+export interface FreeBusyCalendar {
+  busy?: FreeBusyInterval[]
+  /** Per-calendar lookup failures (e.g. reason `notFound`) — the query itself still succeeds. */
+  errors?: FreeBusyError[]
+}
+
+export interface FreeBusyResponse {
+  timeMin?: string
+  timeMax?: string
+  calendars?: Record<string, FreeBusyCalendar>
 }
 
 // --- Normalizers (pure) --------------------------------------------------
@@ -223,6 +260,25 @@ export function summarizeEvent(event: GcalEvent): EventSummary {
   }
 }
 
+export interface FreeBusyCalendarSummary {
+  calendarId: string
+  busy: FreeBusyInterval[]
+  errors: FreeBusyError[]
+}
+
+/**
+ * Flatten the freeBusy calendars map to rows, keeping per-calendar `errors`
+ * (e.g. notFound for a bad id) as data so one broken calendar cannot fail
+ * the whole query.
+ */
+export function summarizeFreeBusy(res: FreeBusyResponse): FreeBusyCalendarSummary[] {
+  return Object.entries(res.calendars ?? {}).map(([calendarId, cal]) => ({
+    calendarId,
+    busy: cal.busy ?? [],
+    errors: cal.errors ?? [],
+  }))
+}
+
 // --- API functions -------------------------------------------------------
 
 export function listCalendars(cfg: GcalConfig, opts: CalendarsListOptions = {}): Promise<CalendarsListResponse> {
@@ -239,6 +295,15 @@ export function listEvents(cfg: GcalConfig, calendarId: string, opts: EventsList
 
 export function getEvent(cfg: GcalConfig, calendarId: string, eventId: string): Promise<GcalEvent> {
   return authedRequestJson<GcalEvent>(cfg, eventGetUrl(calendarId, eventId))
+}
+
+/** POST in transport only — freeBusy queries availability and mutates nothing. */
+export function queryFreeBusy(cfg: GcalConfig, body: FreeBusyRequestBody): Promise<FreeBusyResponse> {
+  return authedRequestJson<FreeBusyResponse>(cfg, freeBusyUrl(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
 }
 
 // --- Status probe --------------------------------------------------------
