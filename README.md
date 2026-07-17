@@ -520,6 +520,33 @@ Security & access; optional default team).
 | `home linear teams list` | Teams — id, key, name |
 | `home linear my-work list [--state] [--limit N]` | Your assigned issues in actionable order (in-progress first, then triage/todo/backlog; higher priority first) |
 | `home linear summary [--team]` | One planning snapshot: your active issues, blocked issues, active cycle with progress, projects at risk |
+### `beszel`
+
+Read-only view of the [Beszel](https://beszel.dev) monitoring hub — it answers
+"what is wrong with the machine or container?": host up/down, CPU/memory/disk
+pressure, per-container resource usage and docker health, and which alerts are
+firing. Synthetic service availability checks belong to uptime-kuma, not here.
+
+Setup: `home beszel configure` (hub URL, a regular hub user's email + password;
+OIDC-only accounts can't authenticate — the module reports
+`beszel_auth_unavailable` if the hub has password login disabled).
+
+The hub is PocketBase-based and its API may shift between minor releases; the
+adapter targets the 0.18.x schema and fails with a stable
+`beszel_incompatible_version` code rather than guessing when a required field
+is missing. Raw PocketBase records never leak — every command returns
+normalized shapes (ISO 8601 timestamps, explicit units: `cpuPct`, `memoryGb`,
+`memoryMb`, `netBytesPerSec`, …). `<system>` accepts an exact id or exact
+case-insensitive name; ambiguous names list the candidates instead of picking.
+
+| Command | Purpose |
+| --- | --- |
+| `home beszel systems list [--status up\|down\|paused\|pending]` | Monitored systems with status and headline cpu/mem/disk % |
+| `home beszel systems get <id\|name>` | One system plus its latest 1-minute stats sample (memory, swap, disk, network, temps, load) |
+| `home beszel containers list <system> [--limit N]` | A system's containers: status, health, cpu %, memory MB, network bytes/s |
+| `home beszel containers get <system> <id\|name>` | One container on a system |
+| `home beszel alerts list [--system <id\|name>] [--active] [--limit N]` | Configured alerts (type, threshold, triggered), newest change first |
+| `home beszel overview` | Compact all-system summary: up/down counts, active alerts, per-host cpu/mem/disk % |
 
 ## Development
 
