@@ -44,12 +44,18 @@ export function parseOpsConfig(raw: unknown): OpsConfig {
   if (!Array.isArray(ops.projects)) throw invalid('"ops.projects" must be an array')
 
   const projects: OpsMappingGroup[] = []
+  const firstSeenAt = new Map<string, number>()
   for (const [i, entry] of ops.projects.entries()) {
     const at = `ops.projects[${i}]`
     const group = asRecord(entry)
     if (!group) throw invalid(`${at} must be an object`)
     const vercelProject = typeof group.vercelProject === 'string' ? group.vercelProject.trim() : ''
     if (!vercelProject) throw invalid(`${at}.vercelProject must be a non-empty string`)
+    const priorIndex = firstSeenAt.get(vercelProject)
+    if (priorIndex !== undefined) {
+      throw invalid(`duplicate vercelProject "${vercelProject}" at ops.projects[${priorIndex}] and ops.projects[${i}]`)
+    }
+    firstSeenAt.set(vercelProject, i)
     const kumaMonitors = group.kumaMonitors ?? []
     if (!Array.isArray(kumaMonitors) || kumaMonitors.some((m) => !Number.isInteger(m))) {
       throw invalid(`${at}.kumaMonitors must be an array of monitor ids (integers)`)

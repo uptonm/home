@@ -279,4 +279,18 @@ describe('overview ops config parsing', () => {
       'beszelSystems',
     )
   })
+
+  test('rejects a duplicate vercelProject naming both indices', () => {
+    expect(() =>
+      parseOpsConfig({
+        ops: {
+          projects: [
+            { vercelProject: 'dup', kumaMonitors: [1], beszelSystems: ['boris'] },
+            { vercelProject: 'other', kumaMonitors: [2], beszelSystems: ['nas'] },
+            { vercelProject: 'dup', kumaMonitors: [3], beszelSystems: ['atlas'] },
+          ],
+        },
+      }),
+    ).toThrow('duplicate vercelProject "dup" at ops.projects[0] and ops.projects[2]')
+  })
 })
