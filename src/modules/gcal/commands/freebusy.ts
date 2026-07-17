@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { freeBusyBody, queryFreeBusy, readGcalConfig, summarizeFreeBusy } from '../client'
+import { freeBusyBody, queryFreeBusy, readGcalCredentials, summarizeFreeBusy } from '../client'
 import { DAY_MS, parseCalendarIds, parseTimeBound } from './shared'
 
 // The freeBusy endpoint itself degrades past ~3 months; reject early with a clear error.
@@ -45,8 +45,8 @@ export const freebusy: CommandSpec = {
     }
 
     const calendarIds = parseCalendarIds(ctx) ?? ['primary']
-    const cfg = readGcalConfig(ctx.config)
-    const res = await queryFreeBusy(cfg, freeBusyBody(from.value, to.value, calendarIds))
+    const creds = readGcalCredentials()
+    const res = await queryFreeBusy(creds, freeBusyBody(from.value, to.value, calendarIds))
     return {
       ok: true,
       data: {

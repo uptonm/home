@@ -17,6 +17,7 @@ const realClient = await import('../modules/gcal/client')
 
 mock.module('../modules/gcal/client', () => ({
   ...realClient,
+  readGcalCredentials: () => ({ clientId: 'c', clientSecret: 's', refreshToken: 'r' }),
   queryFreeBusy: async (_cfg: unknown, body: FreeBusyRequestBody) => {
     queryCalls.push(body)
     return queryResponse

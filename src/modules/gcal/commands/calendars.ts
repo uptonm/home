@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { listCalendars, readGcalConfig, summarizeCalendar } from '../client'
+import { listCalendars, readGcalCredentials, summarizeCalendar } from '../client'
 import { CALENDARS_MAX_CAP, DEFAULT_CALENDARS_MAX, optionalString, parseMax } from './shared'
 
 export const calendarsList: CommandSpec = {
@@ -20,8 +20,8 @@ export const calendarsList: CommandSpec = {
     if (max.error) return { ok: false, kind: 'user', message: max.error, code: 'bad_arg' }
     if (max.warning && ctx.log) ctx.log.warn(max.warning)
 
-    const cfg = readGcalConfig(ctx.config)
-    const page = await listCalendars(cfg, {
+    const creds = readGcalCredentials()
+    const page = await listCalendars(creds, {
       maxResults: max.value,
       pageToken: optionalString(ctx, 'page-token'),
     })

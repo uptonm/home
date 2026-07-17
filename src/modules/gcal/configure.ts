@@ -1,4 +1,27 @@
-import { runConfigure } from '../../core/configure'
-import manifest from './index'
+import { runInstalledAppOAuth, readSharedGoogleClient, GOOGLE_MODULE } from '../../core/google-auth'
+import { setSecret } from '../../core/secrets'
+import { NotConfiguredError } from '../../core/errors'
+import { GCAL_MODULE, GCAL_REFRESH_TOKEN_KEY, GCAL_SCOPES, getCalendarListEntry } from './client'
 
-export const configureGcal = () => runConfigure(manifest)
+/**
+ * Calendar's setup is a browser consent, not a set of typed answers, so it
+ * replaces the prompt-driven `runConfigure` via `ModuleManifest.configure`.
+ */
+export async function configureGcal(): Promise<void> {
+  // Not requireGoogleCredentials: that also demands a refresh token, which is
+  // precisely what this function exists to obtain.
+  const client = readSharedGoogleClient()
+  if (!client) throw new NotConfiguredError(GOOGLE_MODULE, 'google_unconfigured')
+
+  const tokens = await runInstalledAppOAuth({
+    clientId: client.clientId,
+    clientSecret: client.clientSecret,
+    scopes: GCAL_SCOPES,
+  })
+
+  setSecret(GCAL_MODULE, GCAL_REFRESH_TOKEN_KEY, tokens.refreshToken)
+
+  // Confirm the grant works end-to-end before declaring success.
+  const primary = await getCalendarListEntry({ ...client, refreshToken: tokens.refreshToken }, 'primary')
+  process.stderr.write(`authorized ${primary.id}\n`)
+}
