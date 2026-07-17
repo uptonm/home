@@ -27,7 +27,7 @@
  *  - uptimeList values are 0..1 ratios over 24h: monitor.js `calcUptime`
  */
 import { SystemError } from '../../core/errors'
-import type { RawHeartbeat, RawStatusPage } from './client'
+import type { RawCertEntry, RawHeartbeat, RawStatusPage } from './client'
 
 export const MONITOR_STATUSES = ['up', 'down', 'pending', 'maintenance'] as const
 export type MonitorStatus = (typeof MONITOR_STATUSES)[number]
@@ -219,8 +219,11 @@ export function normalizeStatusPage(raw: RawStatusPage): KumaPage {
   }
 }
 
-/** The heartbeat route caps each monitor at the 50 newest beats (LIMIT 50, ascending). */
+/** The public heartbeat route caps each monitor at the 50 newest beats (LIMIT 50, ascending). */
 export const BEATS_MAX = 50
+
+/** The authenticated heartbeatList event caps at 100 (server client.js sendHeartbeatList LIMIT 100). */
+export const AUTH_BEATS_MAX = 100
 
 export interface KumaBeat {
   status: MonitorStatus | null
@@ -228,13 +231,61 @@ export interface KumaBeat {
   latencyMs: number | null
 }
 
-/** Normalize one monitor's beat list; keeps the newest BEATS_MAX, oldest→newest. */
-export function normalizeBeats(raw: RawHeartbeat[]): KumaBeat[] {
-  return raw.slice(-BEATS_MAX).map((b) => ({
+/** Normalize one monitor's beat list; keeps the newest `max`, oldest→newest. */
+export function normalizeBeats(raw: RawHeartbeat[], max: number = BEATS_MAX): KumaBeat[] {
+  return raw.slice(-max).map((b) => ({
     status: heartbeatStatusToString(b?.status),
     at: kumaUtcToIso(b?.time),
     latencyMs: optNumber(b?.ping),
   }))
+}
+
+/** Authenticated beats keep `msg` (the down reason); the public route blanks it. */
+export interface KumaAuthBeat extends KumaBeat {
+  msg: string | null
+}
+
+export function normalizeAuthBeats(raw: RawHeartbeat[]): KumaAuthBeat[] {
+  return raw.slice(-AUTH_BEATS_MAX).map((b) => ({
+    status: heartbeatStatusToString(b?.status),
+    at: kumaUtcToIso(b?.time),
+    latencyMs: optNumber(b?.ping),
+    msg: optString(b?.msg),
+  }))
+}
+
+/**
+ * One monitored endpoint's stored TLS certificate, from monitor_tls_info via
+ * the authenticated transport. Fields per server/util-server.js
+ * `checkCertificate`: valid (socket.authorized), certInfo.daysRemaining,
+ * certInfo.validTo (a Date, ISO after the JSON round trip), certInfo.certType
+ * ('server' / 'self-signed' / …), certInfo.subject/issuer (node cert objects
+ * with CN / O). Only the leaf certificate is read — issuerCertificate chains
+ * are ignored.
+ */
+export interface KumaCertificate {
+  monitorId: string
+  valid: boolean | null
+  daysRemaining: number | null
+  validTo: string | null
+  subjectCN: string | null
+  issuer: string | null
+  certType: string | null
+}
+
+export function normalizeCertificate(monitorId: string, raw: RawCertEntry): KumaCertificate {
+  const info = asRecord(raw.certInfo)
+  const subject = info ? asRecord(info.subject) : null
+  const issuer = info ? asRecord(info.issuer) : null
+  return {
+    monitorId,
+    valid: typeof raw.valid === 'boolean' ? raw.valid : null,
+    daysRemaining: optNumber(info?.daysRemaining),
+    validTo: kumaUtcToIso(info?.validTo),
+    subjectCN: optString(subject?.CN),
+    issuer: optString(issuer?.O) ?? optString(issuer?.CN),
+    certType: optString(info?.certType),
+  }
 }
 
 export interface KumaLatencySummary {

@@ -16,6 +16,7 @@ import {
   createKumaTransport,
   readKumaConfig,
   type KumaConfig,
+  type KumaPrivateData,
   type KumaTransport,
   type RawHeartbeatPayload,
 } from '../client'
@@ -23,6 +24,44 @@ import {
 export function openTransport(ctx: RunContext): { cfg: KumaConfig; t: KumaTransport } {
   const cfg = readKumaConfig(ctx.config)
   return { cfg, t: createKumaTransport(cfg) }
+}
+
+/** Gate for auth-only commands: a stable, mode-explaining refusal on public transports. */
+export function privateDataOrError(
+  cfg: KumaConfig,
+  t: KumaTransport,
+): { ok: true; data: KumaPrivateData } | { ok: false; error: RunResult } {
+  if (t.privateData === null) {
+    return {
+      ok: false,
+      error: {
+        ok: false,
+        kind: 'user',
+        message: `this command needs private monitor data, which mode=${cfg.mode} cannot read — run \`home uptime-kuma configure\` and switch to mode=authenticated-socket`,
+        code: 'kuma_auth_mode_required',
+      },
+    }
+  }
+  return { ok: true, data: t.privateData }
+}
+
+/** Bounded integer flag: default when omitted, user error when nonsense, capped at `max`. */
+export function parseBoundedInt(
+  ctx: RunContext,
+  name: string,
+  fallback: number,
+  max: number,
+): { ok: true; value: number } | { ok: false; error: RunResult } {
+  const raw = ctx.args[name]
+  if (raw === undefined) return { ok: true, value: fallback }
+  const n = Number(raw)
+  if (!Number.isInteger(n) || n < 1) {
+    return {
+      ok: false,
+      error: { ok: false, kind: 'user', message: `--${name} must be a positive integer, got "${raw}"`, code: 'bad_arg' },
+    }
+  }
+  return { ok: true, value: Math.min(n, max) }
 }
 
 /**
