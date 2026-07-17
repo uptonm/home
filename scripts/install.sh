@@ -29,13 +29,27 @@ detect_target() {
   echo "home-${os}-${arch}"
 }
 
-resolve_download_url() {
-  local asset="$1"
-  if [[ "$VERSION" == "latest" ]]; then
-    echo "https://github.com/$REPO/releases/latest/download/$asset"
-  else
-    echo "https://github.com/$REPO/releases/download/$VERSION/$asset"
+# The release repo is private, so downloads go through the authenticated gh
+# CLI. curl is kept only as a fallback for the day the repo (or a mirror) is
+# public — an unauthenticated fetch of a private asset just 404s.
+download_asset() {
+  local asset="$1" out="$2"
+  if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+    if [[ "$VERSION" == "latest" ]]; then
+      gh release download --repo "$REPO" --pattern "$asset" --output "$out" --clobber
+    else
+      gh release download "$VERSION" --repo "$REPO" --pattern "$asset" --output "$out" --clobber
+    fi
+    return
   fi
+  local url
+  if [[ "$VERSION" == "latest" ]]; then
+    url="https://github.com/$REPO/releases/latest/download/$asset"
+  else
+    url="https://github.com/$REPO/releases/download/$VERSION/$asset"
+  fi
+  echo "gh not available/authenticated — trying unauthenticated $url"
+  curl -fsSL "$url" -o "$out"
 }
 
 pick_install_dir() {
@@ -53,14 +67,13 @@ pick_install_dir() {
 }
 
 main() {
-  local asset url dir tmp
+  local asset dir tmp
   asset="$(detect_target)"
-  url="$(resolve_download_url "$asset")"
   dir="$(pick_install_dir)"
   mkdir -p "$dir"
   tmp="$(mktemp)"
-  echo "Downloading $url"
-  curl -fsSL "$url" -o "$tmp"
+  echo "Downloading $asset ($VERSION) from $REPO"
+  download_asset "$asset" "$tmp"
   chmod +x "$tmp"
   if [[ "$dir" == "/usr/local/bin" ]]; then
     sudo mv "$tmp" "$dir/home"

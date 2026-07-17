@@ -12,6 +12,7 @@ export const paths = {
   modulesDir: join(XDG_CONFIG_HOME, 'home', 'modules'),
   moduleConfig: (name: string) => join(XDG_CONFIG_HOME, 'home', 'modules', `${name}.json`),
   secretsFile: join(XDG_CONFIG_HOME, 'home', 'secrets.json'),
+  updateCache: join(XDG_CONFIG_HOME, 'home', 'update-check.json'),
   skillsDir: join(HOME, '.claude', 'skills'),
   skillDir: (module: string) => join(HOME, '.claude', 'skills', `home-${module}`),
   skillFile: (module: string) => join(HOME, '.claude', 'skills', `home-${module}`, 'SKILL.md'),

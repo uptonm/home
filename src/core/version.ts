@@ -24,3 +24,11 @@ function devCommit(): string {
 
 export const HOME_VERSION: string = typeof __HOME_VERSION !== 'undefined' ? __HOME_VERSION : devVersion()
 export const HOME_COMMIT: string = typeof __HOME_COMMIT !== 'undefined' ? __HOME_COMMIT : devCommit()
+
+/**
+ * True only for a distributable binary — one built with the version baked in
+ * via `--define`. Running from source (`bun run`) leaves it undefined. Guards
+ * the update preflight and self-upgrade, neither of which can act on a binary
+ * that doesn't exist yet.
+ */
+export const IS_PACKAGED: boolean = typeof __HOME_VERSION !== 'undefined'
