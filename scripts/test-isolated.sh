@@ -13,21 +13,51 @@
 #
 # Every file passes on its own, so give each one a clean process. Costs ~1s.
 #
-# Pass any argument to delegate straight to `bun test` (e.g. a single file).
+# Usage:
+#   scripts/test-isolated.sh                     # discover + run every test file
+#   scripts/test-isolated.sh a.test.ts           # one file: delegate to bun test
+#   scripts/test-isolated.sh a.test.ts b.test.ts # several: each in its own process
+#
+# Flags are rejected on purpose: `bun test --coverage` (or any flag) would run
+# the whole suite in one process and reintroduce the exact leakage this script
+# exists to prevent.
 set -uo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO"
 
-if [[ $# -gt 0 ]]; then
-  exec bun test "$@"
-fi
-
-# Avoid `mapfile` — macOS still ships bash 3.2, where it doesn't exist.
 FILES=()
-while IFS= read -r line; do
-  FILES+=("$line")
-done < <(find src -name '*.test.ts' | sort)
+
+if [[ $# -gt 0 ]]; then
+  for arg in "$@"; do
+    if [[ ! -f "$arg" ]]; then
+      echo "test-isolated.sh: '$arg' is not a test file." >&2
+      echo "Flags and glob patterns are not supported: bun would run the whole suite in" >&2
+      echo "one process, where mock.module() leaks across files. Pass explicit file" >&2
+      echo "paths, or run 'bun test' directly if you accept shared-process semantics." >&2
+      exit 1
+    fi
+  done
+  if [[ $# -eq 1 ]]; then
+    exec bun test "$1"
+  fi
+  FILES=("$@")
+else
+  # Match bun's own discovery (.test / _test / .spec / _spec × js/jsx/ts/tsx,
+  # anywhere in the repo) so a file bun would run can never be silently skipped
+  # here. Avoid `mapfile` — macOS still ships bash 3.2, where it doesn't exist.
+  while IFS= read -r line; do
+    FILES+=("$line")
+  done < <(
+    find . \( -name node_modules -o -name .git -o -name dist \) -prune -o \
+      -type f \( \
+        -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.test.js' -o -name '*.test.jsx' -o \
+        -name '*_test.ts' -o -name '*_test.tsx' -o -name '*_test.js' -o -name '*_test.jsx' -o \
+        -name '*.spec.ts' -o -name '*.spec.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' -o \
+        -name '*_spec.ts' -o -name '*_spec.tsx' -o -name '*_spec.js' -o -name '*_spec.jsx' \
+      \) -print | sort
+  )
+fi
 
 if [[ ${#FILES[@]} -eq 0 ]]; then
   echo "no test files found" >&2
