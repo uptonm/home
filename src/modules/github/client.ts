@@ -799,6 +799,12 @@ export async function getIssue(
 /** The notifications API caps per_page at 50, unlike most list endpoints. */
 const NOTIFICATIONS_MAX_PAGE = 50
 
+// A --reason filter is applied client-side, so a sparse reason may need more
+// than one 50-row page to reach `limit`. Bound the walk so a rare reason on a
+// large inbox can't fan out into unbounded API calls: 10 pages = up to 500
+// notifications scanned.
+const NOTIFICATIONS_PAGE_CAP = 10
+
 /** gh api has no --repo; a non-default host rides --hostname instead. */
 function apiHostArgs(cfg: GithubConfig): string[] {
   return cfg.host === 'github.com' ? [] : ['--hostname', cfg.host]
@@ -849,13 +855,20 @@ export async function listNotifications(
 ): Promise<NotificationItem[]> {
   const limit = opts.limit ?? DEFAULT_LIMIT
   const reason = opts.reason?.trim().toLowerCase()
-  // The reason filter is ours, not the API's — fetch the full page cap so a
-  // sparse reason can still fill up to the limit.
+  // The reason filter is ours, not the API's, so fetch full pages when one is
+  // set; otherwise `limit` rows (bounded by the API's own 50) is all we need.
   const perPage = reason ? NOTIFICATIONS_MAX_PAGE : Math.min(limit, NOTIFICATIONS_MAX_PAGE)
-  const args = ['api', ...apiHostArgs(cfg), `notifications?per_page=${perPage}`]
-  const result = await execGh(cfg, args, {}, run)
-  const items = parseGhJson<RawNotification[]>('api notifications', result).map(normalizeNotification)
-  return (reason ? items.filter((n) => n.reason === reason) : items).slice(0, limit)
+  const collected: NotificationItem[] = []
+  for (let page = 1; page <= NOTIFICATIONS_PAGE_CAP; page++) {
+    const query = `notifications?per_page=${perPage}${page > 1 ? `&page=${page}` : ''}`
+    const result = await execGh(cfg, ['api', ...apiHostArgs(cfg), query], {}, run)
+    const rows = parseGhJson<RawNotification[]>('api notifications', result).map(normalizeNotification)
+    for (const item of rows) {
+      if (!reason || item.reason === reason) collected.push(item)
+    }
+    if (collected.length >= limit || rows.length < perPage) break
+  }
+  return collected.slice(0, limit)
 }
 
 // ---------------------------------------------------------------------------
@@ -977,16 +990,22 @@ export async function searchCode(
   if (repo && !/^[\w.-]+\/[\w.-]+$/.test(repo)) {
     throw new UserError(`--repo must be owner/name — got ${JSON.stringify(opts.repo)}`, 'bad_arg')
   }
+  // The query goes last, behind a `--` separator: gh's own help mandates it
+  // for hyphen-prefixed qualifiers, and without it a flag-shaped query like
+  // `-w` is parsed as gh's --web flag — opening a browser from a read-only
+  // command. gh (cobra) drops flag parsing after `--`, so every flag must
+  // precede it.
   const args = [
     'search',
     'code',
-    q,
     ...(opts.owner ? ['--owner', opts.owner] : []),
     ...(repo ? ['--repo', repo] : []),
     '--limit',
     String(opts.limit ?? DEFAULT_LIMIT),
     '--json',
     'path,repository,url,textMatches',
+    '--',
+    q,
   ]
   const result = await execGh(cfg, args, {}, run)
   return parseGhJson<RawCodeMatch[]>('search code', result).map(normalizeCodeMatch)

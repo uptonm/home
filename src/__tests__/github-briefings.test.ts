@@ -103,6 +103,30 @@ describe('notifications', () => {
     expect(items.every((n) => n.reason === 'mention')).toBe(true)
   })
 
+  test('a sparse reason walks past page 1 until it has `limit` matches', async () => {
+    // Page 1 is a full 50-row page with zero mentions; the match lives on page 2.
+    const full = Array.from({ length: 50 }, (_, i) =>
+      NOTIFICATION({ id: `p1-${i}`, reason: 'review_requested' }),
+    )
+    const withMention = [NOTIFICATION({ id: 'hit', reason: 'mention' })]
+    const { run, calls } = fakeGh((argv) =>
+      result({ stdout: JSON.stringify(argv[2]!.includes('page=2') ? withMention : full) }),
+    )
+    const items = await listNotifications(CFG, { reason: 'mention', limit: 1 }, run)
+    expect(calls.map((c) => c.argv[2])).toEqual(['notifications?per_page=50', 'notifications?per_page=50&page=2'])
+    expect(items.map((n) => n.id)).toEqual(['hit'])
+  })
+
+  test('pagination is bounded by the page cap on an all-non-matching inbox', async () => {
+    const full = Array.from({ length: 50 }, (_, i) =>
+      NOTIFICATION({ id: `x-${i}`, reason: 'review_requested' }),
+    )
+    const { run, calls } = fakeGh(result({ stdout: JSON.stringify(full) }))
+    const items = await listNotifications(CFG, { reason: 'mention', limit: 5 }, run)
+    expect(items).toEqual([])
+    expect(calls).toHaveLength(10) // NOTIFICATIONS_PAGE_CAP
+  })
+
   test('GHE host rides --hostname', async () => {
     const { run, calls } = fakeGh(result({ stdout: '[]' }))
     await listNotifications({ ...CFG, host: 'ghe.corp.io' }, {}, run)
@@ -163,14 +187,13 @@ describe('releases', () => {
 })
 
 describe('search code', () => {
-  test('threads query and filters through as discrete argv elements', async () => {
+  test('threads filters through, then the query last behind a -- separator', async () => {
     const { run, calls } = fakeGh(result({ stdout: '[]' }))
     await searchCode(CFG, 'boundText language:typescript', { owner: 'uptonm', repo: 'uptonm/home', limit: 5 }, run)
     expect(calls[0]!.argv).toEqual([
       'gh',
       'search',
       'code',
-      'boundText language:typescript',
       '--owner',
       'uptonm',
       '--repo',
@@ -179,7 +202,19 @@ describe('search code', () => {
       '5',
       '--json',
       'path,repository,url,textMatches',
+      '--',
+      'boundText language:typescript',
     ])
+  })
+
+  test('a flag-shaped query rides behind -- so gh cannot parse it as --web', async () => {
+    const { run, calls } = fakeGh(result({ stdout: '[]' }))
+    await searchCode(CFG, '-w', {}, run)
+    const sep = calls[0]!.argv.indexOf('--')
+    expect(sep).toBeGreaterThan(-1)
+    expect(calls[0]!.argv.slice(sep)).toEqual(['--', '-w'])
+    // `-w` never appears ahead of the separator where gh would read it as a flag.
+    expect(calls[0]!.argv.slice(0, sep)).not.toContain('-w')
   })
 
   test('never falls back to defaultRepo — search is global by default', async () => {
