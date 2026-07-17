@@ -15,6 +15,7 @@ Modules:
 - **`gcal`** — Google Calendar (read-only: calendars, events with recurring expansion, merged agenda, free/busy)
 - **`gdrive`** — Google Drive (list/get/download/export files)
 - **`linear`** — Linear (issues, projects with milestones, cycles, teams, your assigned work, planning summary; guarded writes with `--yes`)
+- **`vercel`** — Vercel (read-only: projects, deployments, build events, domains) plus cross-machine sync of this CLI's own config
 
 `spotify`, `sonos`, and `tts` are designed to pair: search the catalog with
 `spotify` and hand the URI to `sonos play-uri`, or synthesize an announcement
@@ -402,14 +403,25 @@ Setup: `home gdrive configure` (set clientId/clientSecret), then `home gdrive au
 
 ### `vercel`
 
-Shares this CLI's own config and secrets between machines — see
-[Sharing a setup across machines](#sharing-a-setup-across-machines). It does not
-deploy anything.
+Read-only access to your Vercel team — projects, deployments, build events,
+and domains — plus sharing this CLI's own config and secrets between machines
+via the `config` commands (see
+[Sharing a setup across machines](#sharing-a-setup-across-machines)). It never
+deploys or mutates anything on Vercel.
 
-Setup: `vercel login`, then `home vercel configure` (pick the team).
+Setup: `vercel login`, then `home vercel configure` (pick the team, and
+optionally a default project whose newest production deployment
+`home vercel status` reports).
 
 | Command | Purpose |
 | --- | --- |
+| `home vercel projects list [--limit N]` | Projects with id, name, framework, linked repo, updatedAt |
+| `home vercel projects get <id\|name>` | One project: framework, linked repo, production/preview targets, domains |
+| `home vercel deployments list [--project <id\|name>] [--environment <target>] [--state <state>] [--limit N]` | Recent deployments, newest first; states normalized to `queued`/`building`/`ready`/`error`/`canceled` |
+| `home vercel deployments get <id\|url>` | One deployment: state, commit, aliases, created/building/ready timing, creator |
+| `home vercel deployments events <id\|url> [--limit N]` | Build/deployment events (mostly build log lines), bounded |
+| `home vercel domains list [--project <id\|name>] [--limit N]` | Team-registered domains, or one project's domains, with verification state |
+| `home vercel domains get <name>` | DNS configuration, owning project, and the project-level attachment |
 | `home vercel config diff` | Compare this host against the store; reports only names, never values |
 | `home vercel config push [--dry-run]` | Upload this host's config + secrets; creates and updates, never deletes |
 | `home vercel config pull [--dry-run]` | Apply the store to this host; writes secrets to the keyring, config to `~/.config/home/modules/` |
