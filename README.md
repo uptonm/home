@@ -11,6 +11,7 @@ Modules:
 - **`spotify`** — Spotify catalog (search, get by id, browse categories, new releases, children)
 - **`sonos`** — Sonos players (playback, volume, groups, queue, favorites, playlists, library, EQ, alarms, notifications)
 - **`tts`** — text-to-speech to an MP3 (macOS `say` / Linux `espeak-ng`), for hand-off to Sonos notify
+- **`google`** — shared Google OAuth client for `gmail`/`gdrive` (configure once, authorize each; `logout` forgets all grants)
 - **`gmail`** — Google Gmail (read-only: search messages/threads, list labels/drafts, mailbox profile)
 - **`gcal`** — Google Calendar (read-only: calendars, events with recurring expansion, merged agenda, free/busy)
 - **`gdrive`** — Google Drive (list/get/download/export files)
@@ -21,7 +22,10 @@ Modules:
 `spotify` and hand the URI to `sonos play-uri`, or synthesize an announcement
 with `tts` and push it through `sonos notify`.
 
-`gmail`, `gcal`, and `gdrive` share a Google OAuth flow via `home <module> auth login`.
+`gmail` and `gdrive` share one Google OAuth client via the `google` module: run
+`home google configure` once, then `home gmail configure` / `home gdrive configure`
+to authorize each (a browser consent). `home google logout` forgets every grant.
+See `docs/google-setup.md`. (`gcal` still carries its own OAuth client for now.)
 
 ## Install
 
@@ -391,10 +395,24 @@ Behavior:
 | --- | --- |
 | `home tts synth <text> [--voice <name>] [--rate <wpm>] [--out <path>]` | Synthesize text to an MP3 (macOS `say` / Linux `espeak-ng`, piped through `lame`) |
 
+### `google`
+
+Holds the one Google OAuth "Desktop app" client that `gmail` and `gdrive` share,
+so the same `clientId`/`clientSecret` isn't pasted per module. No data commands.
+Setup: `home google configure` once (see `docs/google-setup.md` for the Console
+walkthrough — the app must be published to Production or its refresh tokens expire
+in 7 days), then authorize each module with `home <module> configure`.
+
+| Command | Purpose |
+| --- | --- |
+| `home google configure` | Store the shared OAuth client id/secret |
+| `home google status` | Report whether the client is configured and which modules hold a grant |
+| `home google logout` | Forget every Google module's refresh token (gmail, gdrive); the shared client stays configured |
+
 ### `gmail`
 
 Read-only Gmail access using the Gmail API and Google OAuth.
-Setup: `home gmail configure` (set clientId/clientSecret), then `home gmail auth login` (opens a browser).
+Setup: `home google configure` (shared OAuth client — see `docs/google-setup.md`), then `home gmail configure` (opens a browser to authorize).
 
 Works on consumer `@gmail.com` and Google Workspace accounts.
 
@@ -409,7 +427,6 @@ Works on consumer `@gmail.com` and Google Workspace accounts.
 | `home gmail drafts list [--limit N]` | List draft ids (each carries a message id and threadId) |
 | `home gmail drafts get <id>` | Get a single draft and its message by id |
 | `home gmail profile get` | Mailbox profile: email address, message/thread totals, historyId |
-| `home gmail auth login` | OAuth browser flow — store the refresh token |
 
 ### `gcal`
 
@@ -434,7 +451,7 @@ a different surface — use `home assistant calendars` for those.
 ### `gdrive`
 
 Browse and fetch Google Drive files using the Drive API and Google OAuth.
-Setup: `home gdrive configure` (set clientId/clientSecret), then `home gdrive auth login` (opens a browser).
+Setup: `home google configure` (shared OAuth client — see `docs/google-setup.md`), then `home gdrive configure` (opens a browser to authorize).
 
 | Command | Purpose |
 | --- | --- |
@@ -442,8 +459,8 @@ Setup: `home gdrive configure` (set clientId/clientSecret), then `home gdrive au
 | `home gdrive files get <id\|name>` | Fetch full metadata for one file. Name resolves via a scoped search; ambiguous → lists candidates. |
 | `home gdrive files download <id\|name> [--out <path>] [--stdout]` | Download a binary/uploaded file's bytes. Google-native docs (Docs/Sheets/Slides) cannot be downloaded — use `files export`. |
 | `home gdrive files export <id> [--mime <type>] [--out <path>] [--stdout]` | Export a Google-native doc to another format. `--mime` accepts friendly aliases (`pdf`, `docx`, `xlsx`) or full MIME types. |
-| `home gdrive auth login` | OAuth browser flow — store the refresh token |
-| `home gdrive auth logout` | Forget the stored refresh token (revokes nothing server-side) |
+
+To sign out of Drive (and Gmail), use `home google logout`.
 
 ### `vercel`
 
