@@ -4,6 +4,7 @@ import { parseTimeToSeconds, secondsToHms } from '../parse'
 
 export const seek: CommandSpec = {
   path: ['seek'],
+  effect: 'write',
   description: 'Seek to an absolute position in the current track. Accepts "90", "1:30", or "1:02:03".',
   args: [
     { name: 'room', kind: 'positional', description: 'Room name (case-insensitive, partial match)', required: true },

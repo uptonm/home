@@ -5,6 +5,7 @@ interface RawDdns { _id: string; service?: string; hostname?: string; [key: stri
 
 export const dynamicDnsList: CommandSpec = {
   path: ['dynamic-dns', 'list'],
+  effect: 'read',
   description: 'List Dynamic DNS configurations',
   args: [],
   examples: ['home unifi dynamic-dns list', 'home unifi dynamic-dns list --json'],

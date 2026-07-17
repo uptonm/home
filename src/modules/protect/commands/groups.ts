@@ -4,6 +4,7 @@ import { pickOne } from './shared'
 
 export const groupsList: CommandSpec = {
   path: ['groups', 'list'],
+  effect: 'read',
   description: 'List Protect permission groups',
   args: [],
   examples: ['home protect groups list --json'],
@@ -16,6 +17,7 @@ export const groupsList: CommandSpec = {
 
 export const groupsGet: CommandSpec = {
   path: ['groups', 'get'],
+  effect: 'read',
   description: 'Get a single group by id or name',
   args: [{ name: 'ref', kind: 'positional', description: 'Group id or name (substring ok)', required: true }],
   examples: ['home protect groups get <id> --json'],

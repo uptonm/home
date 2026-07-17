@@ -16,6 +16,7 @@ interface RawAlarm { _id: string; msg?: string; [key: string]: unknown }
 
 export const clientsAll: CommandSpec = {
   path: ['clients', 'all'],
+  effect: 'read',
   description: 'List all known clients (including offline/disconnected)',
   args: [],
   examples: ['home unifi clients all', 'home unifi clients all --json | jq \'.[] | select(.use_fixedip)\''],
@@ -28,6 +29,7 @@ export const clientsAll: CommandSpec = {
 
 export const eventsList: CommandSpec = {
   path: ['events', 'list'],
+  effect: 'read',
   description: 'List recent network events',
   args: [
     { name: 'limit', kind: 'number', description: 'Max events to return (default: all)', required: false },
@@ -46,6 +48,7 @@ export const eventsList: CommandSpec = {
 
 export const alarmsList: CommandSpec = {
   path: ['alarms', 'list'],
+  effect: 'read',
   description: 'List active and archived network alarms',
   args: [],
   examples: ['home unifi alarms list', 'home unifi alarms list --json'],
@@ -59,6 +62,7 @@ export const alarmsList: CommandSpec = {
 
 export const rogueApsList: CommandSpec = {
   path: ['rogue-aps', 'list'],
+  effect: 'read',
   description: 'List neighboring/rogue access points detected by your APs',
   args: [],
   examples: ['home unifi rogue-aps list', 'home unifi rogue-aps list --json'],
@@ -71,6 +75,7 @@ export const rogueApsList: CommandSpec = {
 
 export const guestsList: CommandSpec = {
   path: ['guests', 'list'],
+  effect: 'read',
   description: 'List guest authorizations',
   args: [],
   examples: ['home unifi guests list', 'home unifi guests list --json'],
@@ -83,6 +88,7 @@ export const guestsList: CommandSpec = {
 
 export const sessionsList: CommandSpec = {
   path: ['sessions', 'list'],
+  effect: 'read',
   description: 'List historical client connect/disconnect sessions',
   args: [
     { name: 'limit', kind: 'number', description: 'Max sessions to return (default: all)', required: false },
@@ -98,6 +104,7 @@ export const sessionsList: CommandSpec = {
 
 export const dpiStatsSite: CommandSpec = {
   path: ['dpi-stats', 'site'],
+  effect: 'read',
   description: 'List per-application DPI traffic stats for the entire site',
   args: [],
   examples: ['home unifi dpi-stats site', 'home unifi dpi-stats site --json'],
@@ -110,6 +117,7 @@ export const dpiStatsSite: CommandSpec = {
 
 export const dpiStatsClient: CommandSpec = {
   path: ['dpi-stats', 'client'],
+  effect: 'read',
   description: 'Get per-application DPI traffic stats for a single client by MAC',
   args: [{ name: 'mac', kind: 'positional', description: 'Client MAC (with or without colons)', required: true }],
   examples: ['home unifi dpi-stats client 78:8a:20:11:22:33', 'home unifi dpi-stats client 788a20112233 --json'],

@@ -26,6 +26,7 @@ function shapeRow(t: Track) {
 
 export const libraryBrowse: CommandSpec = {
   path: ['library', 'browse'],
+  effect: 'read',
   description: `Browse the local music library by category (${CATEGORY_LIST}). Pass --id to drill into a container returned by a previous browse.`,
   args: [
     { name: 'category', kind: 'positional', description: `One of: ${CATEGORY_LIST}`, required: true },
@@ -57,6 +58,7 @@ export const libraryBrowse: CommandSpec = {
 
 export const librarySearch: CommandSpec = {
   path: ['library', 'search'],
+  effect: 'read',
   description: `Search the local music library within a category (${CATEGORY_LIST})`,
   args: [
     { name: 'category', kind: 'positional', description: `One of: ${CATEGORY_LIST}`, required: true },

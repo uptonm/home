@@ -4,6 +4,7 @@ import { pickOne } from './shared'
 
 export const camerasTalkback: CommandSpec = {
   path: ['cameras', 'talkback'],
+  effect: 'destructive',
   description: 'Print the talkback (two-way audio) WebSocket URL for a camera',
   args: [{ name: 'camera', kind: 'positional', description: 'Camera id or name', required: true }],
   examples: [

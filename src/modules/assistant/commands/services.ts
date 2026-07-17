@@ -3,6 +3,7 @@ import { listServices, readAssistantConfig } from '../client'
 
 export const servicesList: CommandSpec = {
   path: ['services', 'list'],
+  effect: 'read',
   description: 'List available service domains and their services (with field schemas)',
   args: [{ name: 'domain', kind: 'string', description: 'Limit to a single domain (e.g. light, climate)' }],
   examples: [

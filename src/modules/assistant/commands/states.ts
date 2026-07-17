@@ -3,6 +3,7 @@ import { getState, listStates, readAssistantConfig, searchEntities, setState } f
 
 export const statesList: CommandSpec = {
   path: ['states', 'list'],
+  effect: 'read',
   description: 'List Home Assistant entity states, optionally filtered by domain',
   args: [{ name: 'domain', kind: 'string', description: 'Limit to domain (e.g. light, sensor)' }],
   examples: [
@@ -19,6 +20,7 @@ export const statesList: CommandSpec = {
 
 export const statesSearch: CommandSpec = {
   path: ['states', 'search'],
+  effect: 'read',
   description: 'Search entities by substring match against entity_id and friendly_name',
   args: [
     { name: 'query', kind: 'positional', description: 'Search query (case-insensitive substring)', required: true },
@@ -40,6 +42,7 @@ export const statesSearch: CommandSpec = {
 
 export const stateGet: CommandSpec = {
   path: ['state', 'get'],
+  effect: 'read',
   description: 'Get a single entity state by entity_id, optionally watch for changes',
   args: [
     { name: 'entity', kind: 'positional', description: 'entity_id (e.g. light.kitchen)', required: true },
@@ -123,6 +126,7 @@ export const stateGet: CommandSpec = {
 
 export const stateSet: CommandSpec = {
   path: ['state', 'set'],
+  effect: 'write',
   description: 'Override an entity state in the HA state machine (virtual write — requires --confirm)',
   args: [
     { name: 'entity', kind: 'positional', description: 'entity_id (e.g. sensor.virtual)', required: true },

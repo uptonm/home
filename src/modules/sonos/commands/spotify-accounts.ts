@@ -4,6 +4,7 @@ import { listSpotifyAccounts } from '../spotify'
 
 export const spotifyAccountsList: CommandSpec = {
   path: ['spotify-accounts', 'list'],
+  effect: 'read',
   description: 'List every Spotify account subscribed on the Sonos household, with the `sn` you can pass to play-uri / queue add via `--sn`. This is a household-level query — any speaker reports the same answer, so no room argument is needed.',
   args: [],
   examples: [

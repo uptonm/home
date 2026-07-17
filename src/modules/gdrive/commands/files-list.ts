@@ -6,6 +6,7 @@ const MAX_PAGE_SIZE = 1000
 
 export const filesList: CommandSpec = {
   path: ['files', 'list'],
+  effect: 'read',
   description:
     "List Drive files. --q takes the Drive query language (e.g. \"name contains 'report'\", \"mimeType='application/pdf'\", \"'<folderId>' in parents\", \"modifiedTime > '2024-01-01T00:00:00'\"). With no --q, lists live (non-trashed) files.",
   args: [

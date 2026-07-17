@@ -3,6 +3,7 @@ import { getLabel, listLabels, readGmailConfig } from '../client'
 
 export const labelsList: CommandSpec = {
   path: ['labels', 'list'],
+  effect: 'read',
   description: 'List all labels in the mailbox (system + user labels).',
   args: [],
   examples: [
@@ -18,6 +19,7 @@ export const labelsList: CommandSpec = {
 
 export const labelsGet: CommandSpec = {
   path: ['labels', 'get'],
+  effect: 'read',
   description: 'Get a single label by id, including message/thread counts.',
   args: [{ name: 'id', kind: 'positional', description: 'Label id (e.g. INBOX, or a user label id)', required: true }],
   examples: [

@@ -4,6 +4,7 @@ import { pickOne } from './shared'
 
 export const chimesList: CommandSpec = {
   path: ['chimes', 'list'],
+  effect: 'read',
   description: 'List Protect doorbell chimes',
   args: [],
   examples: ['home protect chimes list --json'],
@@ -16,6 +17,7 @@ export const chimesList: CommandSpec = {
 
 export const chimesGet: CommandSpec = {
   path: ['chimes', 'get'],
+  effect: 'read',
   description: 'Get a single chime by id or name',
   args: [{ name: 'ref', kind: 'positional', description: 'Chime id or name (substring ok)', required: true }],
   examples: ['home protect chimes get <id> --json', 'home protect chimes get "Kitchen" --json'],

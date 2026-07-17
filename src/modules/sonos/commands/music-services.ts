@@ -3,6 +3,7 @@ import { discover, readSonosConfig } from '../client'
 
 export const musicServicesList: CommandSpec = {
   path: ['music-services', 'list'],
+  effect: 'read',
   description: 'List the streaming music services available on this Sonos household',
   args: [],
   examples: [

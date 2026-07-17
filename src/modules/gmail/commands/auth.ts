@@ -5,6 +5,7 @@ import { GMAIL_MODULE, GMAIL_REFRESH_TOKEN_KEY, GMAIL_SCOPES, getProfile } from 
 
 export const authLogin: CommandSpec = {
   path: ['auth', 'login'],
+  effect: 'destructive',
   description:
     'Authorize the CLI against your Google account (opens a browser) and store the refresh token. Run `configure` first to set clientId/clientSecret.',
   args: [

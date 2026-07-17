@@ -42,6 +42,7 @@ export function favoriteIsContainer(track: Pick<Track, 'UpnpClass' | 'TrackUri'>
 
 export const favoritesPlay: CommandSpec = {
   path: ['favorites', 'play'],
+  effect: 'write',
   description: 'Play a Sonos favorite (My Sonos) by title. Containers (albums/playlists/stations) replace the queue; radio/streams are set directly. List titles with `home sonos favorites list`.',
   args: [
     { name: 'name', kind: 'positional', description: 'Favorite title (case-insensitive, exact or unique substring)', required: true },

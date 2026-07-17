@@ -5,6 +5,7 @@ interface RawTag { _id: string; name?: string; [key: string]: unknown }
 
 export const tagsList: CommandSpec = {
   path: ['tags', 'list'],
+  effect: 'read',
   description: 'List device tags',
   args: [],
   examples: ['home unifi tags list', 'home unifi tags list --json'],
@@ -18,6 +19,7 @@ export const tagsList: CommandSpec = {
 
 export const tagsGet: CommandSpec = {
   path: ['tags', 'get'],
+  effect: 'read',
   description: 'Dump a single tag by name',
   args: [{ name: 'name', kind: 'positional', description: 'Tag name (case-insensitive, exact or unique substring)', required: true }],
   examples: ['home unifi tags get "Server" --json'],

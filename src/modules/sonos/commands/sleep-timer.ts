@@ -6,6 +6,7 @@ const roomArg = { name: 'room', kind: 'positional', description: 'Room name (def
 
 export const sleepTimerGet: CommandSpec = {
   path: ['sleep-timer', 'get'],
+  effect: 'read',
   description: 'Get the remaining sleep-timer duration for a room (empty when none is set)',
   args: [roomArg],
   examples: [
@@ -23,6 +24,7 @@ export const sleepTimerGet: CommandSpec = {
 
 export const sleepTimerSet: CommandSpec = {
   path: ['sleep-timer', 'set'],
+  effect: 'write',
   description: 'Set or cancel a room\'s sleep timer. Accepts "30m", "1h", "90", "1:30:00", or off/cancel to clear.',
   args: [
     { name: 'room', kind: 'positional', description: 'Room name', required: true },

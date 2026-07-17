@@ -4,6 +4,7 @@ import { pickOne } from './shared'
 
 export const viewersList: CommandSpec = {
   path: ['viewers', 'list'],
+  effect: 'read',
   description: 'List Protect Viewport displays',
   args: [],
   examples: ['home protect viewers list --json'],
@@ -16,6 +17,7 @@ export const viewersList: CommandSpec = {
 
 export const viewersGet: CommandSpec = {
   path: ['viewers', 'get'],
+  effect: 'read',
   description: 'Get a single viewer by id or name',
   args: [{ name: 'ref', kind: 'positional', description: 'Viewer id or name (substring ok)', required: true }],
   examples: ['home protect viewers get <id> --json', 'home protect viewers get "Office" --json'],

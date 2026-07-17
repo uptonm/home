@@ -3,6 +3,7 @@ import { getBootstrap, readProtectConfig } from '../client'
 
 export const nvrInfo: CommandSpec = {
   path: ['nvr', 'info'],
+  effect: 'read',
   description: 'Show the NVR (Protect controller) configuration and status',
   args: [],
   examples: [

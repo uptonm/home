@@ -3,6 +3,7 @@ import { errorLog, readAssistantConfig } from '../client'
 
 export const errorLogCmd: CommandSpec = {
   path: ['error-log'],
+  effect: 'read',
   description: 'Tail the Home Assistant error log (plain text)',
   args: [],
   examples: [

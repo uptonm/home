@@ -35,6 +35,7 @@ function parseTypes(input: string | undefined): { types: SpotifySearchType[]; er
 
 export const searchCmd: CommandSpec = {
   path: ['search'],
+  effect: 'read',
   description: 'Search Spotify catalog (tracks, albums, artists, playlists). Returns Sonos-playable URIs.',
   args: [
     { name: 'query', kind: 'positional', description: 'Freeform Spotify search query', required: true },

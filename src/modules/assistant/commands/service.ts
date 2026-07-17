@@ -3,6 +3,7 @@ import { callService, readAssistantConfig } from '../client'
 
 export const serviceCall: CommandSpec = {
   path: ['service', 'call'],
+  effect: 'write',
   description: 'Call a Home Assistant service (e.g. light.turn_on)',
   args: [
     {

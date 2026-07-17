@@ -58,6 +58,7 @@ export function parseColor(value: string): { rgb_color: [number, number, number]
 
 export const lightCmd: CommandSpec = {
   path: ['light'],
+  effect: 'write',
   description: 'Control a light by name or entity_id (on/off/toggle, brightness, color)',
   args: [
     { name: 'action', kind: 'positional', description: 'on | off | toggle', required: true, enum: ['on', 'off', 'toggle'] },
@@ -117,6 +118,7 @@ export const lightCmd: CommandSpec = {
 
 export const switchCmd: CommandSpec = {
   path: ['switch'],
+  effect: 'write',
   description: 'Control a switch by name or entity_id (on/off/toggle)',
   args: [
     { name: 'action', kind: 'positional', description: 'on | off | toggle', required: true, enum: ['on', 'off', 'toggle'] },
@@ -151,6 +153,7 @@ export const switchCmd: CommandSpec = {
 
 export const climateCmd: CommandSpec = {
   path: ['climate'],
+  effect: 'write',
   description: 'Set a thermostat target temperature and/or HVAC mode by name or entity_id',
   args: [
     { name: 'climate', kind: 'positional', description: 'Climate entity name or entity_id', required: true },

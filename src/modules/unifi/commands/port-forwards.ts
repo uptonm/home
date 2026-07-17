@@ -15,6 +15,7 @@ interface RawPortForward {
 
 export const portForwardsList: CommandSpec = {
   path: ['port-forwards', 'list'],
+  effect: 'read',
   description: 'List WAN port-forward (NAT) rules',
   args: [],
   examples: [
@@ -41,6 +42,7 @@ export const portForwardsList: CommandSpec = {
 
 export const portForwardsGet: CommandSpec = {
   path: ['port-forwards', 'get'],
+  effect: 'read',
   description: 'Dump the full portforward config for a single rule by name or _id',
   args: [
     {

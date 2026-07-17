@@ -18,6 +18,7 @@ function parseSinceIso(value: string | undefined): string {
 
 export const logbookList: CommandSpec = {
   path: ['logbook', 'list'],
+  effect: 'read',
   description: 'Recent human-readable Home Assistant events (with optional entity filter)',
   args: [
     { name: 'since', kind: 'string', description: 'Window start: 1h | 24h | ISO', default: '1h' },

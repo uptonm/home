@@ -3,6 +3,7 @@ import { listEvents, readAssistantConfig } from '../client'
 
 export const eventsList: CommandSpec = {
   path: ['events', 'list'],
+  effect: 'read',
   description: 'List event types on the bus and their listener counts',
   args: [],
   examples: [

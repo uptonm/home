@@ -5,6 +5,7 @@ interface RawDpiApp { _id: string; name?: string; [key: string]: unknown }
 
 export const dpiAppsList: CommandSpec = {
   path: ['dpi-apps', 'list'],
+  effect: 'read',
   description: 'List DPI application signatures',
   args: [],
   examples: ['home unifi dpi-apps list', 'home unifi dpi-apps list --json | jq \'.[] | select(.name|test(\"spotify\";\"i\"))\''],
@@ -18,6 +19,7 @@ export const dpiAppsList: CommandSpec = {
 
 export const dpiAppsGet: CommandSpec = {
   path: ['dpi-apps', 'get'],
+  effect: 'read',
   description: 'Dump a single DPI app by name',
   args: [{ name: 'name', kind: 'positional', description: 'App name (case-insensitive, exact or unique substring)', required: true }],
   examples: ['home unifi dpi-apps get spotify --json'],

@@ -6,6 +6,7 @@ const roomArg = { name: 'room', kind: 'positional', description: 'Room name (cas
 
 export const play: CommandSpec = {
   path: ['play'],
+  effect: 'write',
   description: 'Resume playback in a room (or the only group if room omitted)',
   args: [roomArg],
   examples: ['home sonos play kitchen', 'home sonos play "living room"'],
@@ -19,6 +20,7 @@ export const play: CommandSpec = {
 
 export const pause: CommandSpec = {
   path: ['pause'],
+  effect: 'write',
   description: 'Pause playback in a room',
   args: [roomArg],
   examples: ['home sonos pause kitchen'],
@@ -32,6 +34,7 @@ export const pause: CommandSpec = {
 
 export const next: CommandSpec = {
   path: ['next'],
+  effect: 'write',
   description: 'Skip to next track in a room',
   args: [roomArg],
   examples: ['home sonos next kitchen'],
@@ -45,6 +48,7 @@ export const next: CommandSpec = {
 
 export const prev: CommandSpec = {
   path: ['prev'],
+  effect: 'write',
   description: 'Skip to previous track in a room',
   args: [roomArg],
   examples: ['home sonos prev kitchen'],
@@ -75,6 +79,7 @@ async function readTrackForDevice(d: SonosDevice) {
 
 export const nowPlaying: CommandSpec = {
   path: ['now-playing'],
+  effect: 'read',
   description: 'Show current track for a room, or every group if room omitted',
   args: [{ name: 'room', kind: 'positional', description: 'Room name (case-insensitive, partial match)', required: false }],
   examples: [

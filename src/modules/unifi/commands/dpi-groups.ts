@@ -5,6 +5,7 @@ interface RawDpiGroup { _id: string; name?: string; [key: string]: unknown }
 
 export const dpiGroupsList: CommandSpec = {
   path: ['dpi-groups', 'list'],
+  effect: 'read',
   description: 'List DPI group configurations',
   args: [],
   examples: ['home unifi dpi-groups list', 'home unifi dpi-groups list --json'],
@@ -18,6 +19,7 @@ export const dpiGroupsList: CommandSpec = {
 
 export const dpiGroupsGet: CommandSpec = {
   path: ['dpi-groups', 'get'],
+  effect: 'read',
   description: 'Dump a single DPI group by name',
   args: [{ name: 'name', kind: 'positional', description: 'Group name (case-insensitive, exact or unique substring)', required: true }],
   examples: ['home unifi dpi-groups get "Default" --json'],

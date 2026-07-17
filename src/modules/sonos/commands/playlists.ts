@@ -30,6 +30,7 @@ export function resolvePlaylist(items: Track[], name: string): ResolvePlaylist {
 
 export const playlistsList: CommandSpec = {
   path: ['playlists', 'list'],
+  effect: 'read',
   description: 'List Sonos playlists (saved queues, SQ:)',
   args: [],
   examples: ['home sonos playlists list', 'home sonos playlists list --json'],
@@ -45,6 +46,7 @@ export const playlistsList: CommandSpec = {
 
 export const playlistsGet: CommandSpec = {
   path: ['playlists', 'get'],
+  effect: 'read',
   description: 'Show the tracks in a Sonos playlist (by title)',
   args: [{ name: 'name', kind: 'positional', description: 'Playlist title (case-insensitive, exact or unique substring)', required: true }],
   examples: ['home sonos playlists get "Dinner"', 'home sonos playlists get Dinner --json'],
@@ -76,6 +78,7 @@ export const playlistsGet: CommandSpec = {
 
 export const playlistsPlay: CommandSpec = {
   path: ['playlists', 'play'],
+  effect: 'write',
   description: 'Replace the queue with a Sonos playlist (by title) and start playing',
   args: [
     { name: 'name', kind: 'positional', description: 'Playlist title (case-insensitive, exact or unique substring)', required: true },

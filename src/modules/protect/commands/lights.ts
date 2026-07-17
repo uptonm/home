@@ -46,6 +46,7 @@ const controlArgs = (action: LightAction): CommandSpec['args'] => [
 
 export const lightsOn: CommandSpec = {
   path: ['lights', 'on'],
+  effect: 'write',
   description: 'Turn a Protect light on (optionally set brightness)',
   args: controlArgs('on'),
   examples: ['home protect lights on "Front Light"', 'home protect lights on "Front Light" --brightness 80'],
@@ -54,6 +55,7 @@ export const lightsOn: CommandSpec = {
 
 export const lightsOff: CommandSpec = {
   path: ['lights', 'off'],
+  effect: 'write',
   description: 'Turn a Protect light off',
   args: controlArgs('off'),
   examples: ['home protect lights off "Garage Light"'],
@@ -62,6 +64,7 @@ export const lightsOff: CommandSpec = {
 
 export const lightsToggle: CommandSpec = {
   path: ['lights', 'toggle'],
+  effect: 'write',
   description: 'Toggle a Protect light (optionally set brightness when turning on)',
   args: controlArgs('toggle'),
   examples: ['home protect lights toggle "Front Light"'],
@@ -70,6 +73,7 @@ export const lightsToggle: CommandSpec = {
 
 export const lightsList: CommandSpec = {
   path: ['lights', 'list'],
+  effect: 'read',
   description: 'List Protect lights',
   args: [],
   examples: ['home protect lights list --json'],
@@ -82,6 +86,7 @@ export const lightsList: CommandSpec = {
 
 export const lightsGet: CommandSpec = {
   path: ['lights', 'get'],
+  effect: 'read',
   description: 'Get a single light by id or name',
   args: [{ name: 'ref', kind: 'positional', description: 'Light id or name (substring ok)', required: true }],
   examples: ['home protect lights get <id> --json', 'home protect lights get "Front Light" --json'],

@@ -251,6 +251,7 @@ const roomArg = { name: 'room', kind: 'positional', description: 'Room name (cas
 
 export const notifyCmd: CommandSpec = {
   path: ['notify'],
+  effect: 'write',
   description: 'Play a one-shot audio notification on a room; preserves and restores the current queue, volume, and transport state',
   args: [
     roomArg,

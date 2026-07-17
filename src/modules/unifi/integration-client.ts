@@ -23,7 +23,7 @@ let siteIdCache: Map<string, string> | null = null
 export async function resolveIntegrationSiteId(cfg: UnifiConfig): Promise<string> {
   if (siteIdCache?.has(cfg.site)) return siteIdCache.get(cfg.site)!
 
-  const body = await requestJson<{ data: { id: string; name: string }[] }>(
+  const body = await requestJson<{ data: { id: string; name: string; internalReference?: string }[] }>(
     `${integrationBase(cfg)}/sites`,
     { headers: integrationHeaders(cfg) },
     { insecureTLS: cfg.insecureTLS },
@@ -31,7 +31,10 @@ export async function resolveIntegrationSiteId(cfg: UnifiConfig): Promise<string
 
   if (!siteIdCache) siteIdCache = new Map()
   for (const s of body.data ?? []) {
+    // The classic API's site name (config's `site`) is the integration API's
+    // internalReference; `name` is the display name ("default" vs "Default").
     siteIdCache.set(s.name, s.id)
+    if (s.internalReference) siteIdCache.set(s.internalReference, s.id)
   }
   const id = siteIdCache.get(cfg.site)
   if (!id) throw Object.assign(new Error(`site "${cfg.site}" not found in integration API`), { code: 'site_not_found' })

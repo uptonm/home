@@ -4,6 +4,7 @@ import { pickOne } from './shared'
 
 export const doorlocksList: CommandSpec = {
   path: ['doorlocks', 'list'],
+  effect: 'read',
   description: 'List Protect smart locks (lock state, battery)',
   args: [],
   examples: [
@@ -19,6 +20,7 @@ export const doorlocksList: CommandSpec = {
 
 export const doorlocksGet: CommandSpec = {
   path: ['doorlocks', 'get'],
+  effect: 'read',
   description: 'Get a single smart lock by id or name',
   args: [{ name: 'ref', kind: 'positional', description: 'Doorlock id or name (substring ok)', required: true }],
   examples: ['home protect doorlocks get <id> --json', 'home protect doorlocks get "Front" --json'],

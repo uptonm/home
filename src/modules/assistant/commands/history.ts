@@ -18,6 +18,7 @@ function parseSinceIso(value: string | undefined): string {
 
 export const historyGet: CommandSpec = {
   path: ['history', 'get'],
+  effect: 'read',
   description: 'Recent state history for a single entity',
   args: [
     { name: 'entity', kind: 'positional', description: 'entity_id', required: true },

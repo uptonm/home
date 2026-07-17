@@ -28,6 +28,13 @@ export type RunResult =
 
 export interface CommandSpec {
   path: string[]
+  /**
+   * What running this command does to the world. `read` observes only;
+   * `write` mutates state that is recoverable or acceptable to perturb;
+   * `destructive` is irreversible or outward-facing without a containable
+   * target — the e2e harness refuses to execute it.
+   */
+  effect: 'read' | 'write' | 'destructive'
   description: string
   args: ArgSpec[]
   examples: string[]

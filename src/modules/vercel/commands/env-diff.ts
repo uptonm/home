@@ -4,6 +4,7 @@ import { collectLocal, decodeKey, fieldFor } from '../sync'
 
 export const envDiffCmd: CommandSpec = {
   path: ['env', 'diff'],
+  effect: 'read',
   description: 'Compare this host\'s config and secrets against Vercel without writing either side',
   args: [],
   examples: [

@@ -10,6 +10,7 @@ import { optionalString, parseFormat, parseLabels, parseMax } from './shared'
 
 export const messagesList: CommandSpec = {
   path: ['messages', 'list'],
+  effect: 'read',
   description:
     'List message ids matching a Gmail search query. Use --hydrate to fetch From/Subject/Date/snippet per message in one call.',
   args: [
@@ -55,6 +56,7 @@ export const messagesList: CommandSpec = {
 
 export const messagesGet: CommandSpec = {
   path: ['messages', 'get'],
+  effect: 'read',
   description: 'Get a single message by id.',
   args: [
     { name: 'id', kind: 'positional', description: 'Message id', required: true },

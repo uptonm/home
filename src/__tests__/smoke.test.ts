@@ -28,6 +28,12 @@ describe('module manifests', () => {
         }
       })
 
+      test('every command declares an effect', () => {
+        for (const cmd of m.commands as CommandSpec[]) {
+          expect(['read', 'write', 'destructive']).toContain(cmd.effect)
+        }
+      })
+
       test('every command is well-formed', () => {
         for (const cmd of m.commands as CommandSpec[]) {
           expect(Array.isArray(cmd.path)).toBe(true)

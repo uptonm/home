@@ -18,6 +18,7 @@ export function shapeAlarm(a: Alarm) {
 
 export const alarmsList: CommandSpec = {
   path: ['alarms', 'list'],
+  effect: 'read',
   description: 'List all Sonos alarms (household-wide)',
   args: [],
   examples: ['home sonos alarms list', 'home sonos alarms list --json'],
@@ -32,6 +33,7 @@ export const alarmsList: CommandSpec = {
 
 export const alarmsGet: CommandSpec = {
   path: ['alarms', 'get'],
+  effect: 'read',
   description: 'Get one alarm by ID',
   args: [{ name: 'id', kind: 'positional', description: 'Alarm ID (from `alarms list`)', required: true }],
   examples: ['home sonos alarms get 7 --json'],
@@ -65,6 +67,7 @@ function alarmToggle(enabled: boolean): CommandSpec['run'] {
 
 export const alarmsEnable: CommandSpec = {
   path: ['alarms', 'enable'],
+  effect: 'destructive',
   description: 'Enable an alarm by ID',
   args: [{ name: 'id', kind: 'positional', description: 'Alarm ID', required: true }],
   examples: ['home sonos alarms enable 7'],
@@ -73,6 +76,7 @@ export const alarmsEnable: CommandSpec = {
 
 export const alarmsDisable: CommandSpec = {
   path: ['alarms', 'disable'],
+  effect: 'destructive',
   description: 'Disable an alarm by ID',
   args: [{ name: 'id', kind: 'positional', description: 'Alarm ID', required: true }],
   examples: ['home sonos alarms disable 7'],

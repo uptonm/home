@@ -11,6 +11,7 @@ import { safeFilename, unwrapResolution } from './util'
 
 export const filesDownload: CommandSpec = {
   path: ['files', 'download'],
+  effect: 'write', // writes a local file by default — must stay out of e2e auto-reads
   description:
     'Download a binary/uploaded file’s bytes (alt=media) to a path or stdout. Google-native docs (Docs/Sheets/Slides) cannot be downloaded — use `files export`.',
   args: [

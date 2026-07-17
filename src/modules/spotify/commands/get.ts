@@ -15,6 +15,7 @@ const refArg = {
 
 export const trackGet: CommandSpec = {
   path: ['track', 'get'],
+  effect: 'read',
   description: 'Fetch one track by id/URI/URL. Returns a Sonos-playable spotify:track URI.',
   args: [refArg],
   examples: [
@@ -31,6 +32,7 @@ export const trackGet: CommandSpec = {
 
 export const albumGet: CommandSpec = {
   path: ['album', 'get'],
+  effect: 'read',
   description: 'Fetch one album by id/URI/URL (metadata + canonical spotify:album URI).',
   args: [refArg],
   examples: ['home spotify album get spotify:album:5r36AJ6VOJtp00oxSkBZ5h --json'],
@@ -44,6 +46,7 @@ export const albumGet: CommandSpec = {
 
 export const artistGet: CommandSpec = {
   path: ['artist', 'get'],
+  effect: 'read',
   description: 'Fetch one artist by id/URI/URL (genres, popularity, followers).',
   args: [refArg],
   examples: ['home spotify artist get spotify:artist:7kNqXtgeIwFtelmRjWv205 --json'],
@@ -57,6 +60,7 @@ export const artistGet: CommandSpec = {
 
 export const playlistGet: CommandSpec = {
   path: ['playlist', 'get'],
+  effect: 'read',
   description: 'Fetch one playlist by id/URI/URL (owner, track count).',
   args: [refArg],
   examples: ['home spotify playlist get spotify:playlist:37i9dQZF1DXcBWIGoYBM5M --json'],

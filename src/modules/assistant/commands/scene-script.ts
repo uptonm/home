@@ -30,6 +30,7 @@ async function resolveOrError(
 
 export const sceneActivate: CommandSpec = {
   path: ['scene'],
+  effect: 'write',
   description: 'Activate a scene by name or entity_id',
   args: [{ name: 'scene', kind: 'positional', description: 'Scene name or entity_id (e.g. "Movie Time" or scene.movie_time)', required: true }],
   examples: [
@@ -56,6 +57,7 @@ export const sceneActivate: CommandSpec = {
 
 export const scriptRun: CommandSpec = {
   path: ['script'],
+  effect: 'write',
   description: 'Run a script by name or entity_id',
   args: [{ name: 'script', kind: 'positional', description: 'Script name or entity_id (e.g. "Goodnight" or script.goodnight)', required: true }],
   examples: [

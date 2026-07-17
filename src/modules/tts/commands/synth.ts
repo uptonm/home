@@ -3,6 +3,7 @@ import { readTtsConfig, synth } from '../client'
 
 export const synthCmd: CommandSpec = {
   path: ['synth'],
+  effect: 'write', // writes a local file by default — must stay out of e2e auto-reads
   description: 'Synthesize speech from text and write it to disk as an MP3 file (plays on every Sonos generation tested including S1 hardware like Play:5 Gen 1; earlier m4a and WAV outputs both failed silently on S1). Prints the path; does not play anything. Backend: macOS `say` on darwin, `espeak-ng` on linux; both pipe through `lame` so `brew install lame` / `apt install lame` is required.',
   args: [
     { name: 'text', kind: 'positional', description: 'Text to speak', required: true },

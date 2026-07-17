@@ -38,6 +38,7 @@ export function resolveCalendarWindow(
 
 export const calendarsList: CommandSpec = {
   path: ['calendars', 'list'],
+  effect: 'read',
   description: 'List calendar entities',
   args: [],
   examples: [
@@ -52,6 +53,7 @@ export const calendarsList: CommandSpec = {
 
 export const calendarsGet: CommandSpec = {
   path: ['calendars', 'get'],
+  effect: 'read',
   description: 'Get events for a calendar within a [start, end] window',
   args: [
     { name: 'entity', kind: 'positional', description: 'Calendar entity_id (e.g. calendar.personal)', required: true },

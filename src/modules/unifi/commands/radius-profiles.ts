@@ -9,6 +9,7 @@ interface RawRadiusProfile {
 
 export const radiusProfilesList: CommandSpec = {
   path: ['radius-profiles', 'list'],
+  effect: 'read',
   description: 'List RADIUS profiles referenced by WLANs and networks',
   args: [],
   examples: ['home unifi radius-profiles list', 'home unifi radius-profiles list --json'],
@@ -22,6 +23,7 @@ export const radiusProfilesList: CommandSpec = {
 
 export const radiusProfilesGet: CommandSpec = {
   path: ['radius-profiles', 'get'],
+  effect: 'read',
   description: 'Dump the full radiusprofile for a single profile by name',
   args: [{ name: 'name', kind: 'positional', description: 'Profile name (case-insensitive, exact or unique substring)', required: true }],
   examples: ['home unifi radius-profiles get "Default" --json'],

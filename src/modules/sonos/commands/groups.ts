@@ -4,6 +4,7 @@ import { discover, pickCoordinator, readSonosConfig, resolveRoom, summarizeGroup
 
 export const groupsList: CommandSpec = {
   path: ['groups', 'list'],
+  effect: 'read',
   description: 'List Sonos groups (coordinator + members)',
   args: [],
   examples: [
@@ -42,6 +43,7 @@ export function selectGroup(devices: SonosDevice[], ref: string): SelectGroup {
 
 export const groupsGet: CommandSpec = {
   path: ['groups', 'get'],
+  effect: 'read',
   description: 'Get one group by room: coordinator, transport state, and every member with its per-device volume and mute',
   args: [{ name: 'room', kind: 'positional', description: 'Any room in the target group (case-insensitive, partial match)', required: true }],
   examples: [
@@ -101,6 +103,7 @@ function resolveErr(ref: string, r: { kind: 'not_found' } | { kind: 'ambiguous';
 
 export const groupsJoin: CommandSpec = {
   path: ['groups', 'join'],
+  effect: 'write',
   description: 'Add a room to another room\'s group — they play in sync under the target group\'s coordinator',
   args: [
     { name: 'room', kind: 'positional', description: 'Room to move into the group', required: true },
@@ -142,6 +145,7 @@ export const groupsJoin: CommandSpec = {
 
 export const groupsLeave: CommandSpec = {
   path: ['groups', 'leave'],
+  effect: 'write',
   description: 'Split a room out of its group into a standalone group of one',
   args: [{ name: 'room', kind: 'positional', description: 'Room to remove from its group', required: true }],
   examples: ['home sonos groups leave kitchen'],
@@ -155,6 +159,7 @@ export const groupsLeave: CommandSpec = {
 
 export const groupsParty: CommandSpec = {
   path: ['groups', 'party'],
+  effect: 'write',
   description: 'Party mode: group every speaker under one coordinator so the whole house plays in sync',
   args: [{ name: 'room', kind: 'positional', description: 'Room to be the coordinator (defaults to an existing coordinator)', required: false }],
   examples: [
@@ -189,6 +194,7 @@ export const groupsParty: CommandSpec = {
 
 export const groupsUngroup: CommandSpec = {
   path: ['groups', 'ungroup'],
+  effect: 'write',
   description: 'Dissolve all groups — every speaker in a multi-room group becomes standalone',
   args: [],
   examples: ['home sonos groups ungroup'],

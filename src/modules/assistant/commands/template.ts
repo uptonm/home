@@ -3,6 +3,7 @@ import { readAssistantConfig, renderTemplate } from '../client'
 
 export const templateRender: CommandSpec = {
   path: ['template'],
+  effect: 'read',
   description: 'Render a Jinja template server-side',
   args: [{ name: 'template', kind: 'positional', description: 'Jinja template string', required: true }],
   examples: [

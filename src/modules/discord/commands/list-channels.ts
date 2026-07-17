@@ -10,6 +10,7 @@ export interface DiscordChannel {
 
 export const listChannelsCmd: CommandSpec = {
   path: ['list-channels'],
+  effect: 'read',
   description: 'List text channels (type 0) for the configured guild',
   args: [
     { name: 'guildId', kind: 'positional', description: 'Discord guild ID (overrides configured guildId)', required: false },

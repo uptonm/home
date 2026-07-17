@@ -4,6 +4,7 @@ import { optionalString, parseFormat, parseMax } from './shared'
 
 export const draftsList: CommandSpec = {
   path: ['drafts', 'list'],
+  effect: 'read',
   description: 'List draft ids (each carries a message id/threadId).',
   args: [
     { name: 'q', kind: 'string', description: 'Gmail search query to filter drafts' },
@@ -33,6 +34,7 @@ export const draftsList: CommandSpec = {
 
 export const draftsGet: CommandSpec = {
   path: ['drafts', 'get'],
+  effect: 'read',
   description: 'Get a single draft (and its message) by id.',
   args: [
     { name: 'id', kind: 'positional', description: 'Draft id', required: true },

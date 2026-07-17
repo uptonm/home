@@ -32,6 +32,7 @@ async function fetchEvents(cfg: ReturnType<typeof readProtectConfig>, since: str
 
 export const eventsList: CommandSpec = {
   path: ['events', 'list'],
+  effect: 'read',
   description: 'List recent Protect events',
   args: [
     { name: 'since', kind: 'string', description: 'Window start: e.g. 1h, 24h, 7d, or ISO timestamp', default: '1h' },
@@ -50,6 +51,7 @@ export const eventsList: CommandSpec = {
 
 export const eventsGet: CommandSpec = {
   path: ['events', 'get'],
+  effect: 'read',
   description: 'Fetch a single event by id',
   args: [{ name: 'id', kind: 'positional', description: 'Event id', required: true }],
   examples: ['home protect events get <id> --json'],
@@ -65,6 +67,7 @@ export const eventsGet: CommandSpec = {
 
 export const eventsRecent: CommandSpec = {
   path: ['events', 'recent'],
+  effect: 'read',
   description: 'Pre-filtered recent events (motion or smart-detect), newest-first',
   args: [
     { name: 'type', kind: 'string', description: 'Event type: motion | smart', enum: ['motion', 'smart'], default: 'motion' },

@@ -3,6 +3,7 @@ import { getConfig, readAssistantConfig } from '../client'
 
 export const configGet: CommandSpec = {
   path: ['config', 'get'],
+  effect: 'read',
   description: 'Get the Home Assistant config (version, components, unit system, location)',
   args: [],
   examples: [

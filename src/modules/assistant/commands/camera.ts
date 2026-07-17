@@ -27,6 +27,7 @@ async function resolveOrError(
 
 export const cameraSnapshotCmd: CommandSpec = {
   path: ['camera', 'snapshot'],
+  effect: 'write', // writes a local file by default — must stay out of e2e auto-reads
   description: 'Capture a JPEG snapshot from a camera by name or entity_id',
   args: [
     { name: 'camera', kind: 'positional', description: 'Camera name or entity_id (e.g. camera.front_door)', required: true },

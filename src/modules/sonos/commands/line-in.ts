@@ -13,6 +13,7 @@ export function lineInUri(sourceUuid: string, tv: boolean): string {
 
 export const lineIn: CommandSpec = {
   path: ['line-in'],
+  effect: 'write',
   description: 'Play a speaker\'s line-in (or, with --tv, its TV/HDMI input) on a room. Source defaults to the room itself.',
   args: [
     { name: 'room', kind: 'positional', description: 'Room to play the input on', required: true },

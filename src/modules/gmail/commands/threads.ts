@@ -4,6 +4,7 @@ import { optionalString, parseFormat, parseLabels, parseMax } from './shared'
 
 export const threadsList: CommandSpec = {
   path: ['threads', 'list'],
+  effect: 'read',
   description: 'List thread ids matching a Gmail search query.',
   args: [
     { name: 'q', kind: 'string', description: 'Gmail search query (same syntax as messages list)' },
@@ -35,6 +36,7 @@ export const threadsList: CommandSpec = {
 
 export const threadsGet: CommandSpec = {
   path: ['threads', 'get'],
+  effect: 'read',
   description: 'Get a thread and all of its messages by id.',
   args: [
     { name: 'id', kind: 'positional', description: 'Thread id', required: true },
