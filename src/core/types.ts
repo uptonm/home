@@ -53,6 +53,14 @@ export interface ConfigField {
   help?: string
   validate?: (v: string) => string | null
   probe?: (cfg: ModuleConfig) => Promise<string | null>
+  /**
+   * Whether this field's value is meaningful only on the host that set it, and
+   * so must never be shared between machines (`home vercel env push/pull`).
+   * Set for anything describing the host's own vantage point rather than the
+   * service being reached — e.g. sonos `subnet`, which depends on which VLAN
+   * *this* machine sits on.
+   */
+  hostLocal?: boolean
 }
 
 export interface ModuleManifest {

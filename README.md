@@ -100,6 +100,42 @@ home config export --out ~/home-config.json     # module config only (no secrets
 home config import --in  ~/home-config.json
 ```
 
+## Sharing a setup across machines
+
+`home vercel` keeps the same config and secrets on more than one host (laptop +
+server) using [Vercel shared environment variables][vercel-shared] as the store,
+so there is no plaintext file to hand-carry between machines.
+
+```bash
+vercel login                    # the only auth step; or export VERCEL_TOKEN
+home vercel configure           # pick the team that holds your variables
+
+home vercel env diff            # compare this host against the store
+home vercel env push            # upload this host's config + secrets
+home vercel env pull            # apply the store to this host
+```
+
+Both directions take `--dry-run`.
+
+Notes:
+
+- **Additive both ways.** Neither `push` nor `pull` deletes anything: a value
+  the other side lacks is left alone. Use the Vercel dashboard to remove one.
+- **Last write wins.** `push` overwrites the store, `pull` overwrites this host.
+  Run `env diff` first if both may have changed.
+- **Host-specific settings never sync.** Fields marked `hostLocal` in a module's
+  schema describe *this* machine's vantage point rather than the service, so
+  they stay put — currently sonos `subnet`, which depends on the VLAN the host
+  sits on.
+- **Variables are stored `encrypted`, not `sensitive`.** Vercel cannot decrypt a
+  `sensitive` value once written, so `pull` could never read it back. Anything
+  holding a token for your team can read these — the store is as trusted as your
+  Vercel account.
+- **Sync is explicit.** Nothing calls Vercel unless you run `home vercel …`, so
+  every other command keeps working from the local keyring when offline.
+
+[vercel-shared]: https://vercel.com/docs/environment-variables/shared-environment-variables
+
 ## Shell completions
 
 `home` generates completion scripts for bash, zsh, and fish straight from its
@@ -309,6 +345,20 @@ Setup: `home gdrive configure` (set clientId/clientSecret), then `home gdrive au
 | `home gdrive files export <id> [--mime <type>] [--out <path>] [--stdout]` | Export a Google-native doc to another format. `--mime` accepts friendly aliases (`pdf`, `docx`, `xlsx`) or full MIME types. |
 | `home gdrive auth login` | OAuth browser flow — store the refresh token |
 | `home gdrive auth logout` | Forget the stored refresh token (revokes nothing server-side) |
+
+### `vercel`
+
+Shares this CLI's own config and secrets between machines — see
+[Sharing a setup across machines](#sharing-a-setup-across-machines). It does not
+deploy anything.
+
+Setup: `vercel login`, then `home vercel configure` (pick the team).
+
+| Command | Purpose |
+| --- | --- |
+| `home vercel env diff` | Compare this host against the store; reports only names, never values |
+| `home vercel env push [--dry-run]` | Upload this host's config + secrets; creates and updates, never deletes |
+| `home vercel env pull [--dry-run]` | Apply the store to this host; writes secrets to the keyring, config to `~/.config/home/modules/` |
 
 ## Development
 

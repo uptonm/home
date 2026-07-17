@@ -34,6 +34,7 @@ export const manifest: ModuleManifest = {
       kind: 'string',
       help: 'CIDR of the VLAN your Sonos live on, e.g. 10.0.10.0/24. Leave blank to use SSDP multicast (works only when this host shares the speakers\' subnet).',
       validate: validateCidr,
+      hostLocal: true,
     },
   ],
   commands: [
