@@ -42,6 +42,28 @@ Supported targets:
 - Linux x86_64 (`bun-linux-x64-baseline` — no AVX required)
 - macOS arm64
 
+The release repo is private, so the installer (and `home upgrade`) pull binaries
+through the authenticated `gh` CLI — `gh auth login` first.
+
+## Updating
+
+Releases are automated: conventional-commit merges to `main` accumulate a
+[release-please](https://github.com/googleapis/release-please) PR; merging it
+tags `vX.Y.Z`, builds both binaries, and publishes the GitHub Release.
+
+On a real (installed) binary, `home` checks for a newer release at most once a
+day and prints a one-line banner when one exists. The check is cached and runs
+in a detached background refresh — it never blocks or slows a command, is
+silent under `--json`/pipes/CI, and can be turned off with `updateCheck: false`
+in `~/.config/home/config.json`.
+
+```bash
+home upgrade            # show what it would do (requires --yes to install)
+home upgrade --yes      # download the latest binary via gh and swap it in place
+home upgrade --check    # report current vs latest; never installs
+home upgrade --tag v0.2.0 --yes   # install a specific release
+```
+
 ## Quick start
 
 ```bash
@@ -199,8 +221,8 @@ show inline descriptions.
 
 ## Telemetry
 
-None. `home doctor` confirms this. Update checks query the GitHub Releases API
-only (no metadata leaves your machine).
+None. `home doctor` confirms this. The update check only asks `gh` for the
+latest release tag (no metadata leaves your machine).
 
 ## Operational overview: `home overview ops`
 
