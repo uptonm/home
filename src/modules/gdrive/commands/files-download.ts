@@ -11,6 +11,7 @@ import { safeFilename, unwrapResolution } from './util'
 
 export const filesDownload: CommandSpec = {
   path: ['files', 'download'],
+  effect: 'read',
   description:
     'Download a binary/uploaded file’s bytes (alt=media) to a path or stdout. Google-native docs (Docs/Sheets/Slides) cannot be downloaded — use `files export`.',
   args: [

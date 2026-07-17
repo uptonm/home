@@ -4,6 +4,7 @@ import { pickOne } from './shared'
 
 export const usersList: CommandSpec = {
   path: ['users', 'list'],
+  effect: 'read',
   description: 'List Protect users and their permissions',
   args: [],
   examples: [
@@ -19,6 +20,7 @@ export const usersList: CommandSpec = {
 
 export const usersGet: CommandSpec = {
   path: ['users', 'get'],
+  effect: 'read',
   description: 'Get a single user by id or name',
   args: [{ name: 'ref', kind: 'positional', description: 'User id or name (substring ok)', required: true }],
   examples: ['home protect users get <id> --json', 'home protect users get admin --json'],

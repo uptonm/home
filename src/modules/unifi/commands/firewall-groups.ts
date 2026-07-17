@@ -11,6 +11,7 @@ interface RawFirewallGroup {
 
 export const firewallGroupsList: CommandSpec = {
   path: ['firewall-groups', 'list'],
+  effect: 'read',
   description: 'List firewall/IP groups referenced by firewall rules',
   args: [],
   examples: [
@@ -33,6 +34,7 @@ export const firewallGroupsList: CommandSpec = {
 
 export const firewallGroupsGet: CommandSpec = {
   path: ['firewall-groups', 'get'],
+  effect: 'read',
   description: 'Dump the full firewallgroup config for a single group by name',
   args: [
     {

@@ -5,6 +5,7 @@ interface RawRoute { _id: string; name?: string; [key: string]: unknown }
 
 export const routesList: CommandSpec = {
   path: ['routes', 'list'],
+  effect: 'read',
   description: 'List static routes',
   args: [],
   examples: ['home unifi routes list', 'home unifi routes list --json'],
@@ -18,6 +19,7 @@ export const routesList: CommandSpec = {
 
 export const routesGet: CommandSpec = {
   path: ['routes', 'get'],
+  effect: 'read',
   description: 'Dump the full routing config for a single static route by name',
   args: [{ name: 'name', kind: 'positional', description: 'Route name (case-insensitive, exact or unique substring)', required: true }],
   examples: ['home unifi routes get "My Route" --json'],

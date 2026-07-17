@@ -3,6 +3,7 @@ import { getBootstrap, readProtectConfig } from '../client'
 
 export const ringtonesList: CommandSpec = {
   path: ['ringtones', 'list'],
+  effect: 'read',
   description: 'List the chime ringtone library',
   args: [],
   examples: [

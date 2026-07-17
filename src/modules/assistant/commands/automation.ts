@@ -3,6 +3,7 @@ import { callService, readAssistantConfig } from '../client'
 
 export const automationTrigger: CommandSpec = {
   path: ['automation', 'trigger'],
+  effect: 'write',
   description: 'Trigger an automation by entity_id',
   args: [{ name: 'entity', kind: 'positional', description: 'automation.<id>', required: true }],
   examples: ['home assistant automation trigger automation.morning_lights'],

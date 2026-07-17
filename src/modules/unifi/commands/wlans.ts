@@ -20,6 +20,7 @@ interface RawNetwork {
 
 export const wlansList: CommandSpec = {
   path: ['wlans', 'list'],
+  effect: 'read',
   description: 'List wireless networks (SSIDs) with security and mapped VLAN',
   args: [],
   examples: [
@@ -54,6 +55,7 @@ export const wlansList: CommandSpec = {
 
 export const wlansGet: CommandSpec = {
   path: ['wlans', 'get'],
+  effect: 'read',
   description: 'Dump the full raw wlanconf for a single SSID (proxy_arp, mcastenhance, dtim, fast_roaming, etc)',
   args: [{ name: 'ssid', kind: 'positional', description: 'SSID name (case-insensitive)', required: true }],
   examples: [

@@ -10,6 +10,7 @@ interface RawPortProfile {
 
 export const portProfilesList: CommandSpec = {
   path: ['port-profiles', 'list'],
+  effect: 'read',
   description: 'List switch port profiles (portconf) referenced by switch port_table',
   args: [],
   examples: [
@@ -31,6 +32,7 @@ export const portProfilesList: CommandSpec = {
 
 export const portProfilesGet: CommandSpec = {
   path: ['port-profiles', 'get'],
+  effect: 'read',
   description: 'Dump the full portconf for a single port profile by name',
   args: [{ name: 'name', kind: 'positional', description: 'Profile name (case-insensitive, exact or unique substring)', required: true }],
   examples: ['home unifi port-profiles get "All"', 'home unifi port-profiles get PoE --json'],

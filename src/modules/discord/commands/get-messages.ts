@@ -13,6 +13,7 @@ export interface DiscordMessage {
 
 export const getMessagesCmd: CommandSpec = {
   path: ['get-messages'],
+  effect: 'read',
   description: 'Read recent messages from a text channel',
   args: [
     { name: 'channelId', kind: 'positional', description: 'Discord channel ID', required: true },

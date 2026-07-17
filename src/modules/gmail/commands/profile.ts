@@ -3,6 +3,7 @@ import { getProfile, readGmailConfig } from '../client'
 
 export const profileGet: CommandSpec = {
   path: ['profile'],
+  effect: 'read',
   description: 'Get the mailbox profile: email address, message/thread totals, historyId.',
   args: [],
   examples: [

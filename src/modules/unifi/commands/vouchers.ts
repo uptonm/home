@@ -9,6 +9,7 @@ import {
 
 export const vouchersList: CommandSpec = {
   path: ['vouchers', 'list'],
+  effect: 'read',
   description: 'List hotspot guest vouchers (Integration API, paginated)',
   args: [],
   examples: [
@@ -24,6 +25,7 @@ export const vouchersList: CommandSpec = {
 
 export const vouchersGet: CommandSpec = {
   path: ['vouchers', 'get'],
+  effect: 'read',
   description: 'Fetch a single hotspot voucher by its Integration API id',
   args: [{ name: 'id', kind: 'positional', description: 'Voucher id', required: true }],
   examples: ['home unifi vouchers get 661a1f2c0e9b4d00010a2b3c --json'],
@@ -39,6 +41,7 @@ export const vouchersGet: CommandSpec = {
 
 export const vouchersCreate: CommandSpec = {
   path: ['vouchers', 'create'],
+  effect: 'write',
   description: 'Create one or more hotspot guest vouchers (write — requires --yes)',
   args: [
     { name: 'count', kind: 'number', description: 'How many vouchers to create', default: 1 },
@@ -92,6 +95,7 @@ export const vouchersCreate: CommandSpec = {
 
 export const vouchersDelete: CommandSpec = {
   path: ['vouchers', 'delete'],
+  effect: 'destructive',
   description: 'Delete a hotspot voucher by id (write — requires --yes)',
   args: [
     { name: 'id', kind: 'positional', description: 'Voucher id', required: true },

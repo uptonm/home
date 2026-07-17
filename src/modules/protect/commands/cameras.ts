@@ -4,6 +4,7 @@ import { pickOne } from './shared'
 
 export const camerasList: CommandSpec = {
   path: ['cameras', 'list'],
+  effect: 'read',
   description: 'List Protect cameras',
   args: [],
   examples: [
@@ -19,6 +20,7 @@ export const camerasList: CommandSpec = {
 
 export const camerasGet: CommandSpec = {
   path: ['cameras', 'get'],
+  effect: 'read',
   description: 'Get a single camera by id or name',
   args: [{ name: 'id', kind: 'positional', description: 'Camera id or name (substring ok)', required: true }],
   examples: ['home protect cameras get <id> --json', 'home protect cameras get "Front Door" --json'],

@@ -4,6 +4,7 @@ import { integrationClientAction } from '../integration-client'
 
 export const clientsControl: CommandSpec = {
   path: ['client'],
+  effect: 'destructive',
   description: 'Control a client: block, unblock, or reconnect by MAC, hostname, or IP',
   args: [
     {
@@ -66,6 +67,7 @@ export const clientsControl: CommandSpec = {
 
 export const clientsAuthorizeGuest: CommandSpec = {
   path: ['clients', 'authorize-guest'],
+  effect: 'destructive',
   description: 'Authorize a guest client for hotspot/guest-network access via the Integration API (write — requires --yes)',
   args: [
     { name: 'client', kind: 'positional', description: 'Client MAC, hostname, or IP', required: true },

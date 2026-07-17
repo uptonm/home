@@ -15,6 +15,7 @@ interface RawSysinfo {
 
 export const controllerInfoCmd: CommandSpec = {
   path: ['controller', 'info'],
+  effect: 'read',
   description: 'Controller version, build, update status, data retention, timezone',
   args: [],
   examples: ['home unifi controller info', 'home unifi controller info --json'],

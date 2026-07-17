@@ -5,6 +5,7 @@ interface RawAccount { _id: string; name?: string; [key: string]: unknown }
 
 export const radiusAccountsList: CommandSpec = {
   path: ['radius-accounts', 'list'],
+  effect: 'read',
   description: 'List RADIUS user accounts',
   args: [],
   examples: ['home unifi radius-accounts list', 'home unifi radius-accounts list --json'],
@@ -18,6 +19,7 @@ export const radiusAccountsList: CommandSpec = {
 
 export const radiusAccountsGet: CommandSpec = {
   path: ['radius-accounts', 'get'],
+  effect: 'read',
   description: 'Dump a single RADIUS account by name',
   args: [{ name: 'name', kind: 'positional', description: 'Account name (case-insensitive, exact or unique substring)', required: true }],
   examples: ['home unifi radius-accounts get user1 --json'],

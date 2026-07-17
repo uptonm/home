@@ -37,6 +37,7 @@ export function flagsToPlayMode(f: PlayModeFlags): PlayMode {
 
 export const playModeGet: CommandSpec = {
   path: ['play-mode', 'get'],
+  effect: 'read',
   description: 'Get the play mode for a room: repeat (off/all/one), shuffle, and crossfade',
   args: [roomArg],
   examples: [
@@ -66,6 +67,7 @@ export const playModeGet: CommandSpec = {
 
 export const playModeSet: CommandSpec = {
   path: ['play-mode', 'set'],
+  effect: 'write',
   description: 'Set repeat, shuffle, and/or crossfade for a room. Only the flags you pass change; the rest are read and preserved.',
   args: [
     { name: 'room', kind: 'positional', description: 'Room name (defaults to the only group)', required: false },

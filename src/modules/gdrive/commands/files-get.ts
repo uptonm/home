@@ -4,6 +4,7 @@ import { unwrapResolution } from './util'
 
 export const filesGet: CommandSpec = {
   path: ['files', 'get'],
+  effect: 'read',
   description: 'Fetch full metadata for one file by id or name (name resolves via a scoped search; ambiguous → candidates listed)',
   args: [
     { name: 'file', kind: 'positional', description: 'File id or name (case-insensitive, substring ok)', required: true },

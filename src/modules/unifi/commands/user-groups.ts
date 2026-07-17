@@ -11,6 +11,7 @@ interface RawUserGroup {
 
 export const userGroupsList: CommandSpec = {
   path: ['user-groups', 'list'],
+  effect: 'read',
   description: 'List user groups (bandwidth limits) referenced by reservations',
   args: [],
   examples: ['home unifi user-groups list', 'home unifi user-groups list --json'],
@@ -30,6 +31,7 @@ export const userGroupsList: CommandSpec = {
 
 export const userGroupsGet: CommandSpec = {
   path: ['user-groups', 'get'],
+  effect: 'read',
   description: 'Dump the full usergroup for a single group by name',
   args: [{ name: 'name', kind: 'positional', description: 'Group name (case-insensitive, exact or unique substring)', required: true }],
   examples: ['home unifi user-groups get "Default" --json'],

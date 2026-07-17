@@ -31,6 +31,7 @@ function shape(r: RawFirewallRule) {
 
 export const firewallList: CommandSpec = {
   path: ['firewall', 'list'],
+  effect: 'read',
   description: 'List firewall rules',
   args: [],
   examples: [
@@ -52,6 +53,7 @@ export const firewallList: CommandSpec = {
 
 export const firewallGet: CommandSpec = {
   path: ['firewall', 'get'],
+  effect: 'read',
   description: 'Fetch a single firewall rule by id',
   args: [{ name: 'id', kind: 'positional', description: 'Firewall rule _id', required: true }],
   examples: ['home unifi firewall get 5f8a1b2c3d4e5f6a7b8c9d0e --json'],

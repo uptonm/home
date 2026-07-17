@@ -55,6 +55,7 @@ async function replaceAndPlaySpotifyViaQueue(d: SonosDevice, transportUri: strin
 
 export const playUri: CommandSpec = {
   path: ['play-uri'],
+  effect: 'write',
   description: 'Replace the current transport with a URI (HTTP stream, spotify:..., open.spotify.com share URL, etc.) and start playing',
   args: [
     roomArg,
@@ -118,6 +119,7 @@ export const playUri: CommandSpec = {
 
 export const favoritesList: CommandSpec = {
   path: ['favorites', 'list'],
+  effect: 'read',
   description: 'List Sonos favorites (My Sonos)',
   args: [],
   examples: ['home sonos favorites list', 'home sonos favorites list --json'],

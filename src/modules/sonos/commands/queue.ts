@@ -37,6 +37,7 @@ async function pickSpotifyAccount(d: SonosDevice, snOverride: number | undefined
 
 export const queueList: CommandSpec = {
   path: ['queue', 'list'],
+  effect: 'read',
   description: 'List the current queue for a room',
   args: [roomArg],
   examples: ['home sonos queue list "Dining Room" --json'],
@@ -59,6 +60,7 @@ export const queueList: CommandSpec = {
 
 export const queueClear: CommandSpec = {
   path: ['queue', 'clear'],
+  effect: 'write',
   description: 'Clear the queue for a room',
   args: [roomArg],
   examples: ['home sonos queue clear "Dining Room"'],
@@ -72,6 +74,7 @@ export const queueClear: CommandSpec = {
 
 export const queueAdd: CommandSpec = {
   path: ['queue', 'add'],
+  effect: 'write',
   description: 'Add a URI to the queue (spotify:track:..., open.spotify.com share URL, HTTP stream, etc.). Metadata is auto-guessed for known services; Spotify sn= is auto-discovered.',
   args: [
     roomArg,
@@ -155,6 +158,7 @@ export const queueAdd: CommandSpec = {
 
 export const queueRemove: CommandSpec = {
   path: ['queue', 'remove'],
+  effect: 'write',
   description: 'Remove a track from the queue by its 1-based position (see `queue list`)',
   args: [
     roomArg,
@@ -175,6 +179,7 @@ export const queueRemove: CommandSpec = {
 
 export const queueSave: CommandSpec = {
   path: ['queue', 'save'],
+  effect: 'write',
   description: 'Save the current queue as a Sonos playlist',
   args: [
     roomArg,

@@ -9,6 +9,7 @@ interface RawWlanGroup {
 
 export const wlanGroupsList: CommandSpec = {
   path: ['wlan-groups', 'list'],
+  effect: 'read',
   description: 'List WLAN groups referenced by wlanconf',
   args: [],
   examples: ['home unifi wlan-groups list', 'home unifi wlan-groups list --json'],
@@ -22,6 +23,7 @@ export const wlanGroupsList: CommandSpec = {
 
 export const wlanGroupsGet: CommandSpec = {
   path: ['wlan-groups', 'get'],
+  effect: 'read',
   description: 'Dump the full wlangroup for a single group by name',
   args: [{ name: 'name', kind: 'positional', description: 'Group name (case-insensitive, exact or unique substring)', required: true }],
   examples: ['home unifi wlan-groups get "Default" --json'],

@@ -4,6 +4,7 @@ import { integrationPortAction, withSource } from '../integration-client'
 
 export const devicesPoeCycle: CommandSpec = {
   path: ['devices', 'poe-cycle'],
+  effect: 'destructive',
   description: 'Power-cycle a switch port (PoE) by device name/MAC and port number (write — requires --yes)',
   args: [
     { name: 'device', kind: 'positional', description: 'Switch name or MAC', required: true },

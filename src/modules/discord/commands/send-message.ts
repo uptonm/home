@@ -3,6 +3,7 @@ import { requestJson, readDiscordConfig } from '../client'
 
 export const sendMessageCmd: CommandSpec = {
   path: ['send-message'],
+  effect: 'write',
   description: 'Send a text message to a Discord channel.',
   args: [
     { name: 'channelId', kind: 'positional', description: 'Discord channel ID', required: true },

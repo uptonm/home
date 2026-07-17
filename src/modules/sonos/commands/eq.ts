@@ -21,6 +21,7 @@ export function channelsToBalance(lf: number, rf: number): number {
 
 export const eqGet: CommandSpec = {
   path: ['eq', 'get'],
+  effect: 'read',
   description: 'Get a room\'s audio settings: bass, treble, loudness, balance, night-mode, speech-enhancement. Unsupported fields on a given speaker are omitted.',
   args: [{ name: 'room', kind: 'positional', description: 'Room name (case-insensitive, partial match)', required: false }],
   examples: [
@@ -65,6 +66,7 @@ function readRange(v: unknown, lo: number, hi: number): number | null {
 
 export const eqSet: CommandSpec = {
   path: ['eq', 'set'],
+  effect: 'write',
   description: 'Set a room\'s audio settings. Only the flags you pass change. Bass/treble -10..10, balance -100 (left) .. 100 (right).',
   args: [
     roomArg,

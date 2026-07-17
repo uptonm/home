@@ -7,6 +7,7 @@ type PtzDirection = (typeof DIRECTIONS)[number]
 
 export const camerasPtz: CommandSpec = {
   path: ['cameras', 'ptz'],
+  effect: 'write',
   description: 'Pan-tilt-zoom a PTZ-capable camera',
   args: [
     { name: 'camera', kind: 'positional', description: 'Camera id or name', required: true },

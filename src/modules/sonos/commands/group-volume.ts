@@ -5,6 +5,7 @@ const roomArg = { name: 'room', kind: 'positional', description: 'Any room in th
 
 export const groupVolumeGet: CommandSpec = {
   path: ['group-volume', 'get'],
+  effect: 'read',
   description: 'Get the group volume (the blended level across all speakers in the group)',
   args: [{ name: 'room', kind: 'positional', description: 'Any room in the target group (defaults to the only group)', required: false }],
   examples: [
@@ -21,6 +22,7 @@ export const groupVolumeGet: CommandSpec = {
 
 export const groupVolumeSet: CommandSpec = {
   path: ['group-volume', 'set'],
+  effect: 'write',
   description: 'Set the group volume (0-100); every speaker in the group moves proportionally',
   args: [
     roomArg,
@@ -44,6 +46,7 @@ export const groupVolumeSet: CommandSpec = {
 
 export const groupMute: CommandSpec = {
   path: ['group-mute'],
+  effect: 'write',
   description: 'Mute, unmute, or toggle an entire group',
   args: [
     roomArg,

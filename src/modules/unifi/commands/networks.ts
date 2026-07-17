@@ -20,6 +20,7 @@ function purposeRank(purpose: string | undefined): number {
 
 export const networksList: CommandSpec = {
   path: ['networks', 'list'],
+  effect: 'read',
   description: 'List configured networks/VLANs with subnet and DHCP range',
   args: [],
   examples: [
@@ -50,6 +51,7 @@ export const networksList: CommandSpec = {
 
 export const networksGet: CommandSpec = {
   path: ['networks', 'get'],
+  effect: 'read',
   description: 'Dump the full networkconf for a single network by name, VLAN id, or _id',
   args: [
     {

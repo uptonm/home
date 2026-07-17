@@ -5,6 +5,7 @@ interface RawSetting { key?: string; [key: string]: unknown }
 
 export const settingsList: CommandSpec = {
   path: ['settings', 'list'],
+  effect: 'read',
   description: 'List all UniFi site settings (sections with keys)',
   args: [],
   examples: ['home unifi settings list', 'home unifi settings list --json | jq \'.[] | .key\''],
@@ -18,6 +19,7 @@ export const settingsList: CommandSpec = {
 
 export const settingsGet: CommandSpec = {
   path: ['settings', 'get'],
+  effect: 'read',
   description: 'Dump a single settings section by key (e.g. "usg", "mgmt", "super_mgmt")',
   args: [{ name: 'key', kind: 'positional', description: 'Settings key (case-insensitive, exact or unique substring)', required: true }],
   examples: ['home unifi settings get usg --json', 'home unifi settings get mgmt'],

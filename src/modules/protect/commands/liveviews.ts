@@ -4,6 +4,7 @@ import { pickOne } from './shared'
 
 export const liveviewsList: CommandSpec = {
   path: ['liveviews', 'list'],
+  effect: 'read',
   description: 'List saved multi-camera liveview layouts',
   args: [],
   examples: ['home protect liveviews list --json'],
@@ -16,6 +17,7 @@ export const liveviewsList: CommandSpec = {
 
 export const liveviewsGet: CommandSpec = {
   path: ['liveviews', 'get'],
+  effect: 'read',
   description: 'Get a single liveview by id or name',
   args: [{ name: 'ref', kind: 'positional', description: 'Liveview id or name (substring ok)', required: true }],
   examples: ['home protect liveviews get <id> --json', 'home protect liveviews get "All Cameras" --json'],

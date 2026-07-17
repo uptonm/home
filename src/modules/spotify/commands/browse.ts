@@ -13,6 +13,7 @@ const marketArg = { name: 'market', kind: 'string' as const, description: 'ISO 3
 
 export const newReleases: CommandSpec = {
   path: ['new-releases'],
+  effect: 'read',
   description: 'List newly released albums. Each row is a canonical spotify:album URI.',
   args: [marketArg, limitArg, offsetArg],
   examples: [
@@ -37,6 +38,7 @@ export const newReleases: CommandSpec = {
 
 export const categoriesList: CommandSpec = {
   path: ['categories', 'list'],
+  effect: 'read',
   description: 'List Spotify browse categories (paged).',
   args: [marketArg, limitArg, offsetArg],
   examples: ['home spotify categories list --market US --limit 50 --json'],
@@ -58,6 +60,7 @@ export const categoriesList: CommandSpec = {
 
 export const categoriesGet: CommandSpec = {
   path: ['categories', 'get'],
+  effect: 'read',
   description: 'Fetch one browse category by id (e.g. "toplists", "pop").',
   args: [{ name: 'id', kind: 'positional', description: 'Spotify category id', required: true }],
   examples: ['home spotify categories get toplists --json'],

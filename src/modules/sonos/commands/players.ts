@@ -3,6 +3,7 @@ import { discover, readSonosConfig, summarizePlayer, withRoom, type PlayerSummar
 
 export const playersList: CommandSpec = {
   path: ['players', 'list'],
+  effect: 'read',
   description: 'List all Sonos players discovered on the network',
   args: [],
   examples: [
@@ -66,6 +67,7 @@ export function buildPlayerDetail(
 
 export const playersGet: CommandSpec = {
   path: ['players', 'get'],
+  effect: 'read',
   description: 'Get full detail for one player: model, IP, MAC, serial, software/hardware version, LED state, and group membership (beyond what `players list` shows)',
   args: [{ name: 'room', kind: 'positional', description: 'Room name (case-insensitive, partial match)', required: true }],
   examples: [

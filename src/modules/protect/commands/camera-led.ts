@@ -4,6 +4,7 @@ import { pickOne } from './shared'
 
 export const camerasLed: CommandSpec = {
   path: ['cameras', 'led'],
+  effect: 'write',
   description: 'Control a camera IR LED and flood light',
   args: [
     { name: 'camera', kind: 'positional', description: 'Camera id or name', required: true },

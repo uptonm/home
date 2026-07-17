@@ -5,6 +5,7 @@ const roomArg = { name: 'room', kind: 'positional', description: 'Room name (cas
 
 export const volumeGet: CommandSpec = {
   path: ['volume', 'get'],
+  effect: 'read',
   description: 'Get current volume (0-100) for a room',
   args: [roomArg],
   examples: ['home sonos volume get kitchen'],
@@ -18,6 +19,7 @@ export const volumeGet: CommandSpec = {
 
 export const volumeSet: CommandSpec = {
   path: ['volume', 'set'],
+  effect: 'write',
   description: 'Set volume (0-100) for a room',
   args: [
     roomArg,
@@ -41,6 +43,7 @@ export const volumeSet: CommandSpec = {
 
 export const mute: CommandSpec = {
   path: ['mute'],
+  effect: 'write',
   description: 'Mute or unmute a room',
   args: [
     roomArg,

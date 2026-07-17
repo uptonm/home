@@ -19,6 +19,7 @@ const marketArg = { name: 'market', kind: 'string' as const, description: 'ISO 3
 
 export const albumTracks: CommandSpec = {
   path: ['album', 'tracks'],
+  effect: 'read',
   description: 'List an album\'s tracks (paged). Each row is a Sonos-playable spotify:track URI.',
   args: [refArg, limitArg, offsetArg, marketArg],
   examples: [
@@ -45,6 +46,7 @@ export const albumTracks: CommandSpec = {
 
 export const artistAlbums: CommandSpec = {
   path: ['artist', 'albums'],
+  effect: 'read',
   description: "List an artist's albums (paged). Each row is a canonical spotify:album URI.",
   args: [refArg, limitArg, offsetArg, marketArg],
   examples: ['home spotify artist albums spotify:artist:7kNqXtgeIwFtelmRjWv205 --limit 10 --json'],
@@ -68,6 +70,7 @@ export const artistAlbums: CommandSpec = {
 
 export const artistTopTracks: CommandSpec = {
   path: ['artist', 'top-tracks'],
+  effect: 'read',
   description: "List an artist's top tracks for a market. Each row is a Sonos-playable spotify:track URI.",
   args: [refArg, marketArg],
   examples: ['home spotify artist top-tracks spotify:artist:7kNqXtgeIwFtelmRjWv205 --market US --json'],
@@ -83,6 +86,7 @@ export const artistTopTracks: CommandSpec = {
 
 export const playlistTracks: CommandSpec = {
   path: ['playlist', 'tracks'],
+  effect: 'read',
   description: "List a playlist's tracks (paged). Each row is a Sonos-playable spotify:track URI.",
   args: [refArg, limitArg, offsetArg, marketArg],
   examples: ['home spotify playlist tracks spotify:playlist:37i9dQZF1DXcBWIGoYBM5M --limit 50 --json'],

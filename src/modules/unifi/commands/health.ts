@@ -15,6 +15,7 @@ interface RawHealth {
 
 export const healthCmd: CommandSpec = {
   path: ['health'],
+  effect: 'read',
   description: 'Controller health rollup: wifi score, device up/down counts, utilization',
   args: [],
   examples: ['home unifi health', 'home unifi health --json'],

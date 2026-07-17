@@ -15,6 +15,7 @@ const ALIAS_LIST = Object.keys(EXPORT_MIME_ALIASES).join(', ')
 
 export const filesExport: CommandSpec = {
   path: ['files', 'export'],
+  effect: 'read',
   description:
     'Export a Google-native doc (Docs/Sheets/Slides/Drawings) to another format. --mime accepts a friendly alias or a full MIME type. Use `files download` for uploaded/binary files.',
   args: [

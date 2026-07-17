@@ -4,6 +4,7 @@ import { integrationDeviceAction, integrationGetDeviceStats } from '../integrati
 
 export const devicesList: CommandSpec = {
   path: ['devices', 'list'],
+  effect: 'read',
   description: 'List all adopted UniFi devices (APs, switches, gateway)',
   args: [],
   examples: [
@@ -19,6 +20,7 @@ export const devicesList: CommandSpec = {
 
 export const devicesGet: CommandSpec = {
   path: ['devices', 'get'],
+  effect: 'read',
   description: 'Fetch a single device by MAC address',
   args: [{ name: 'mac', kind: 'positional', description: 'Device MAC (with or without colons)', required: true }],
   examples: ['home unifi devices get 78:8a:20:11:22:33 --json'],
@@ -34,6 +36,7 @@ export const devicesGet: CommandSpec = {
 
 export const devicesStats: CommandSpec = {
   path: ['devices', 'stats'],
+  effect: 'read',
   description: 'Get latest device statistics via Integration API (CPU, memory, uptime, temps)',
   args: [{ name: 'ref', kind: 'positional', description: 'Device MAC (resolved to integration ID)', required: true }],
   examples: ['home unifi devices stats 78:8a:20:11:22:33 --json'],
@@ -53,6 +56,7 @@ export const devicesStats: CommandSpec = {
 
 export const devicesRestart: CommandSpec = {
   path: ['devices', 'restart'],
+  effect: 'destructive',
   description: 'Restart (reboot) a device by MAC or name via the Integration API (write — requires --yes)',
   args: [
     { name: 'device', kind: 'positional', description: 'Device MAC or name', required: true },

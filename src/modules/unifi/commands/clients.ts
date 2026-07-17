@@ -10,6 +10,7 @@ function normalizeMac(raw: string): string | null {
 
 export const clientsList: CommandSpec = {
   path: ['clients', 'list'],
+  effect: 'read',
   description: 'List currently-connected clients',
   args: [],
   examples: [
@@ -25,6 +26,7 @@ export const clientsList: CommandSpec = {
 
 export const clientsGet: CommandSpec = {
   path: ['clients', 'get'],
+  effect: 'read',
   description: 'Fetch full stats for a single client (STA) by MAC — signal, channel, uptime, rx/tx history',
   args: [{ name: 'mac', kind: 'positional', description: 'Client MAC (with or without colons)', required: true }],
   examples: [

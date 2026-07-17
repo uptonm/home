@@ -3,6 +3,7 @@ import { readUnifiConfig, siteHealth, siteInfo } from '../client'
 
 export const siteInfoCmd: CommandSpec = {
   path: ['site', 'info'],
+  effect: 'read',
   description: 'Site identity and raw stats',
   args: [],
   examples: ['home unifi site info --json'],
@@ -15,6 +16,7 @@ export const siteInfoCmd: CommandSpec = {
 
 export const siteHealthCmd: CommandSpec = {
   path: ['site', 'health'],
+  effect: 'read',
   description: 'Per-subsystem site health (WAN, LAN, WLAN, WWW)',
   args: [],
   examples: [

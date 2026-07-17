@@ -3,6 +3,7 @@ import { getReservation, listNetworks, listUsers, readUnifiConfig } from '../cli
 
 export const reservationsGet: CommandSpec = {
   path: ['reservations', 'get'],
+  effect: 'read',
   description: 'Dump the full user record for a fixed-IP reservation by MAC, name, hostname, or IP',
   args: [
     {
@@ -84,6 +85,7 @@ function cidrContains(cidr: string, ip: string): boolean {
 
 export const reservationsList: CommandSpec = {
   path: ['reservations', 'list'],
+  effect: 'read',
   description: 'List fixed-IP reservations, each labeled with its VLAN/network',
   args: [],
   examples: [

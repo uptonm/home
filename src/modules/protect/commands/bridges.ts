@@ -4,6 +4,7 @@ import { pickOne } from './shared'
 
 export const bridgesList: CommandSpec = {
   path: ['bridges', 'list'],
+  effect: 'read',
   description: 'List UP Connect bridges',
   args: [],
   examples: ['home protect bridges list --json'],
@@ -16,6 +17,7 @@ export const bridgesList: CommandSpec = {
 
 export const bridgesGet: CommandSpec = {
   path: ['bridges', 'get'],
+  effect: 'read',
   description: 'Get a single bridge by id or name',
   args: [{ name: 'ref', kind: 'positional', description: 'Bridge id or name (substring ok)', required: true }],
   examples: ['home protect bridges get <id> --json'],

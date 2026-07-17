@@ -4,6 +4,7 @@ import { pickOne } from './shared'
 
 export const sensorsList: CommandSpec = {
   path: ['sensors', 'list'],
+  effect: 'read',
   description: 'List Protect sensors (door/window/motion/leak, temp/humidity/light)',
   args: [],
   examples: [
@@ -19,6 +20,7 @@ export const sensorsList: CommandSpec = {
 
 export const sensorsGet: CommandSpec = {
   path: ['sensors', 'get'],
+  effect: 'read',
   description: 'Get a single sensor by id or name',
   args: [{ name: 'ref', kind: 'positional', description: 'Sensor id or name (substring ok)', required: true }],
   examples: ['home protect sensors get <id> --json', 'home protect sensors get "Front Door" --json'],

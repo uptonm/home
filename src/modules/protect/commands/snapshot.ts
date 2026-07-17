@@ -5,6 +5,7 @@ import { pickOne } from './shared'
 
 export const snapshot: CommandSpec = {
   path: ['snapshot'],
+  effect: 'read',
   description: 'Capture a JPEG snapshot from a camera',
   args: [
     { name: 'camera', kind: 'positional', description: 'Camera id or name', required: true },

@@ -5,6 +5,7 @@ import { DRIVE_SCOPES, MODULE_NAME, readGdriveConfig, REFRESH_TOKEN_KEY } from '
 
 export const authLogin: CommandSpec = {
   path: ['auth', 'login'],
+  effect: 'destructive',
   description:
     'Authorize Drive access via the browser (OAuth installed-app flow) and store the refresh token. Interactive — needs a human at a browser; you cannot drive it.',
   args: [
@@ -39,6 +40,7 @@ export const authLogin: CommandSpec = {
 
 export const authLogout: CommandSpec = {
   path: ['auth', 'logout'],
+  effect: 'destructive',
   description: 'Forget the stored Drive refresh token (revokes nothing server-side; re-run `auth login` to re-authorize)',
   args: [],
   examples: ['home gdrive auth logout'],
