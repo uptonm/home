@@ -49,7 +49,21 @@ export const doctorCmd: CommandDef = defineCommand({
 
     const moduleReports: ModuleReport[] = []
     for (const manifest of modules) {
-      const cfg = resolveModuleConfig(manifest)
+      // Config resolution reads secrets and can fail (denied keychain dialog,
+      // corrupt store); report it as this module's status rather than letting
+      // one broken module kill the whole doctor run.
+      let cfg
+      try {
+        cfg = resolveModuleConfig(manifest)
+      } catch (err) {
+        moduleReports.push({
+          module: manifest.name,
+          configured: true,
+          status: 'error',
+          message: (err as Error).message,
+        })
+        continue
+      }
       if (!cfg) {
         moduleReports.push({ module: manifest.name, configured: false, status: 'not_configured' })
         continue

@@ -15,19 +15,20 @@ const importArgs: ArgsDef = {
   json: { type: 'boolean', description: 'Emit JSON to stdout' },
 }
 
-function collectSecretRows(): SecretRow[] {
-  const direct = exportAll(modules.map((m) => m.name))
-  if (direct.length) return direct
-  // Keyring backend: walk manifests for declared secret keys, look them up.
-  const out: SecretRow[] = []
+/** Exported for tests: the migration-inventory behavior is a review guarantee. */
+export function collectSecretRows(): SecretRow[] {
+  // Read every declared secret first: on the keyring backend that pulls any
+  // pre-consolidation entry into the single item. Without this pass a partly
+  // migrated install would export only what had already been consolidated.
+  // Program-managed secrets (e.g. gdrive/gmail refreshToken, written by `auth
+  // login` rather than configure) are declared in their module's schema
+  // precisely so this inventory can see them.
   for (const m of modules) {
     for (const field of m.configSchema) {
-      if (field.kind !== 'secret') continue
-      const v = getSecret(m.name, field.key)
-      if (v !== null) out.push({ module: m.name, key: field.key, value: v })
+      if (field.kind === 'secret') getSecret(m.name, field.key)
     }
   }
-  return out
+  return exportAll()
 }
 
 export const secretsCmd: CommandDef = defineCommand({

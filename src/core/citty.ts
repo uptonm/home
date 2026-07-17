@@ -94,7 +94,16 @@ function makeUserLeaf(manifest: ModuleManifest, spec: CommandSpec): CommandDef {
     async run({ args }) {
       const raw = args as Record<string, unknown>
       const env = ctxFromArgs(raw)
-      const config = resolveModuleConfig(manifest)
+      // Config resolution reads secrets, which can fail (denied keychain
+      // dialog, corrupt store). That must surface as a structured error —
+      // never proceed to the network with a credential that failed to load.
+      let config: ModuleConfig | null
+      try {
+        config = resolveModuleConfig(manifest)
+      } catch (err) {
+        await emit(systemErrorResultFor(err), { json: env.json })
+        return
+      }
       if (!config && requiresConfig) {
         await emit(
           {
@@ -160,7 +169,13 @@ function makeStatusCommand(manifest: ModuleManifest): CommandDef {
     async run({ args }) {
       const raw = args as Record<string, unknown>
       const env = ctxFromArgs(raw)
-      const config = resolveModuleConfig(manifest)
+      let config: ModuleConfig | null
+      try {
+        config = resolveModuleConfig(manifest)
+      } catch (err) {
+        await emit(systemErrorResultFor(err), { json: env.json })
+        return
+      }
       if (!config && requiresConfig) {
         await emit(
           {

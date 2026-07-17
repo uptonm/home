@@ -88,6 +88,37 @@ Exit codes:
   mode-0600 `~/.config/home/secrets.json` on headless Linux without libsecret
   (you'll be prompted during `home init`)
 
+All secrets live in a **single** keyring entry (`home-cli` / `secrets`) holding
+one JSON blob, rather than an entry per module. macOS attaches an ACL to each
+keychain *item*, so an item-per-secret layout costs one "allow access?" prompt
+per module — and every one of them repeats whenever the binary's identity
+changes. One item means one grant.
+
+Installs predating this migrate automatically: each secret folds into the shared
+entry the first time it's read, and the old item is removed. Expect one last
+prompt per secret while that happens, then no more.
+
+### macOS keychain prompts
+
+macOS pins a keychain grant to the **exact binary**, not to its signing
+identity. A rebuild changes the bytes, so it re-asks — even when both builds
+share a designated requirement (`identifier home and certificate leaf = …`).
+Codesigning does not avoid this; it was verified not to.
+
+What consolidation buys is that the dialog is now **one, not one per module**.
+Click *Always Allow* (not *Allow*) so it sticks for that build.
+
+For a tight edit/run loop, prefer `bun run src/index.ts …` over rebuilding: the
+identity macOS sees is `bun`, which doesn't change as you edit, so the grant
+holds. The compiled binary then costs one dialog per `bun run build:install`.
+
+`scripts/setup-codesign.sh` is still worth running once — it gives builds a
+stable identity and lets `codesign` use its key without a dialog per build — but
+it will not stop the per-rebuild secrets prompt.
+
+If prompts persist per *module* rather than once, some secrets are still in the
+pre-consolidation layout: read them once (`home doctor`) to fold them in.
+
 Rotate / migrate:
 
 ```bash
