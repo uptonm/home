@@ -26,11 +26,14 @@ export const envPullCmd: CommandSpec = {
       const values = await getSharedEnvValues(cfg, ours)
       const result = applyRemote(values, dryRun)
 
+      const label = (a: { module: string; field: string; secret: boolean }) =>
+        `${a.module}.${a.field}${a.secret ? ' (secret)' : ''}`
       return {
         ok: true,
         data: {
           dryRun,
-          applied: result.applied.map((a) => `${a.module}.${a.field}${a.secret ? ' (secret)' : ''}`),
+          applied: result.applied.map(label),
+          unchanged: result.unchanged.map(label),
           skipped: result.skipped,
         },
       }

@@ -6,6 +6,7 @@ import {
   readVercelConfig,
   updateSharedEnv,
   type NewSharedEnv,
+  type SharedEnvUpdate,
 } from '../client'
 import { collectLocal, decodeKey } from '../sync'
 
@@ -35,7 +36,7 @@ export const envPushCmd: CommandSpec = {
       const idByKey = new Map(ours.map((e) => [e.key, e.id] as const))
 
       const toCreate: NewSharedEnv[] = []
-      const toUpdate = new Map<string, string>()
+      const toUpdate: SharedEnvUpdate[] = []
       const created: string[] = []
       const updated: string[] = []
       const unchanged: string[] = []
@@ -50,7 +51,7 @@ export const envPushCmd: CommandSpec = {
           })
           created.push(entry.key)
         } else if (remoteValues.get(entry.key) !== entry.value) {
-          toUpdate.set(id, entry.value)
+          toUpdate.push({ id, key: entry.key, value: entry.value })
           updated.push(entry.key)
         } else {
           unchanged.push(entry.key)

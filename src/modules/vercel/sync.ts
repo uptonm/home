@@ -1,14 +1,11 @@
 import { loadModuleConfig, saveModuleConfig, type ModuleConfigData } from '../../core/config'
 import { resolveModuleConfig } from '../../core/citty'
-import { setSecret } from '../../core/secrets'
+import { getSecret, setSecret } from '../../core/secrets'
 import { modules } from '../../registry'
 import type { ConfigField, ModuleManifest } from '../../core/types'
+import { KEY_PREFIX } from './client'
 
-/**
- * Prefix marking a shared env var as owned by this CLI. Anything without it is
- * someone else's variable and is never read, written, or reported.
- */
-export const KEY_PREFIX = 'HOME__'
+export { KEY_PREFIX }
 
 /** `HOME__<module>__<field>`. Vercel accepts mixed-case keys, so the field name
  * survives a round trip verbatim — no lossy upper-casing of e.g. `insecureTLS`. */
@@ -91,16 +88,20 @@ function coerce(field: ConfigField, value: string): string | boolean {
 
 export interface ApplyResult {
   applied: { module: string; field: string; secret: boolean }[]
+  unchanged: { module: string; field: string; secret: boolean }[]
   skipped: { key: string; reason: string }[]
 }
 
 /**
  * Write remote values into local config and secrets. Additive by design: local
  * keys absent from `remote` are left untouched, so a pull can never delete
- * config this host has and the other doesn't.
+ * config this host has and the other doesn't. Values already equal locally are
+ * reported as `unchanged` and not rewritten — so `--dry-run` genuinely means
+ * "what would change", and a pull right after a pull reports nothing pending.
  */
 export function applyRemote(remote: Map<string, string>, dryRun: boolean): ApplyResult {
   const applied: ApplyResult['applied'] = []
+  const unchanged: ApplyResult['unchanged'] = []
   const skipped: ApplyResult['skipped'] = []
 
   // Group by module so each config file is read and written once.
@@ -125,17 +126,27 @@ export function applyRemote(remote: Map<string, string>, dryRun: boolean): Apply
     let configChanged = false
 
     for (const { field, value } of entries) {
+      const row = { module: moduleName, field: field.key, secret: field.kind === 'secret' }
       if (field.kind === 'secret') {
+        if (getSecret(moduleName, field.key) === value) {
+          unchanged.push(row)
+          continue
+        }
         if (!dryRun) setSecret(moduleName, field.key, value)
       } else {
-        next[field.key] = coerce(field, value)
+        const coerced = coerce(field, value)
+        if (existing !== null && existing[field.key] === coerced) {
+          unchanged.push(row)
+          continue
+        }
+        next[field.key] = coerced
         configChanged = true
       }
-      applied.push({ module: moduleName, field: field.key, secret: field.kind === 'secret' })
+      applied.push(row)
     }
 
     if (configChanged && !dryRun) saveModuleConfig(moduleName, next)
   }
 
-  return { applied, skipped }
+  return { applied, unchanged, skipped }
 }
