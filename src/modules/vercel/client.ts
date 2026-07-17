@@ -717,11 +717,20 @@ export async function getDomainConfig(cfg: VercelConfig, name: string): Promise<
 export interface DomainOwner {
   projectId: string
   projectName: string
+  /**
+   * Coverage of the resolved match: only production aliases are scanned, so a
+   * domain attached to a preview/gitBranch deployment or a project with no
+   * production deployment is invisible here and reads as unowned.
+   */
+  ownerLookup: 'production-alias'
 }
 
 /**
  * No read endpoint maps a domain to its project, but each project's production
  * target lists every alias assigned to it — so scan the (paged) project list.
+ * A full per-project domain scan would honor preview/gitBranch attachments too,
+ * at the cost of a rate-limited call per project; production aliases are the
+ * documented coverage instead.
  */
 export async function findDomainOwner(cfg: VercelConfig, name: string): Promise<DomainOwner | null> {
   const needle = name.toLowerCase()
@@ -730,7 +739,7 @@ export async function findDomainOwner(cfg: VercelConfig, name: string): Promise<
     for (const p of projects) {
       const aliases = p.targets?.production?.alias ?? []
       if (aliases.some((a) => a.toLowerCase() === needle)) {
-        owner = { projectId: p.id, projectName: p.name }
+        owner = { projectId: p.id, projectName: p.name, ownerLookup: 'production-alias' }
         return true
       }
     }

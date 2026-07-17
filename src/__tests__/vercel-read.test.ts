@@ -286,7 +286,11 @@ describe('findDomainOwner', () => {
       })
     })
 
-    expect(await findDomainOwner(CFG, 'blog.example.com')).toEqual({ projectId: 'prj_2', projectName: 'blog' })
+    expect(await findDomainOwner(CFG, 'blog.example.com')).toEqual({
+      projectId: 'prj_2',
+      projectName: 'blog',
+      ownerLookup: 'production-alias',
+    })
     expect(requests).toHaveLength(2)
   })
 

@@ -35,7 +35,8 @@ export const domainsListCmd: CommandSpec = {
 export const domainsGetCmd: CommandSpec = {
   path: ['domains', 'get'],
   effect: 'read',
-  description: 'Get one domain: DNS configuration, owning project, and its project-level attachment',
+  description:
+    'Get one domain: DNS configuration, owning project, and its project-level attachment. Owner detection covers production aliases only — a domain attached to a preview/gitBranch deployment or a project with no production deployment may read as unowned',
   args: [
     { name: 'name', kind: 'positional', description: 'Domain name (e.g. example.com)', required: true },
   ],
