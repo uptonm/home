@@ -17,6 +17,7 @@ const realClient = await import('../modules/gmail/client')
 
 mock.module('../modules/gmail/client', () => ({
   ...realClient,
+  readGmailCredentials: () => ({ clientId: 'c', clientSecret: 's', refreshToken: 'r' }),
   listDrafts: async (_cfg: unknown, opts: DraftsListOptions = {}) => {
     listCalls.push(opts)
     return { drafts: [{ id: 'd1', message: { id: 'm1', threadId: 't1' } }], resultSizeEstimate: 1 }

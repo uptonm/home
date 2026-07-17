@@ -16,6 +16,7 @@ const realClient = await import('../modules/gmail/client')
 
 mock.module('../modules/gmail/client', () => ({
   ...realClient,
+  readGmailCredentials: () => ({ clientId: 'c', clientSecret: 's', refreshToken: 'r' }),
   listLabels: async () => {
     listCalls++
     return { labels: [{ id: 'INBOX', name: 'INBOX', type: 'system' }] }

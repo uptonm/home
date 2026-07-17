@@ -1,5 +1,4 @@
-import { authedRequestJson, type GoogleOAuthCredentials } from '../../core/google-auth'
-import type { ModuleConfig } from '../../core/types'
+import { authedRequestJson, requireGoogleCredentials, type GoogleOAuthCredentials } from '../../core/google-auth'
 
 /**
  * Gmail REST client. All requests hit `users/me` (the authenticated user's
@@ -22,12 +21,9 @@ export const GMAIL_REFRESH_TOKEN_KEY = 'refreshToken'
 
 export type GmailConfig = GoogleOAuthCredentials
 
-export function readGmailConfig(cfg: ModuleConfig): GmailConfig {
-  return {
-    clientId: String(cfg.clientId ?? ''),
-    clientSecret: String(cfg.clientSecret ?? ''),
-    refreshToken: String(cfg.refreshToken ?? ''),
-  }
+/** Shared OAuth client + gmail's own refresh token. Throws when either is absent. */
+export function readGmailCredentials(): GmailConfig {
+  return requireGoogleCredentials(GMAIL_MODULE)
 }
 
 // `messages.get` / `threads.get` / `drafts.get` projection. `raw` (full RFC 2822

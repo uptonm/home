@@ -17,6 +17,7 @@ const realClient = await import('../modules/gmail/client')
 
 mock.module('../modules/gmail/client', () => ({
   ...realClient,
+  readGmailCredentials: () => ({ clientId: 'c', clientSecret: 's', refreshToken: 'r' }),
   listThreads: async (_cfg: unknown, opts: MessagesListOptions = {}) => {
     listCalls.push(opts)
     return { threads: [{ id: 't1' }], nextPageToken: 'NPT' }

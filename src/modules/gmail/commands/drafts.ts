@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { MESSAGE_FORMATS, getDraft, listDrafts, readGmailConfig } from '../client'
+import { MESSAGE_FORMATS, getDraft, listDrafts, readGmailCredentials } from '../client'
 import { optionalString, parseFormat, parseMax } from './shared'
 
 export const draftsList: CommandSpec = {
@@ -21,7 +21,7 @@ export const draftsList: CommandSpec = {
     if (max.error) return { ok: false, kind: 'user', message: max.error, code: 'bad_arg' }
     if (max.warning && ctx.log) ctx.log.warn(max.warning)
 
-    const cfg = readGmailConfig(ctx.config)
+    const cfg = readGmailCredentials()
     const data = await listDrafts(cfg, {
       q: optionalString(ctx, 'q'),
       maxResults: max.value,
@@ -56,7 +56,7 @@ export const draftsGet: CommandSpec = {
     const fmt = parseFormat(ctx, MESSAGE_FORMATS)
     if (fmt.error) return { ok: false, kind: 'user', message: fmt.error, code: 'bad_arg' }
 
-    const cfg = readGmailConfig(ctx.config)
+    const cfg = readGmailCredentials()
     const data = await getDraft(cfg, id, { format: fmt.value })
     return { ok: true, data }
   },

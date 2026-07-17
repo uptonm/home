@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { getProfile, readGmailConfig } from '../client'
+import { getProfile, readGmailCredentials } from '../client'
 
 export const profileGet: CommandSpec = {
   path: ['profile'],
@@ -11,7 +11,7 @@ export const profileGet: CommandSpec = {
     'home gmail profile --json | jq .emailAddress',
   ],
   async run(ctx) {
-    const cfg = readGmailConfig(ctx.config)
+    const cfg = readGmailCredentials()
     const data = await getProfile(cfg)
     return { ok: true, data }
   },

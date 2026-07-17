@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { THREAD_FORMATS, getThread, listThreads, readGmailConfig } from '../client'
+import { THREAD_FORMATS, getThread, listThreads, readGmailCredentials } from '../client'
 import { optionalString, parseFormat, parseLabels, parseMax } from './shared'
 
 export const threadsList: CommandSpec = {
@@ -22,7 +22,7 @@ export const threadsList: CommandSpec = {
     if (max.error) return { ok: false, kind: 'user', message: max.error, code: 'bad_arg' }
     if (max.warning && ctx.log) ctx.log.warn(max.warning)
 
-    const cfg = readGmailConfig(ctx.config)
+    const cfg = readGmailCredentials()
     const data = await listThreads(cfg, {
       q: optionalString(ctx, 'q'),
       labelIds: parseLabels(ctx),
@@ -58,7 +58,7 @@ export const threadsGet: CommandSpec = {
     const fmt = parseFormat(ctx, THREAD_FORMATS)
     if (fmt.error) return { ok: false, kind: 'user', message: fmt.error, code: 'bad_arg' }
 
-    const cfg = readGmailConfig(ctx.config)
+    const cfg = readGmailCredentials()
     const data = await getThread(cfg, id, { format: fmt.value })
     return { ok: true, data }
   },
