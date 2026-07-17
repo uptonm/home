@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from 'bun:test'
+import { PlayMode } from '@svrooij/sonos/lib/models'
 import { EMPTY_CTX, asDevice, data, errCode, realSonosClient } from './sonos-fakes'
 
 interface Calls {
@@ -71,7 +72,8 @@ const { groupVolumeGet, groupVolumeSet, groupMute } = await import('../modules/s
 const { seek } = await import('../modules/sonos/commands/seek')
 
 describe('playModeToFlags / flagsToPlayMode round-trip', () => {
-  const modes = ['NORMAL', 'REPEAT_ALL', 'REPEAT_ONE', 'SHUFFLE', 'SHUFFLE_NOREPEAT', 'SHUFFLE_REPEAT_ONE']
+  // Drive off the enum itself so a new PlayMode can't silently skip the round-trip.
+  const modes = Object.values(PlayMode)
   test('every PlayMode decomposes and recombines to itself', () => {
     for (const m of modes) expect(flagsToPlayMode(playModeToFlags(m))).toBe(m)
   })
