@@ -95,8 +95,10 @@ async function main() {
       continue
     }
     if (status.exitCode !== 0) {
-      skippedModules.push({ module: m.name, reason: `status exited ${status.exitCode}` })
-      console.log(`   SKIP (status exited ${status.exitCode})`)
+      // 143 = SIGTERM from our own timeout kill
+      const reason = status.exitCode === 143 ? 'status timed out' : `status exited ${status.exitCode}`
+      skippedModules.push({ module: m.name, reason })
+      console.log(`   SKIP (${reason})`)
       continue
     }
 
