@@ -1,4 +1,5 @@
 import type { ModuleManifest } from '../../core/types'
+import { NotConfiguredError } from '../../core/errors'
 import { GMAIL_MODULE, getProfile, readGmailCredentials } from './client'
 import { configureGmail } from './configure'
 import { messagesGet, messagesList } from './commands/messages'
@@ -49,6 +50,9 @@ export const manifest: ModuleManifest = {
         },
       }
     } catch (err) {
+      if (err instanceof NotConfiguredError) {
+        return { ok: false, kind: 'config', code: 'not_configured', message: err.message }
+      }
       return { ok: false, kind: 'system', message: (err as Error).message, code: 'status_failed' }
     }
   },
