@@ -19,6 +19,7 @@ import {
   LOGIN_2FA,
   LOGIN_BAD,
   LOGIN_OK,
+  LOGIN_RATE_LIMITED,
   SOCKET_BEATS,
   SOCKET_CERTS,
   SOCKET_MAINTENANCE_LIST,
@@ -174,6 +175,14 @@ describe('login', () => {
     expect(sockets[0]!.disconnected).toBe(true)
   })
 
+  // The rate limiter shares bad-creds' shape; it must not be reported as a
+  // rejected password (a system-kind retryable error, not kuma_auth_failed).
+  test('rate-limit rejection is kuma_rate_limited, not kuma_auth_failed', async () => {
+    const sockets = stubSocket({ loginResponse: LOGIN_RATE_LIMITED })
+    await expect(summaryCmd.run(ctx())).rejects.toMatchObject({ code: 'kuma_rate_limited' })
+    expect(sockets[0]!.disconnected).toBe(true)
+  })
+
   // Socket failures are SystemErrors: like the public transport's
   // kuma_unreachable, they propagate to the citty wrapper rather than
   // returning a user-kind RunResult.
@@ -239,6 +248,18 @@ describe('initial-burst collection', () => {
     expect(sockets[0]!.disconnected).toBe(true)
   })
 
+  test('a cap-truncated burst marks freshness partial so tail nulls read as truncation', async () => {
+    stubSocket({ omitUptimeFor: ['3'] })
+    const data = dataOf(await summaryCmd.run(ctx()))
+    expect((data.freshness as { partial?: boolean }).partial).toBe(true)
+  })
+
+  test('a complete burst leaves partial absent', async () => {
+    stubSocket()
+    const data = dataOf(await summaryCmd.run(ctx()))
+    expect(data.freshness).not.toHaveProperty('partial')
+  })
+
   test('a session with no monitorList by the cap is kuma_socket_failed', async () => {
     const sockets = stubSocket({ omitMonitorList: true })
     await expect(summaryCmd.run(ctx())).rejects.toMatchObject({ code: 'kuma_socket_failed' })
@@ -281,6 +302,14 @@ describe('event → normalized mapping', () => {
     expect(data.incident).toBeNull()
     expect(data.maintenances).toHaveLength(2)
     expect(data.freshness).toEqual({ cachedTransport: false, newestBeatAt: null })
+  })
+
+  test('pages get notes that a requested slug is ignored in auth mode', async () => {
+    stubSocket()
+    const data = dataOf(await pagesGetCmd.run(ctx({ slug: 'marketing' })))
+    expect(data.title).toBe('All monitors (authenticated)')
+    expect(String(data.note)).toContain('marketing')
+    expect(String(data.note)).toContain('ignored')
   })
 
   test('maintenances list carries every window with its status and ISO timeslots', async () => {

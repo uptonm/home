@@ -101,6 +101,17 @@ export interface KumaSnapshot {
   uptime24ByMonitor: Record<string, number>
   certsByMonitor: Record<string, RawCertEntry>
   maintenances: unknown[]
+  /**
+   * True when the settle cap cut collection short before every monitor's stats
+   * arrived: tail monitors then read as null and are indistinguishable from a
+   * monitor that never ran unless callers know the burst was truncated.
+   */
+  partial: boolean
+}
+
+/** Kuma's login rate limiter answers with the same `{ok:false, msg}` shape as bad creds. */
+function isRateLimitMessage(msg: string): boolean {
+  return /too frequently|try again later/i.test(msg)
 }
 
 function asRecord(v: unknown): Record<string, unknown> | null {
@@ -139,6 +150,8 @@ export function collectKumaSnapshot(cfg: KumaConfig): Promise<KumaSnapshot> {
     let loginAcked = false
     let loginOk = false
     let graceScheduled = false
+    let settleConditionReached = false
+    let partial = false
 
     let serverVersion: string | null = null
     let monitors: Record<string, Record<string, unknown>> | null = null
@@ -156,7 +169,7 @@ export function collectKumaSnapshot(cfg: KumaConfig): Promise<KumaSnapshot> {
     const finish = (): void => {
       if (settled) return
       settled = true
-      resolve({ serverVersion, monitors: monitors ?? {}, beatsByMonitor, uptime24ByMonitor, certsByMonitor, maintenances })
+      resolve({ serverVersion, monitors: monitors ?? {}, beatsByMonitor, uptime24ByMonitor, certsByMonitor, maintenances, partial })
     }
 
     /**
@@ -169,6 +182,7 @@ export function collectKumaSnapshot(cfg: KumaConfig): Promise<KumaSnapshot> {
     const maybeFinishSoon = (): void => {
       if (graceScheduled || !loginOk || monitors === null) return
       if (!Object.keys(monitors).every((id) => id in uptime24ByMonitor)) return
+      settleConditionReached = true
       graceScheduled = true
       later(finish, timings.settleGraceMs)
     }
@@ -251,14 +265,23 @@ export function collectKumaSnapshot(cfg: KumaConfig): Promise<KumaSnapshot> {
         }
         if (res.ok !== true) {
           const msg = typeof res.msg === 'string' && res.msg ? boundedDetail(res.msg) : 'login rejected'
+          // The rate limiter shares bad-creds' shape; treating it as a rejected
+          // password would tell a polling loop to rotate a working credential.
+          if (isRateLimitMessage(msg)) {
+            return fail(new SystemError(`Uptime Kuma rate-limited the login, retry later: ${msg}`, 'kuma_rate_limited'))
+          }
           return fail(new UserError(`Uptime Kuma rejected the configured credentials: ${msg}`, 'kuma_auth_failed'))
         }
         loginOk = true
         later(() => {
           // The cap is a bound, not an error: a slow burst resolves with what
           // arrived — but a burst with no monitorList at all is a broken session.
-          if (monitors !== null) finish()
-          else fail(new SystemError(`Uptime Kuma: no monitorList within ${timings.settleCapMs}ms of login`, 'kuma_socket_failed'))
+          if (monitors === null) {
+            fail(new SystemError(`Uptime Kuma: no monitorList within ${timings.settleCapMs}ms of login`, 'kuma_socket_failed'))
+            return
+          }
+          if (!settleConditionReached) partial = true
+          finish()
         }, timings.settleCapMs)
         maybeFinishSoon()
       })
@@ -319,9 +342,17 @@ export function createAuthenticatedSocketTransport(cfg: KumaConfig): KumaTranspo
   // One socket session per CLI invocation: every read shares the same
   // collected burst, and a failed collection stays failed — no retry storms.
   let snapshot: Promise<KumaSnapshot> | null = null
-  const snap = (): Promise<KumaSnapshot> => (snapshot ??= collectKumaSnapshot(cfg))
+  let partial = false
+  const snap = (): Promise<KumaSnapshot> =>
+    (snapshot ??= collectKumaSnapshot(cfg).then((s) => {
+      partial = s.partial
+      return s
+    }))
   return {
     cachedTransport: false,
+    get partial() {
+      return partial
+    },
     privateData: {
       async monitorBeats(monitorId) {
         return (await snap()).beatsByMonitor[monitorId] ?? []

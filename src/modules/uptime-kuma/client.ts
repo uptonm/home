@@ -120,6 +120,12 @@ export interface KumaTransport {
    * authenticated socket reads live server state instead.
    */
   readonly cachedTransport: boolean
+  /**
+   * True when the last-collected snapshot was truncated by the settle cap
+   * before every monitor's stats arrived. Always false on public-status, which
+   * reads a complete cached payload in one request.
+   */
+  readonly partial: boolean
   /** Auth-only reads; null when the transport cannot serve them (public-status). */
   readonly privateData: KumaPrivateData | null
   /** Page config, groups with monitors, pinned incident, maintenance windows. */
@@ -183,6 +189,7 @@ export function createPublicStatusTransport(cfg: KumaConfig): KumaTransport {
 
   return {
     cachedTransport: true,
+    partial: false,
     privateData: null,
     async getStatusPage(slug) {
       await assertPageExists(slug)

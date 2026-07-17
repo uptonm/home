@@ -87,6 +87,8 @@ export async function runKumaCommand(fn: () => Promise<RunResult>): Promise<RunR
 export interface KumaFreshness {
   cachedTransport: boolean
   newestBeatAt: string | null
+  /** Present only when the authenticated burst was truncated — see KumaTransport.partial. */
+  partial?: boolean
 }
 
 export function freshnessFrom(t: KumaTransport, beatLists: KumaBeat[][]): KumaFreshness {
@@ -96,7 +98,9 @@ export function freshnessFrom(t: KumaTransport, beatLists: KumaBeat[][]): KumaFr
       if (beat.at !== null && (newest === null || beat.at > newest)) newest = beat.at
     }
   }
-  return { cachedTransport: t.cachedTransport, newestBeatAt: newest }
+  const freshness: KumaFreshness = { cachedTransport: t.cachedTransport, newestBeatAt: newest }
+  if (t.partial) freshness.partial = true
+  return freshness
 }
 
 export function normalizeBeatMap(payload: RawHeartbeatPayload): Map<string, KumaBeat[]> {

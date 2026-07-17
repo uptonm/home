@@ -46,6 +46,8 @@ export const INFO_POST_LOGIN = {
 export const LOGIN_OK = { ok: true, token: 'jwt-token' }
 export const LOGIN_2FA = { tokenRequired: true }
 export const LOGIN_BAD = { ok: false, msg: 'Incorrect username or password.' }
+/** Kuma's rate limiter: same `{ok:false, msg}` shape as bad credentials. */
+export const LOGIN_RATE_LIMITED = { ok: false, msg: 'Too frequently, try again later.' }
 
 /** monitor.toJSON() subsets — representative fields only. */
 export const SOCKET_MONITOR_LIST: Record<string, Record<string, unknown>> = {
