@@ -275,6 +275,24 @@ export function parseAuthRedirect(rawUrl: string, expectedState: string): { code
   return { code }
 }
 
+/**
+ * Interpret a line the user pasted into the terminal when the loopback
+ * redirect couldn't reach this machine (browser on another host). Accepts the
+ * full redirect URL from the browser's address bar (state validated, same as
+ * the loopback path) or a bare authorization code. A bare code carries no
+ * state to check — it is useless without the in-process PKCE verifier, and
+ * the user typing it is the consent. Throws `UserError` on anything else.
+ */
+export function parsePastedRedirect(input: string, expectedState: string): { code: string } {
+  const trimmed = input.trim()
+  if (/^https?:\/\//.test(trimmed)) return parseAuthRedirect(trimmed, expectedState)
+  if (/^[\w/-]+$/.test(trimmed) && trimmed.length > 0) return { code: trimmed }
+  throw new UserError(
+    "unrecognized input — paste the full redirect URL from the browser's address bar",
+    'google_paste_unrecognized',
+  )
+}
+
 export interface ExchangeCodeParams {
   clientId: string
   clientSecret: string
