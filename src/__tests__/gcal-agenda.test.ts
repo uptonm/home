@@ -93,7 +93,8 @@ describe('mergeAgenda', () => {
       id: 'vacation',
       summary: 'Vacation',
       start: '2026-07-17',
-      end: '2026-07-18',
+      // Google's all-day end.date (2026-07-18) is exclusive; collapsed to the inclusive last day.
+      end: '2026-07-17',
       allDay: true,
       location: undefined,
     })
