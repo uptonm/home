@@ -17,6 +17,7 @@ describe('module manifests', () => {
         expect(Array.isArray(m.configSchema)).toBe(true)
         expect(Array.isArray(m.commands)).toBe(true)
         expect(typeof m.status).toBe('function')
+        expect(m.status.constructor.name).toBe('AsyncFunction')
       })
 
       test('every configSchema field is well-formed', () => {

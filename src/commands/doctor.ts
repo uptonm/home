@@ -1,7 +1,8 @@
 import { defineCommand, type ArgsDef, type CommandDef } from 'citty'
-import { emit } from '../core/output'
 import { resolveModuleConfig } from '../core/citty'
+import { emit } from '../core/output'
 import { request } from '../core/http'
+import { collectModuleStatuses, type ModuleStatusReport } from '../core/status'
 import { modules } from '../registry'
 import { HOME_VERSION } from '../core/version'
 
@@ -11,17 +12,10 @@ const args: ArgsDef = {
 
 const RELEASE_URL = 'https://api.github.com/repos/uptonm/home/releases/latest'
 
-interface ModuleReport {
-  module: string
-  configured: boolean
-  status: 'ok' | 'error' | 'not_configured'
-  message?: string
-}
-
 interface DoctorReport {
   version: string
   telemetry: 'off (no-op)'
-  modules: ModuleReport[]
+  modules: ModuleStatusReport[]
   update?: { current: string; latest: string; outOfDate: boolean }
   updateError?: string
 }
@@ -47,49 +41,14 @@ export const doctorCmd: CommandDef = defineCommand({
     const raw = args as Record<string, unknown>
     const json = Boolean(raw.json)
 
-    const moduleReports: ModuleReport[] = []
-    for (const manifest of modules) {
-      // Config resolution reads secrets and can fail (denied keychain dialog,
-      // corrupt store); report it as this module's status rather than letting
-      // one broken module kill the whole doctor run.
-      let cfg
-      try {
-        cfg = resolveModuleConfig(manifest)
-      } catch (err) {
-        moduleReports.push({
-          module: manifest.name,
-          configured: true,
-          status: 'error',
-          message: (err as Error).message,
-        })
-        continue
-      }
-      if (!cfg) {
-        moduleReports.push({ module: manifest.name, configured: false, status: 'not_configured' })
-        continue
-      }
-      try {
-        const result = await manifest.status(cfg)
-        if (result.ok) {
-          moduleReports.push({ module: manifest.name, configured: true, status: 'ok' })
-        } else {
-          moduleReports.push({ module: manifest.name, configured: true, status: 'error', message: result.message })
-        }
-      } catch (err) {
-        moduleReports.push({
-          module: manifest.name,
-          configured: true,
-          status: 'error',
-          message: (err as Error).message,
-        })
-      }
-    }
-
-    const update = await checkUpdate()
+    const [moduleStatus, update] = await Promise.all([
+      collectModuleStatuses(modules, resolveModuleConfig),
+      checkUpdate(),
+    ])
     const report: DoctorReport = {
       version: HOME_VERSION,
       telemetry: 'off (no-op)',
-      modules: moduleReports,
+      modules: moduleStatus.modules,
       ...('error' in update ? { updateError: update.error } : { update }),
     }
     await emit({ ok: true, data: report }, { json })

@@ -77,5 +77,6 @@ export interface ModuleManifest {
    */
   requiresConfig?: boolean
   commands: CommandSpec[]
-  status: (cfg: ModuleConfig) => Promise<RunResult>
+  /** Async readiness probe used by both module-level and root-level status. */
+  status(cfg: ModuleConfig): Promise<RunResult>
 }

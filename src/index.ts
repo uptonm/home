@@ -2,6 +2,7 @@ import { defineCommand, runMain } from 'citty'
 import { buildCommandTree } from './core/citty'
 import { initCmd } from './commands/init'
 import { configureAllCmd } from './commands/configure-all'
+import { statusCmd } from './commands/status'
 import { skillCmd } from './commands/skill'
 import { doctorCmd } from './commands/doctor'
 import { secretsCmd } from './commands/secrets'
@@ -30,6 +31,7 @@ const root = defineCommand({
     ...moduleSubCommands,
     init: initCmd,
     configure: configureAllCmd,
+    status: statusCmd,
     skill: skillCmd,
     doctor: doctorCmd,
     secrets: secretsCmd,

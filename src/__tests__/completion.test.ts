@@ -29,7 +29,7 @@ describe('completion tree', () => {
   })
 
   test('includes the static top-level commands', () => {
-    for (const name of ['init', 'configure', 'doctor', 'secrets', 'skill', 'completions']) {
+    for (const name of ['init', 'configure', 'status', 'doctor', 'secrets', 'skill', 'completions']) {
       expect(tree.subcommands.has(name)).toBe(true)
     }
   })
