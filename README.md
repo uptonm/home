@@ -392,6 +392,31 @@ Setup: `vercel login`, then `home vercel configure` (pick the team).
 | `home vercel env push [--dry-run]` | Upload this host's config + secrets; creates and updates, never deletes |
 | `home vercel env pull [--dry-run]` | Apply the store to this host; writes secrets to the keyring, config to `~/.config/home/modules/` |
 
+### `github`
+
+Read-only view of GitHub *remote* state through the official `gh` CLI — the
+module never talks to the API itself and never writes. Local stacked-branch
+topology is the graphite module's territory; this one owns what the remote
+knows: PRs, reviews, checks, runs, issues.
+
+Setup: install and authenticate `gh` (`gh auth login`), then
+`home github configure`. Configuration is required so an absent `gh` binary
+doesn't degrade `home status` on machines that don't use it. When `--repo` is
+omitted, the configured `defaultRepo` applies, else the repo is inferred from
+the current directory's git remotes.
+
+| Command | Purpose |
+| --- | --- |
+| `home github repos get [owner/name]` | Repository identity: default branch, visibility, description, fork/archive flags |
+| `home github prs list [--repo] [--state] [--author] [--limit N]` | List pull requests with author, head/base refs, and draft state |
+| `home github prs get <number\|url> [--repo]` | One PR in detail: reviews, mergeability, refs, labels, stack links from the body |
+| `home github prs checks <number\|url> [--repo]` | CI checks summarized: pass/fail/pending/skipped counts + failing check names |
+| `home github prs diff <number\|url> [--repo] [--name-only]` | Size-capped patch (truncation flagged) or changed file names |
+| `home github runs list [--repo] [--branch] [--status] [--limit N]` | List Actions workflow runs with status, conclusion, and branch |
+| `home github runs get <id> [--repo]` | One run in detail: jobs, per-job conclusion and timing, URL |
+| `home github issues list [--repo] [--state] [--label] [--limit N]` | List issues with author, labels, and assignees |
+| `home github issues get <number\|url> [--repo]` | One issue in detail with its newest comments (bounded) |
+
 ## Development
 
 Requires Bun ≥ 1.3.
