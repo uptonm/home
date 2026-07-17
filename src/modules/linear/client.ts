@@ -3,10 +3,12 @@ import { HomeError, SystemError, UserError } from '../../core/errors'
 import type { ModuleConfig, RunResult } from '../../core/types'
 
 /**
- * Linear GraphQL client (read-only). One transport (`gql`) posts named query
+ * Linear GraphQL client. One transport (`gql`) posts named query and mutation
  * documents with variables — user input never reaches a document string, only
  * the `variables` object. Resolvers, filter builders, and shapers are pure and
  * exported so they can be unit-tested against fixtures without a network.
+ * Mutations are guarded at the command layer (`--yes`); there are no delete or
+ * archive operations.
  */
 
 export const LINEAR_API_URL = 'https://api.linear.app/graphql'
@@ -159,6 +161,43 @@ export const TEAM_ACTIVE_CYCLE_QUERY = `query TeamActiveCycle($id: String!) {
   team(id: $id) {
     id key name
     activeCycle { id number name startsAt endsAt progress }
+  }
+}`
+
+export const ISSUE_TEAM_QUERY = `query IssueTeam($id: String!) {
+  issue(id: $id) {
+    id identifier
+    team { id key name }
+  }
+}`
+
+// --- GraphQL mutation documents (constants only, variables carry all input) --
+
+export const CREATE_ISSUE_MUTATION = `mutation CreateIssue($input: IssueCreateInput!) {
+  issueCreate(input: $input) {
+    success
+    issue { id identifier title url }
+  }
+}`
+
+export const UPDATE_ISSUE_MUTATION = `mutation UpdateIssue($id: String!, $input: IssueUpdateInput!) {
+  issueUpdate(id: $id, input: $input) {
+    success
+    issue { id identifier title url }
+  }
+}`
+
+export const CREATE_COMMENT_MUTATION = `mutation CreateComment($input: CommentCreateInput!) {
+  commentCreate(input: $input) {
+    success
+    comment { id url issue { id identifier } }
+  }
+}`
+
+export const UPDATE_PROJECT_MUTATION = `mutation UpdateProject($id: String!, $input: ProjectUpdateInput!) {
+  projectUpdate(id: $id, input: $input) {
+    success
+    project { id name url }
   }
 }`
 
@@ -396,6 +435,30 @@ export function resolveState(states: WorkflowStateRow[], ref: string): WorkflowS
   throw new UserError(`state "${ref}" not found — states: ${available || 'none'}`, 'linear_not_found')
 }
 
+export function resolveProject(projects: ProjectNode[], ref: string): ProjectNode {
+  const wanted = ref.trim()
+  const byId = projects.find((p) => p.id === wanted.toLowerCase())
+  if (byId) return byId
+  const byName = projects.filter((p) => p.name.toLowerCase() === wanted.toLowerCase())
+  if (byName.length === 1) return byName[0]!
+  if (byName.length > 1) {
+    const candidates = byName.map((p) => `${p.name} (${p.id})`).join(', ')
+    throw new UserError(`project "${ref}" is ambiguous — candidates: ${candidates}`, 'linear_ambiguous')
+  }
+  throw new UserError(`project "${ref}" not found`, 'linear_not_found')
+}
+
+/** Index position is the Linear priority int: 0 none, 1 urgent, 2 high, 3 medium, 4 low. */
+export const PRIORITY_NAMES = ['none', 'urgent', 'high', 'medium', 'low'] as const
+
+export function parsePriority(raw: string): number {
+  const idx = (PRIORITY_NAMES as readonly string[]).indexOf(raw.trim().toLowerCase())
+  if (idx === -1) {
+    throw new UserError(`unknown priority "${raw}" — one of: ${PRIORITY_NAMES.join(', ')}`, 'bad_arg')
+  }
+  return idx
+}
+
 // --- Row shapes ------------------------------------------------------------
 
 export interface IssueNode {
@@ -504,6 +567,9 @@ export interface ProjectNode {
   targetDate?: string | null
   lead?: { id: string; name: string; displayName?: string | null } | null
 }
+
+/** Project.state values in Linear's API. */
+export const PROJECT_STATES = ['backlog', 'planned', 'started', 'paused', 'completed', 'canceled'] as const
 
 const AT_RISK_HEALTH = new Set(['atRisk', 'offTrack'])
 
@@ -674,6 +740,129 @@ export async function getTeamActiveCycle(cfg: LinearConfig, teamId: string): Pro
   const res = await gql<{ team: TeamWithActiveCycle | null }>(cfg, TEAM_ACTIVE_CYCLE_QUERY, { id: teamId })
   if (!res.data.team) throw new UserError(`team "${teamId}" not found`, 'linear_not_found')
   return { data: res.data.team, warnings: res.warnings }
+}
+
+export async function getIssueTeam(
+  cfg: LinearConfig,
+  ref: IssueRef,
+): Promise<GqlResponse<{ id: string; identifier: string; team?: TeamRow | null }>> {
+  const res = await gql<{ issue: { id: string; identifier: string; team?: TeamRow | null } | null }>(
+    cfg,
+    ISSUE_TEAM_QUERY,
+    { id: ref.id },
+  )
+  if (!res.data.issue) throw new UserError(`issue "${ref.id}" not found`, 'linear_not_found')
+  return { data: res.data.issue, warnings: res.warnings }
+}
+
+export async function getViewer(cfg: LinearConfig): Promise<GqlResponse<{ id: string; name: string; email: string }>> {
+  const res = await gql<ViewerStatusData>(cfg, VIEWER_STATUS_QUERY)
+  return { data: res.data.viewer, warnings: res.warnings }
+}
+
+// --- Mutations ----------------------------------------------------------------
+
+export interface IssueCreateInput {
+  title: string
+  teamId: string
+  description?: string
+  projectId?: string
+  assigneeId?: string
+  priority?: number
+  stateId?: string
+}
+
+export interface IssueUpdateInput {
+  title?: string
+  description?: string
+  assigneeId?: string
+  priority?: number
+  stateId?: string
+}
+
+export interface ProjectUpdateInputFields {
+  name?: string
+  description?: string
+  state?: string
+  targetDate?: string
+}
+
+export interface MutatedIssue {
+  id: string
+  identifier: string
+  title: string
+  url?: string
+}
+
+export interface CreatedComment {
+  id: string
+  url?: string
+  issue: { id: string; identifier: string }
+}
+
+export interface MutatedProject {
+  id: string
+  name: string
+  url?: string
+}
+
+function mutationFailed(what: string): SystemError {
+  return new SystemError(`Linear reported the ${what} did not succeed`, 'linear_api_failed')
+}
+
+export async function createIssue(cfg: LinearConfig, input: IssueCreateInput): Promise<GqlResponse<MutatedIssue>> {
+  const res = await gql<{ issueCreate: { success: boolean; issue: MutatedIssue | null } }>(
+    cfg,
+    CREATE_ISSUE_MUTATION,
+    { input },
+  )
+  const payload = res.data.issueCreate
+  if (!payload.success || !payload.issue) throw mutationFailed('issue create')
+  return { data: payload.issue, warnings: res.warnings }
+}
+
+export async function updateIssue(
+  cfg: LinearConfig,
+  id: string,
+  input: IssueUpdateInput,
+): Promise<GqlResponse<MutatedIssue>> {
+  const res = await gql<{ issueUpdate: { success: boolean; issue: MutatedIssue | null } }>(
+    cfg,
+    UPDATE_ISSUE_MUTATION,
+    { id, input },
+  )
+  const payload = res.data.issueUpdate
+  if (!payload.success || !payload.issue) throw mutationFailed('issue update')
+  return { data: payload.issue, warnings: res.warnings }
+}
+
+export async function createComment(
+  cfg: LinearConfig,
+  input: { issueId: string; body: string },
+): Promise<GqlResponse<CreatedComment>> {
+  const res = await gql<{ commentCreate: { success: boolean; comment: CreatedComment | null } }>(
+    cfg,
+    CREATE_COMMENT_MUTATION,
+    { input },
+  )
+  const payload = res.data.commentCreate
+  if (!payload.success || !payload.comment) throw mutationFailed('comment create')
+  return { data: payload.comment, warnings: res.warnings }
+}
+
+export async function updateProject(
+  cfg: LinearConfig,
+  id: string,
+  input: ProjectUpdateInputFields,
+): Promise<GqlResponse<MutatedProject>> {
+  const res = await gql<{ projectUpdate: { success: boolean; project: MutatedProject | null } }>(
+    cfg,
+    UPDATE_PROJECT_MUTATION,
+    { id, input },
+  )
+  const payload = res.data.projectUpdate
+  if (!payload.success || !payload.project) throw mutationFailed('project update')
+  return { data: payload.project, warnings: res.warnings }
 }
 
 // --- Status probe ------------------------------------------------------------

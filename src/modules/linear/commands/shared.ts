@@ -1,4 +1,5 @@
-import type { RunContext } from '../../../core/types'
+import { UserError } from '../../../core/errors'
+import type { RunContext, RunResult } from '../../../core/types'
 import {
   DEFAULT_LIMIT,
   MAX_LIMIT,
@@ -103,6 +104,43 @@ export async function buildFilterInput(
   if (project) input.project = project
 
   return { input, warnings }
+}
+
+/**
+ * House confirmation guard for mutations: without `--yes` the command returns
+ * the stable `confirmation_required` code before anything is sent — never an
+ * interactive prompt.
+ */
+export function requireYes(ctx: RunContext, action: string): RunResult | null {
+  if (ctx.args.yes) return null
+  return {
+    ok: false,
+    kind: 'user',
+    message: `refusing to ${action} without confirmation — re-run with --yes`,
+    code: 'confirmation_required',
+  }
+}
+
+/**
+ * Body/description text enters via stdin, never argv — no shell-history leaks,
+ * no quoting fights. `Bun.stdin` can't be fed from a unit test, so the source
+ * is swappable.
+ */
+let stdinSource: () => Promise<string> = async () => {
+  if (process.stdin.isTTY) {
+    throw new UserError('stdin is a TTY — pipe the text in (e.g. `echo "body" | home linear …`)', 'missing_arg')
+  }
+  return Bun.stdin.text()
+}
+
+export function setStdinSource(read: () => Promise<string>): void {
+  stdinSource = read
+}
+
+export async function readStdinText(flag: string): Promise<string> {
+  const text = (await stdinSource()).trim()
+  if (!text) throw new UserError(`${flag} was set but stdin was empty`, 'missing_arg')
+  return text
 }
 
 /** Attach accumulated partial-result warnings to a data payload (omitted when none). */
