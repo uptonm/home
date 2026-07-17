@@ -12,13 +12,14 @@ Modules:
 - **`sonos`** — Sonos players (playback, volume, groups, queue, favorites, playlists, library, EQ, alarms, notifications)
 - **`tts`** — text-to-speech to an MP3 (macOS `say` / Linux `espeak-ng`), for hand-off to Sonos notify
 - **`gmail`** — Google Gmail (read-only: search messages/threads, list labels/drafts, mailbox profile)
+- **`gcal`** — Google Calendar (read-only: list calendars, list/get events with recurring expansion)
 - **`gdrive`** — Google Drive (list/get/download/export files)
 
 `spotify`, `sonos`, and `tts` are designed to pair: search the catalog with
 `spotify` and hand the URI to `sonos play-uri`, or synthesize an announcement
 with `tts` and push it through `sonos notify`.
 
-`gmail` and `gdrive` share a Google OAuth flow via `home <module> auth login`.
+`gmail`, `gcal`, and `gdrive` share a Google OAuth flow via `home <module> auth login`.
 
 ## Install
 
@@ -363,6 +364,24 @@ Works on consumer `@gmail.com` and Google Workspace accounts.
 | `home gmail drafts get <id>` | Get a single draft and its message by id |
 | `home gmail profile get` | Mailbox profile: email address, message/thread totals, historyId |
 | `home gmail auth login` | OAuth browser flow — store the refresh token |
+
+### `gcal`
+
+Read-only Google Calendar access using the Calendar API and Google OAuth.
+Setup: `home gcal configure` (set clientId/clientSecret — the same OAuth client
+as gmail/gdrive works, with the Calendar API enabled), then `home gcal auth login`
+(opens a browser).
+
+Owns Google Calendar schedule/agenda/availability. Home Assistant calendars are
+a different surface — use `home assistant calendars` for those.
+
+| Command | Purpose |
+| --- | --- |
+| `home gcal calendars list [--max N]` | List calendars on the account — owned, shared, and subscribed — with id, summary, primary flag, access role, and time zone |
+| `home gcal events list [calendarId] [--from <t>] [--to <t>] [--q <text>] [--max N]` | List events ordered by start time, recurring events expanded to individual instances. Calendar defaults to `primary`; `--from`/`--to` take RFC 3339 or bare `YYYY-MM-DD` (local midnight). |
+| `home gcal events get <calendarId> <eventId>` | Get a single event by id (full payload) |
+| `home gcal auth login` | OAuth browser flow — store the refresh token |
+| `home gcal auth status` | Probe the stored credentials with one bounded calendar-list request; reports the authenticated account |
 
 ### `gdrive`
 
