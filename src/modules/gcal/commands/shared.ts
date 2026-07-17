@@ -8,6 +8,11 @@ export const DEFAULT_CALENDARS_MAX = 100
 // calendarList.list caps at 250 results per page.
 export const CALENDARS_MAX_CAP = 250
 
+export const DEFAULT_AGENDA_DAYS = 1
+export const AGENDA_DAYS_CAP = 14
+
+export const DAY_MS = 24 * 60 * 60 * 1000
+
 export interface ParseResult<T> {
   value?: T
   error?: string
@@ -61,4 +66,29 @@ export function optionalString(ctx: RunContext, name: string): string | undefine
   if (ctx.args[name] === undefined) return undefined
   const s = String(ctx.args[name]).trim()
   return s.length > 0 ? s : undefined
+}
+
+/** Parse `--days <n>` into a bounded window length, defaulting when absent. */
+export function parseDays(ctx: RunContext): ParseResult<number> {
+  if (ctx.args.days === undefined) return { value: DEFAULT_AGENDA_DAYS }
+  const n = Number(ctx.args.days)
+  if (!Number.isFinite(n) || n < 1) {
+    return { error: 'days must be a positive number' }
+  }
+  const clamped = Math.min(Math.floor(n), AGENDA_DAYS_CAP)
+  if (clamped < n) {
+    return { value: clamped, warning: `days capped at ${AGENDA_DAYS_CAP}` }
+  }
+  return { value: clamped }
+}
+
+/** Parse `--calendars a,b,c` into trimmed ids; undefined when absent or empty. */
+export function parseCalendarIds(ctx: RunContext): string[] | undefined {
+  const raw = optionalString(ctx, 'calendars')
+  if (raw === undefined) return undefined
+  const ids = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+  return ids.length > 0 ? ids : undefined
 }
