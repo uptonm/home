@@ -423,14 +423,18 @@ the current directory's git remotes.
 
 ### `graphite`
 
-Read-only view of *local* Graphite stacked-branch state through the `gt` CLI —
-which branches are tracked, how they stack, and whether a branch is safe to
-restack. It never mutates a stack (no create/restack/submit/delete); remote PR
-state — reviews, checks, mergeability — is the github module's territory.
+View of *local* Graphite stacked-branch state through the `gt` CLI — which
+branches are tracked, how they stack, whether a branch is safe to restack —
+plus guarded stack actions. Every write requires `--yes` (refusing with
+`confirmation_required` otherwise), always runs gt with `--no-interactive`,
+and never passes a force flag — submit pushes stay `--force-with-lease`. A
+merge/rebase conflict comes back as `graphite_conflict` with gt's text
+verbatim; the module never auto-resolves. Remote PR state — reviews, checks,
+mergeability — is the github module's territory.
 
 Setup: install and authenticate `gt` (`gt auth`), then
 `home graphite configure`. `gt` promises no machine-readable output, so every
-inspect result preserves gt's complete raw text in a `raw` field next to the
+result preserves gt's complete raw text in a `raw` field next to the
 best-effort parsed fields; parsers are written against gt 1.8.6 and `home
 graphite status` flags an untested major version (`compatible: false`) without
 blocking commands. All commands except `status` need the cwd inside a git
@@ -441,8 +445,14 @@ working tree.
 | `home graphite stack list [--all]` | Tracked branches from `gt log short` (raw preserved) with per-branch parents from bounded gt lookups |
 | `home graphite stack get [branch]` | One branch via `gt info`: parent, PR number/state/title, Graphite URL, tip commit |
 | `home graphite stack validate [branch]` | Non-mutating restack readiness: tracked, parent known, restack marker, clean working tree |
+| `home graphite stack restack [--branch b] --yes` | Rebase the stack onto up-to-date parents; conflicts halt as `graphite_conflict` |
+| `home graphite stack sync --yes` | Pull trunk and restack open stacks; never deletes branches itself (gt 1.8.6 has no `--no-delete` — any deletion gt performs is surfaced verbatim in `deletedBranches`) |
+| `home graphite stack submit [--draft] [--dry-run] --yes` | Push the stack and create/update PRs (`--no-edit`); `--dry-run` only reports and needs no `--yes` |
+| `home graphite stack merge --yes` | Merge every PR from trunk to the current branch via Graphite (gt 1.8.6 has no partial-merge flag) |
 | `home graphite branch parent [branch]` | Parent of the current or named branch; trunk reports `parent: null`, `isTrunk: true` |
 | `home graphite branch children [branch]` | Children of the current branch (`gt children`), or derived for a named branch |
+| `home graphite branch create <name> --message <msg> --yes` | Stack a new branch committing only already-staged changes — never stages anything |
+| `home graphite branch track <branch> --parent <p> --yes` | Start tracking an existing branch under an already-tracked parent |
 | `home graphite repo trunk` | The repository's trunk branch as gt reports it |
 
 ## Development

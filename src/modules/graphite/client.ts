@@ -35,12 +35,12 @@ function firstLine(text: string): string {
   return text.trim().split('\n')[0]?.trim() ?? ''
 }
 
-interface BoundedRaw {
+export interface BoundedRaw {
   raw: string
   rawTruncated: boolean
 }
 
-function boundRaw(text: string, alreadyTruncated: boolean): BoundedRaw {
+export function boundRaw(text: string, alreadyTruncated: boolean): BoundedRaw {
   const clean = stripAnsi(text)
   if (clean.length <= RAW_MAX_CHARS) return { raw: clean, rawTruncated: alreadyTruncated }
   return { raw: clean.slice(0, RAW_MAX_CHARS), rawTruncated: true }
