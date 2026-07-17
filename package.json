@@ -17,7 +17,8 @@
     "build": "bash scripts/build-local.sh",
     "build:install": "bash scripts/build-local.sh $HOME/.local/bin/home",
     "build:linux": "bun build --compile --target=bun-linux-x64-baseline src/index.ts --outfile dist/home-linux-x64",
-    "build:mac": "bun build --compile --target=bun-darwin-arm64 src/index.ts --outfile dist/home-darwin-arm64"
+    "build:mac": "bun build --compile --target=bun-darwin-arm64 src/index.ts --outfile dist/home-darwin-arm64",
+    "e2e": "bun e2e/run.ts"
   },
   "dependencies": {
     "@napi-rs/keyring": "^1.1.7",
