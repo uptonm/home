@@ -9,8 +9,9 @@ import gdriveManifest from './modules/gdrive'
 import gmailManifest from './modules/gmail'
 import discordManifest from './modules/discord'
 import vercelManifest from './modules/vercel'
+import githubManifest from './modules/github'
 
-export const modules: ModuleManifest[] = [unifiManifest, protectManifest, assistantManifest, spotifyManifest, sonosManifest, ttsManifest, gdriveManifest, gmailManifest, discordManifest, vercelManifest]
+export const modules: ModuleManifest[] = [unifiManifest, protectManifest, assistantManifest, spotifyManifest, sonosManifest, ttsManifest, gdriveManifest, gmailManifest, discordManifest, vercelManifest, githubManifest]
 
 export const moduleByName: Record<string, ModuleManifest> = Object.fromEntries(
   modules.map((m) => [m.name, m] as const),
