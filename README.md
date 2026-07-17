@@ -41,7 +41,8 @@ Supported targets:
 home init                       # create ~/.config/home/, pick a secrets backend
 home configure                  # interactive configure for every module in turn
 home skill install              # write ~/.claude/skills/home-<module>/SKILL.md (one per module)
-home doctor                     # status across every configured module
+home status                     # readiness + structured data across every module
+home doctor                     # module status plus version/update diagnostics
 ```
 
 You can also configure modules one at a time — `home unifi configure`,

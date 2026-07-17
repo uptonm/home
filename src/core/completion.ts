@@ -125,6 +125,7 @@ export function buildCompletionTree(manifests: ModuleManifest[]): CompletionNode
   const staticTop: Array<[string, string, CompletionOption[]]> = [
     ['init', 'Initialise home configuration', GLOBAL_FLAGS],
     ['configure', 'Configure all modules (interactive)', GLOBAL_FLAGS],
+    ['status', 'Check readiness across every module', [{ name: '--json', description: 'Emit JSON to stdout' }]],
     ['doctor', 'Check status across modules and look for updates', [{ name: '--json', description: 'Emit JSON to stdout' }]],
     ['secrets', 'Manage stored secrets', GLOBAL_FLAGS],
     ['completions', 'Generate a shell completion script', GLOBAL_FLAGS],
