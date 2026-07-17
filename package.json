@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "bun run src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
+    "test": "bash scripts/test-isolated.sh",
     "build": "bash scripts/build-local.sh",
     "build:install": "bash scripts/build-local.sh $HOME/.local/bin/home",
     "build:linux": "bun build --compile --target=bun-linux-x64-baseline src/index.ts --outfile dist/home-linux-x64",

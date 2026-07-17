@@ -9,7 +9,6 @@
         "@svrooij/sonos": "^2.5.0",
         "citty": "^0.1.6",
         "consola": "^3.4.0",
-        "unifi-protect": "^4.29.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -74,11 +73,7 @@
 
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
-    "undici": ["undici@8.0.2", "", {}, "sha512-B9MeU5wuFhkFAuNeA19K2GDFcQXZxq33fL0nRy2Aq30wdufZbyyvxW3/ChaeipXVfy/wUweZyzovQGk39+9k2w=="],
-
     "undici-types": ["undici-types@7.24.6", "", {}, "sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg=="],
-
-    "unifi-protect": ["unifi-protect@4.29.0", "", { "dependencies": { "undici": "8.0.2" }, "bin": { "ufp": "dist/util/ufp.js" } }, "sha512-vRLq+LEE8xtdTR5TfGUvZ4auIAAgO2TbtJDD3fSBiBtzP4JFXr9wSA5N2+odQkWDZpsGZ7PYvHLl7IH37C2+HQ=="],
 
     "webidl-conversions": ["webidl-conversions@3.0.1", "", {}, "sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ=="],
 

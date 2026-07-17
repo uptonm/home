@@ -317,11 +317,28 @@ Requires Bun ≥ 1.3.
 ```bash
 bun install
 bun run typecheck
-bun test
+bun run test                # NOT `bun test` — see below
 bun run dev -- unifi --help
 bun run build:linux         # bun-linux-x64-baseline → dist/home-linux-x64
 bun run build:mac           # bun-darwin-arm64       → dist/home-darwin-arm64
 ```
+
+### Running tests
+
+Use `bun run test` (which runs `scripts/test-isolated.sh`), not `bun test`.
+
+Bun's `mock.module()` is process-global with no teardown, and bun evaluates
+every test file's module scope before running any test. So a command test that
+mocks a client module — say `gmail-messages.test.ts` mocking
+`../modules/gmail/client` — replaces that module for *every* file in the run,
+including `gmail-client.test.ts`, which exists to exercise the real one. Those
+tests then fail based on nothing but who else is in the run.
+
+`bun test --isolate` / `--parallel` don't fix it; they break top-level-await
+imports in the sonos suites instead. So each file gets its own process. Every
+file passes alone, and the whole suite costs about a second more.
+
+`bun run test <file>` delegates straight to `bun test <file>` for a single file.
 
 Adding a module: create `src/modules/<name>/index.ts` exporting a
 `ModuleManifest`, add it to `src/registry.ts`, and `home skill install`
