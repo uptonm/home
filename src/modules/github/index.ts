@@ -2,16 +2,20 @@ import { HomeError } from '../../core/errors'
 import type { ModuleManifest } from '../../core/types'
 import { checkAuth, readGithubConfig } from './client'
 import { issuesGet, issuesList } from './commands/issues'
+import { notificationsList } from './commands/notifications'
 import { prsChecks, prsDiff, prsGet, prsList } from './commands/prs'
+import { releasesList } from './commands/releases'
 import { reposGet } from './commands/repos'
 import { runsGet, runsList } from './commands/runs'
+import { searchCode } from './commands/search'
+import { summary } from './commands/summary'
 
 export const manifest: ModuleManifest = {
   name: 'github',
   description:
-    'Read GitHub remote state via the gh CLI — repos, pull requests (reviews, checks, diffs), Actions runs, and issues',
+    'Read GitHub remote state via the gh CLI — repos, pull requests (reviews, checks, diffs), Actions runs, issues, notifications, releases, code search, and a one-shot summary briefing',
   whenToUse:
-    'Use for what the GitHub *remote* knows: repository metadata, pull requests (detail, reviews, mergeability, CI check summaries, diffs), Actions workflow runs, and issues — all read-only, authenticated through the `gh` CLI (`gh auth login`). When `--repo` is omitted it falls back to the configured defaultRepo, then to the git remotes of the current directory. This module owns remote repo state — PRs, reviews, checks, runs, issues, releases; local stacked-branch topology (creating, restacking, navigating stacks) is the graphite module\'s job, not this one\'s. Do not use to mutate anything — it never writes.',
+    'Use for what the GitHub *remote* knows: repository metadata, pull requests (detail, reviews, mergeability, CI check summaries, diffs), Actions workflow runs, issues, unread notifications, releases, and code search — all read-only, authenticated through the `gh` CLI (`gh auth login`). Start a work session with `summary`: one briefing of my open PRs with failing-check rollups, PRs awaiting my review, and recent failed runs, each item carrying the pr number / run id / repo the follow-up command needs; use `notifications list` for the inbox (filter by --reason, e.g. review_requested). When `--repo` is omitted it falls back to the configured defaultRepo, then to the git remotes of the current directory (except `search code`, which is global by default). This module owns remote repo state — PRs, reviews, checks, runs, issues, releases; local stacked-branch topology (creating, restacking, navigating stacks) is the graphite module\'s job, not this one\'s. Do not use to mutate anything — it never writes.',
   configSchema: [
     {
       key: 'host',
@@ -39,7 +43,21 @@ export const manifest: ModuleManifest = {
         v === '' || /^[\w.-]+\/[\w.-]+$/.test(v) ? null : 'must be owner/name',
     },
   ],
-  commands: [reposGet, prsList, prsGet, prsChecks, prsDiff, runsList, runsGet, issuesList, issuesGet],
+  commands: [
+    summary,
+    reposGet,
+    prsList,
+    prsGet,
+    prsChecks,
+    prsDiff,
+    runsList,
+    runsGet,
+    issuesList,
+    issuesGet,
+    notificationsList,
+    releasesList,
+    searchCode,
+  ],
   async status(cfg) {
     try {
       const gc = readGithubConfig(cfg)

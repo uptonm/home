@@ -416,6 +416,10 @@ the current directory's git remotes.
 | `home github runs get <id> [--repo]` | One run in detail: jobs, per-job conclusion and timing, URL |
 | `home github issues list [--repo] [--state] [--label] [--limit N]` | List issues with author, labels, and assignees |
 | `home github issues get <number\|url> [--repo]` | One issue in detail with its newest comments (bounded) |
+| `home github summary [--repo]` | One briefing: my open PRs with check rollups, PRs awaiting my review, recent failed runs |
+| `home github notifications list [--reason] [--limit N]` | Unread notifications: reason, repo, subject title/type, last update |
+| `home github releases list [--repo] [--limit N]` | Recent releases: tag, name, publish date, prerelease/draft flags, URL |
+| `home github search code <query> [--owner] [--repo] [--limit N]` | Code search: repo, path, URL, bounded matching fragments |
 
 ## Development
 
