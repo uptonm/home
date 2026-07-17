@@ -565,32 +565,46 @@ incidents, and maintenance windows. When a service is down, the host or
 container *cause* (CPU, memory, disk, docker health) is beszel's job, and
 network gear belongs to `unifi`.
 
-Setup: `home uptime-kuma configure` (instance URL, access mode, status page
-slug). The only mode implemented today is `public-status`, which reads the
-instance's public status-page API (targets 1.23.x) without credentials;
-`authenticated-socket` is accepted by the config schema but rejected at
-runtime with `kuma_mode_unsupported` until it lands in a later release.
+Setup: `home uptime-kuma configure` (instance URL, access mode, and the mode's
+inputs). Two modes, both targeting Kuma 1.23.x:
 
-**Public data is cached.** The status-page routes are served from Kuma's
-server-side cache (heartbeat ~1 min, page config ~5 min) on top of each
-monitor's poll interval, so results can trail reality by ~5 minutes. Every
-command therefore carries a `freshness` object: `cachedTransport: true` plus
-`newestBeatAt`, the newest heartbeat timestamp that command saw (null when it
-read only page metadata).
+- **`public-status`** reads the instance's public status-page API without
+  credentials — needs `statusPageSlug`, sees only monitors published on that
+  page. **Public data is cached:** the routes are served from Kuma's
+  server-side cache (heartbeat ~1 min, page config ~5 min) on top of each
+  monitor's poll interval, so results can trail reality by ~5 minutes.
+- **`authenticated-socket`** logs in over Socket.IO with `username` +
+  `password` (stored as a secret) and reads *every* monitor, live. Each CLI
+  invocation is one-shot: connect, log in, collect the server's initial state
+  burst (bounded settle window), disconnect — no daemon, no persistent
+  connection. **2FA accounts are not supported** (the login is refused with
+  `kuma_2fa_unsupported`; use a non-2FA account) — an explicit later spike.
+  Servers outside the tested 1.23.x series are refused with
+  `kuma_untested_version` unless `allowUnsupported` is set. One asymmetry:
+  Kuma pushes no incidents over the authenticated socket, so `incidents list`
+  is only meaningful in public mode.
+
+Every command carries a `freshness` object — `cachedTransport` (`true` on the
+cached public transport, `false` on the live socket) plus `newestBeatAt`, the
+newest heartbeat timestamp that command saw (null when it read no heartbeats).
 
 Timestamps are normalized to ISO 8601, heartbeat status ints to
 `up`/`down`/`pending`/`maintenance`. `<monitor>` accepts an exact id or exact
 case-insensitive name; ambiguous names list the candidates instead of picking.
 Stable codes: `kuma_page_not_found` (instance reachable, slug missing —
-distinct from `kuma_unreachable`), `kuma_api_failed`, `kuma_mode_unsupported`.
+distinct from `kuma_unreachable`), `kuma_api_failed`, `kuma_auth_failed`,
+`kuma_2fa_unsupported`, `kuma_untested_version`, `kuma_socket_failed`, and
+`kuma_auth_mode_required` (an auth-only command ran in public mode).
 
 | Command | Purpose |
 | --- | --- |
-| `home uptime-kuma pages get [slug]` | Status-page metadata: title, groups with monitors, published incident, maintenance windows |
-| `home uptime-kuma monitors list [--status up\|down\|pending\|maintenance]` | Monitors on the page with latest public heartbeat state, latency, 24h uptime |
-| `home uptime-kuma monitors get <id\|name>` | One monitor: state, avg/min/max latency over the recent beats (≤50), cert expiry when exposed |
-| `home uptime-kuma incidents list` | Currently published (pinned) incidents |
-| `home uptime-kuma maintenances list` | Maintenance windows active right now |
+| `home uptime-kuma pages get [slug]` | Status-page metadata: title, groups with monitors, published incident, maintenance windows (auth mode: the full private inventory as one page) |
+| `home uptime-kuma monitors list [--status up\|down\|pending\|maintenance]` | Monitors with latest heartbeat state, latency, 24h uptime |
+| `home uptime-kuma monitors get <id\|name>` | One monitor: state, avg/min/max latency over the recent beats, cert expiry when known |
+| `home uptime-kuma heartbeats list <id\|name> [--since ISO] [--limit N]` | Recent checks for one monitor with latency and failure messages (auth mode only, ≤100 beats) |
+| `home uptime-kuma certificates list [--days N]` | Stored TLS certs — validity, days remaining, expiry; `--days` keeps soon-to-expire, invalid always kept (auth mode only) |
+| `home uptime-kuma incidents list` | Currently published (pinned) incidents (public mode; empty with a note in auth mode) |
+| `home uptime-kuma maintenances list` | Maintenance windows — active ones in public mode, all windows with status in auth mode |
 | `home uptime-kuma summary` | Counts by state, worst state, avg latency, freshness timestamp |
 
 ## Development

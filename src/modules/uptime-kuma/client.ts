@@ -1,6 +1,7 @@
 import { request } from '../../core/http'
 import type { ModuleConfig } from '../../core/types'
 import { SystemError, UserError } from '../../core/errors'
+import { createAuthenticatedSocketTransport } from './socket'
 
 export const KUMA_MODES = ['public-status', 'authenticated-socket'] as const
 export type KumaMode = (typeof KUMA_MODES)[number]
@@ -9,6 +10,9 @@ export interface KumaConfig {
   url: string
   mode: KumaMode
   statusPageSlug: string
+  username: string
+  password: string
+  allowUnsupported: boolean
   insecureTLS?: boolean
 }
 
@@ -33,7 +37,23 @@ export function readKumaConfig(cfg: ModuleConfig): KumaConfig {
       'kuma_not_configured',
     )
   }
-  return { url, mode: mode as KumaMode, statusPageSlug, insecureTLS: Boolean(cfg.insecureTLS) }
+  const username = String(cfg.username ?? '').trim()
+  const password = String(cfg.password ?? '')
+  if (mode === 'authenticated-socket' && (!username || !password)) {
+    throw new UserError(
+      'username and password are required when mode=authenticated-socket — run `home uptime-kuma configure`',
+      'kuma_not_configured',
+    )
+  }
+  return {
+    url,
+    mode: mode as KumaMode,
+    statusPageSlug,
+    username,
+    password,
+    allowUnsupported: Boolean(cfg.allowUnsupported),
+    insecureTLS: Boolean(cfg.insecureTLS),
+  }
 }
 
 /**
@@ -68,33 +88,54 @@ export interface RawHeartbeatPayload {
 }
 
 /**
+ * A monitor_tls_info row, parsed from the certInfo event's JSON string
+ * (1.23.x server/model/monitor.js `sendCertInfo`). `certInfo` carries the
+ * node peer-certificate fields plus daysRemaining / validTo / certType
+ * (server/util-server.js `checkCertificate`).
+ */
+export interface RawCertEntry {
+  valid?: boolean
+  certInfo?: Record<string, unknown>
+}
+
+/** Reads only an authenticated transport can serve. */
+export interface KumaPrivateData {
+  /** Up to 100 raw beats for one monitor, oldest→newest, with `msg` populated. */
+  monitorBeats(monitorId: string): Promise<RawHeartbeat[]>
+  /** Stored TLS info keyed by monitor id — only monitors Kuma has cert data for. */
+  certificates(): Promise<Record<string, RawCertEntry>>
+}
+
+/**
  * Mode-agnostic data access. Commands and the adapter speak only to this
- * interface — route paths (public-status) and Socket.IO event names (the
- * future authenticated-socket transport) never leave their transport.
+ * interface — route paths (public-status) and Socket.IO event names
+ * (authenticated-socket) never leave their transport.
  */
 export interface KumaTransport {
   /**
    * True when reads come from a server-side cache rather than live state.
    * The public status routes are apicache-cached (heartbeat 1 min, page
    * config 5 min) on top of the monitor poll interval, so data can trail
-   * reality by ~5 minutes — commands surface this via `freshness`.
+   * reality by ~5 minutes — commands surface this via `freshness`. The
+   * authenticated socket reads live server state instead.
    */
   readonly cachedTransport: boolean
-  /** Page config, groups with monitors, pinned incident, active maintenance windows. */
+  /**
+   * True when the last-collected snapshot was truncated by the settle cap
+   * before every monitor's stats arrived. Always false on public-status, which
+   * reads a complete cached payload in one request.
+   */
+  readonly partial: boolean
+  /** Auth-only reads; null when the transport cannot serve them (public-status). */
+  readonly privateData: KumaPrivateData | null
+  /** Page config, groups with monitors, pinned incident, maintenance windows. */
   getStatusPage(slug: string): Promise<RawStatusPage>
-  /** Recent public beats + 24h uptime ratios for the page's monitors. */
+  /** Recent beats + 24h uptime ratios for the page's monitors. */
   getHeartbeats(slug: string): Promise<RawHeartbeatPayload>
 }
 
-/** Rejects modes that have no transport yet; the seam for authenticated-socket. */
 export function createKumaTransport(cfg: KumaConfig): KumaTransport {
-  if (cfg.mode === 'authenticated-socket') {
-    throw new UserError(
-      'uptime-kuma mode "authenticated-socket" is not supported yet — it arrives in a later release; use mode=public-status',
-      'kuma_mode_unsupported',
-    )
-  }
-  return createPublicStatusTransport(cfg)
+  return cfg.mode === 'authenticated-socket' ? createAuthenticatedSocketTransport(cfg) : createPublicStatusTransport(cfg)
 }
 
 /** Public status-page transport: bounded unauthenticated GETs against the 1.23.x routes. */
@@ -148,6 +189,8 @@ export function createPublicStatusTransport(cfg: KumaConfig): KumaTransport {
 
   return {
     cachedTransport: true,
+    partial: false,
+    privateData: null,
     async getStatusPage(slug) {
       await assertPageExists(slug)
       const path = `/api/status-page/${encodeURIComponent(slug)}`

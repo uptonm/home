@@ -4,7 +4,7 @@ import { pagesGetCmd } from '../modules/uptime-kuma/commands/pages'
 import { monitorsGetCmd, monitorsListCmd } from '../modules/uptime-kuma/commands/monitors'
 import { incidentsListCmd, maintenancesListCmd } from '../modules/uptime-kuma/commands/incidents'
 import { summaryCmd } from '../modules/uptime-kuma/commands/summary'
-import { createKumaTransport, readKumaConfig } from '../modules/uptime-kuma/client'
+import { readKumaConfig } from '../modules/uptime-kuma/client'
 import type { RunContext, RunResult } from '../core/types'
 import {
   EMPTY_HEARTBEATS,
@@ -243,20 +243,20 @@ describe('summary', () => {
 })
 
 describe('mode + config gates', () => {
-  test('mode=authenticated-socket is rejected at the transport seam with kuma_mode_unsupported', () => {
+  test('mode=authenticated-socket without credentials is kuma_not_configured', () => {
     let code: string | undefined
     try {
-      createKumaTransport(readKumaConfig({ ...CONFIG, mode: 'authenticated-socket' }))
+      readKumaConfig({ ...CONFIG, mode: 'authenticated-socket' })
     } catch (err) {
       code = (err as { code?: string }).code
     }
-    expect(code).toBe('kuma_mode_unsupported')
+    expect(code).toBe('kuma_not_configured')
   })
 
-  test('a command under authenticated-socket fails as a user error before any request', async () => {
+  test('a command under credential-less authenticated-socket fails before any request', async () => {
     stubKuma({})
-    const res = await summaryCmd.run(ctx({}, { ...CONFIG, mode: 'authenticated-socket' }))
-    expect(res).toMatchObject({ ok: false, kind: 'user', code: 'kuma_mode_unsupported' })
+    const res = await summaryCmd.run(ctx({}, { ...CONFIG, mode: 'authenticated-socket', username: 'admin' }))
+    expect(res).toMatchObject({ ok: false, kind: 'user', code: 'kuma_not_configured' })
     expect(requests).toHaveLength(0)
   })
 
@@ -306,9 +306,9 @@ describe('status()', () => {
     expect(res).toMatchObject({ ok: false, kind: 'system', code: 'kuma_unreachable' })
   }, 15_000)
 
-  test('unsupported mode surfaces as config with kuma_mode_unsupported', async () => {
+  test('credential-less authenticated-socket surfaces as config with kuma_not_configured', async () => {
     const res = await manifest.status({ ...CONFIG, mode: 'authenticated-socket' })
-    expect(res).toMatchObject({ ok: false, kind: 'config', code: 'kuma_mode_unsupported' })
+    expect(res).toMatchObject({ ok: false, kind: 'config', code: 'kuma_not_configured' })
   })
 
   test('unconfigured module reports config kind', async () => {
