@@ -1,8 +1,8 @@
-import type { CommandSpec, RunContext, RunResult } from '../../../core/types'
+import type { CommandSpec } from '../../../core/types'
 import { createTransport, pbQuote, readBeszelConfig, type BeszelTransport } from '../client'
 import { normalizeContainer, type BeszelContainer } from '../adapter'
 import { resolveExact } from '../resolve'
-import { fetchSystems, parseLimit, pickSystem, requiredPositional } from './shared'
+import { parseLimit, requiredPositional, resolveSystemArg } from './shared'
 
 const CONTAINERS_DEFAULT = 200
 const CONTAINERS_MAX = 500
@@ -10,17 +10,6 @@ const CONTAINERS_MAX = 500
 async function fetchContainers(t: BeszelTransport, systemId: string, limit: number): Promise<BeszelContainer[]> {
   const raw = await t.list('containers', limit, { filter: `system=${pbQuote(systemId)}`, sort: 'name' })
   return raw.map(normalizeContainer)
-}
-
-async function resolveSystemArg(
-  ctx: RunContext,
-  t: BeszelTransport,
-): Promise<{ ok: true; system: { id: string; name: string } } | { ok: false; error: RunResult }> {
-  const ref = requiredPositional(ctx, 'system')
-  if (!ref) {
-    return { ok: false, error: { ok: false, kind: 'user', message: 'system id or name is required', code: 'missing_arg' } }
-  }
-  return pickSystem(await fetchSystems(t), ref)
 }
 
 export const containersListCmd: CommandSpec = {

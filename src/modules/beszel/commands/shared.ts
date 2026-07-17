@@ -61,15 +61,30 @@ export interface ParsedLimit {
   error?: string
 }
 
-/** Bounded `--limit`: default when omitted, error when nonsense, capped at `max`. */
-export function parseLimit(ctx: RunContext, fallback: number, max: number): ParsedLimit {
-  const raw = ctx.args.limit
+/** Bounded integer flag: default when omitted, error when nonsense, capped at `max`. */
+export function parseBoundedInt(ctx: RunContext, name: string, fallback: number, max: number): ParsedLimit {
+  const raw = ctx.args[name]
   if (raw === undefined) return { value: fallback }
   const n = Number(raw)
-  if (!Number.isInteger(n) || n < 1) return { value: fallback, error: `--limit must be a positive integer, got "${raw}"` }
+  if (!Number.isInteger(n) || n < 1) return { value: fallback, error: `--${name} must be a positive integer, got "${raw}"` }
   return { value: Math.min(n, max) }
+}
+
+export function parseLimit(ctx: RunContext, fallback: number, max: number): ParsedLimit {
+  return parseBoundedInt(ctx, 'limit', fallback, max)
 }
 
 export function requiredPositional(ctx: RunContext, name: string): string {
   return String(ctx.args[name] ?? '').trim()
+}
+
+export async function resolveSystemArg(
+  ctx: RunContext,
+  t: BeszelTransport,
+): Promise<{ ok: true; system: { id: string; name: string } } | { ok: false; error: RunResult }> {
+  const ref = requiredPositional(ctx, 'system')
+  if (!ref) {
+    return { ok: false, error: { ok: false, kind: 'user', message: 'system id or name is required', code: 'missing_arg' } }
+  }
+  return pickSystem(await fetchSystems(t), ref)
 }

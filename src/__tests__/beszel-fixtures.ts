@@ -128,6 +128,91 @@ export const CONTAINER_BESZEL: RawRecord = {
   updated: 1784282370123,
 }
 
+/**
+ * container_stats provenance (v0.18.7): the record's `stats` json is an ARRAY of
+ * per-container entries. internal/hub/systems/system.go `createRecords` sets
+ * `containerStatsRecord.Set("stats", data.Containers)` where data.Containers is
+ * []*container.Stats (internal/entities/container/container.go): n name, c cpu %,
+ * m memory MB, b [sent, recv] bytes/s (added 0.18.3), ns/nr deprecated MB/s kept
+ * for pre-0.18.3 agents/records; health/status/id/image/ports are json:"-" and
+ * therefore absent. Same 1m/10m/20m/120m/480m `type` select as system_stats
+ * (migration snapshot 0_collections_snapshot_0_19_0_dev_1.go).
+ */
+export const CONTAINER_STATS_1M: RawRecord = {
+  id: 'cstataaaaaaaaaa1',
+  system: 'sysaaaaaaaaaaaa1',
+  type: '1m',
+  created: '2026-07-17 09:59:00.000Z',
+  updated: '2026-07-17 09:59:00.000Z',
+  stats: [
+    { n: 'caddy', c: 0.3, m: 45.2, b: [1200, 3400] },
+    // pre-0.18.3 record shape: deprecated ns/nr MB/s only, no `b`
+    { n: 'beszel', c: 1.1, m: 120.5, ns: 0.5, nr: 0.25 },
+  ],
+}
+
+/** Older sample where caddy was not running — its entry is simply absent. */
+export const CONTAINER_STATS_1M_OLDER: RawRecord = {
+  id: 'cstatbbbbbbbbbb2',
+  system: 'sysaaaaaaaaaaaa1',
+  type: '1m',
+  created: '2026-07-17 09:58:00.000Z',
+  updated: '2026-07-17 09:58:00.000Z',
+  stats: [{ n: 'beszel', c: 0.9, m: 118, b: [800, 1600] }],
+}
+
+/**
+ * smart_devices provenance (v0.18.7): columns from the migration snapshot
+ * (system/name/model/state/capacity/temp/firmware/serial/type/hours/cycles/
+ * attributes/updated — note there is NO `created` column). Values written by
+ * internal/hub/systems/system_smart.go `upsertSmartDeviceRecord`: state is
+ * smartctl's SmartStatus string (PASSED/FAILED), capacity bytes, temp °C,
+ * hours/cycles extracted from the attribute table. `attributes` entries are
+ * entities/smart `SmartAttribute` json: {id, n, v, w, t, rv, rs, wf}.
+ */
+export const SMART_NVME: RawRecord = {
+  id: 'smartaaaaaaaaaa1',
+  system: 'sysaaaaaaaaaaaa1',
+  name: 'nvme0n1',
+  model: 'Samsung SSD 990 PRO 1TB',
+  state: 'PASSED',
+  capacity: 1000204886016,
+  temp: 41,
+  firmware: '4B2QJXD7',
+  serial: 'S6Z1NJ0T123456',
+  type: 'nvme',
+  hours: 8760,
+  cycles: 456,
+  // NVMe attributes are synthesized from the health log — no id/value/worst/threshold
+  attributes: [
+    { n: 'PowerOnHours', rv: 8760, rs: '8760' },
+    { n: 'PowerCycles', rv: 456, rs: '456' },
+    { n: 'PercentageUsed', rv: 3, rs: '3' },
+  ],
+  updated: '2026-07-17 09:30:00.000Z',
+}
+
+export const SMART_SATA: RawRecord = {
+  id: 'smartbbbbbbbbbb2',
+  system: 'sysaaaaaaaaaaaa1',
+  name: 'sda',
+  model: 'WDC WD40EFRX-68N32N0',
+  state: 'PASSED',
+  capacity: 4000787030016,
+  temp: 34,
+  firmware: '82.00A82',
+  serial: 'WD-WCC7K1234567',
+  type: 'sat',
+  hours: 41000,
+  cycles: 120,
+  attributes: [
+    { id: 5, n: 'Reallocated_Sector_Ct', v: 200, w: 200, t: 140, rv: 0, rs: '0' },
+    { id: 9, n: 'Power_On_Hours', v: 44, w: 44, t: 0, rv: 41000, rs: '41000' },
+    { id: 194, n: 'Temperature_Celsius', v: 116, w: 95, t: 0, rv: 34, rs: '34' },
+  ],
+  updated: '2026-07-17 09:30:00.000Z',
+}
+
 export const ALERT_CPU_TRIGGERED: RawRecord = {
   id: 'alertaaaaaaaaaa1',
   user: 'useraaaaaaaaaaa1',
