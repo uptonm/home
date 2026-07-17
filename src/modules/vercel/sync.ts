@@ -51,12 +51,33 @@ export interface LocalEntry {
  * Every syncable value present on this host, secrets included. Reuses
  * `resolveModuleConfig` so config and keyring secrets merge exactly the way a
  * real command sees them.
+ *
+ * A module can have no config file yet still hold state: gmail/gdrive/gcal
+ * persist nothing but a keyring-backed `refreshToken` secret, so
+ * `resolveModuleConfig` (which starts from the config file) returns null for
+ * them. In that case fall back to reading each declared secret field
+ * directly — non-secret fields have no storage without a config file, so they
+ * never contribute.
  */
 export function collectLocal(): LocalEntry[] {
   const out: LocalEntry[] = []
   for (const manifest of syncableModules()) {
     const cfg = resolveModuleConfig(manifest)
-    if (!cfg) continue
+    if (!cfg) {
+      for (const field of syncableFields(manifest)) {
+        if (field.kind !== 'secret') continue
+        const value = getSecret(manifest.name, field.key)
+        if (!value) continue
+        out.push({
+          module: manifest.name,
+          field: field.key,
+          key: encodeKey(manifest.name, field.key),
+          value,
+          secret: true,
+        })
+      }
+      continue
+    }
     for (const field of syncableFields(manifest)) {
       const raw = cfg[field.key]
       if (raw === undefined || raw === '') continue
