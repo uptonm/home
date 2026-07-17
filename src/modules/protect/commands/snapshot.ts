@@ -5,7 +5,7 @@ import { pickOne } from './shared'
 
 export const snapshot: CommandSpec = {
   path: ['snapshot'],
-  effect: 'read',
+  effect: 'write', // writes a local file by default — must stay out of e2e auto-reads
   description: 'Capture a JPEG snapshot from a camera',
   args: [
     { name: 'camera', kind: 'positional', description: 'Camera id or name', required: true },

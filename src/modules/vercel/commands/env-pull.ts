@@ -4,6 +4,7 @@ import { applyRemote, decodeKey } from '../sync'
 
 export const envPullCmd: CommandSpec = {
   path: ['env', 'pull'],
+  effect: 'write',
   description: 'Apply Vercel shared environment variables to this host\'s config and secrets',
   args: [
     { name: 'dry-run', kind: 'boolean', description: 'Report what would change without writing', required: false },

@@ -16,7 +16,7 @@ export const sonosScenarios: Scenario[] = [
       const original = Number(field(before.json, 'volume'))
       ctx.check(Number.isFinite(original), 'volume get returned no volume')
       ctx.defer(async () => {
-        await ctx.cli('sonos', ['volume', 'set'], [room(ctx), String(original)])
+        await ctx.cliOk('sonos', ['volume', 'set'], [room(ctx), String(original)])
       })
       const target = original === 17 ? 18 : 17
       const set = await ctx.cli('sonos', ['volume', 'set'], [room(ctx), String(target)])
@@ -29,7 +29,19 @@ export const sonosScenarios: Scenario[] = [
     name: 'mute-cycle',
     module: 'sonos',
     async run(ctx) {
-      // ends unmuted; acceptable perturbation on the test speaker
+      // Snapshot the real state first — forcing "unmuted" at the end would
+      // change the house whenever the speaker was deliberately muted.
+      const before = await ctx.cli('sonos', ['groups', 'get'], [room(ctx)])
+      ctx.check(before.exitCode === 0, 'groups get failed')
+      const members = field(before.json, 'members')
+      const me = (Array.isArray(members) ? members : []).find(
+        (m) => String(field(m, 'name')).toLowerCase() === room(ctx).toLowerCase(),
+      )
+      const original = field(me, 'muted')
+      ctx.check(typeof original === 'boolean', 'could not determine current mute state')
+      ctx.defer(async () => {
+        await ctx.cliOk('sonos', ['mute'], [room(ctx), '--state', original ? 'on' : 'off'])
+      })
       const on = await ctx.cli('sonos', ['mute'], [room(ctx), '--state', 'on'])
       ctx.check(on.exitCode === 0, 'mute on failed')
       const off = await ctx.cli('sonos', ['mute'], [room(ctx), '--state', 'off'])
@@ -45,7 +57,7 @@ export const sonosScenarios: Scenario[] = [
       const shuffle = String(field(before.json, 'shuffle'))
       const original = shuffle === 'true' || shuffle === 'on' ? 'on' : 'off'
       ctx.defer(async () => {
-        await ctx.cli('sonos', ['play-mode', 'set'], [room(ctx), '--shuffle', original])
+        await ctx.cliOk('sonos', ['play-mode', 'set'], [room(ctx), '--shuffle', original])
       })
       const flipped = original === 'on' ? 'off' : 'on'
       const set = await ctx.cli('sonos', ['play-mode', 'set'], [room(ctx), '--shuffle', flipped])
@@ -64,7 +76,7 @@ export const sonosScenarios: Scenario[] = [
       const original = Number(field(before.json, 'bass'))
       ctx.check(Number.isFinite(original), 'eq get returned no bass')
       ctx.defer(async () => {
-        await ctx.cli('sonos', ['eq', 'set'], [room(ctx), '--bass', String(original)])
+        await ctx.cliOk('sonos', ['eq', 'set'], [room(ctx), '--bass', String(original)])
       })
       const target = original >= 10 ? original - 1 : original + 1
       const set = await ctx.cli('sonos', ['eq', 'set'], [room(ctx), '--bass', String(target)])
@@ -82,7 +94,7 @@ export const sonosScenarios: Scenario[] = [
       const original = Number(field(before.json, 'volume'))
       ctx.check(Number.isFinite(original), 'group-volume get returned no volume')
       ctx.defer(async () => {
-        await ctx.cli('sonos', ['group-volume', 'set'], [room(ctx), String(original)])
+        await ctx.cliOk('sonos', ['group-volume', 'set'], [room(ctx), String(original)])
       })
       const target = original === 15 ? 16 : 15
       const set = await ctx.cli('sonos', ['group-volume', 'set'], [room(ctx), String(target)])
@@ -98,20 +110,47 @@ export const sonosScenarios: Scenario[] = [
       const row = Array.isArray(np.json) ? np.json[0] : np.json
       const state = String(field(row, 'state') ?? '')
       if (!/playing/i.test(state)) return // nothing playing: only exercised when restore is possible
+      // Register the resume BEFORE pausing: if the pause path throws midway,
+      // the deferred play still runs and the music comes back.
+      ctx.defer(async () => {
+        await ctx.cliOk('sonos', ['play'], [room(ctx)])
+      })
       const pause = await ctx.cli('sonos', ['pause'], [room(ctx)])
       ctx.check(pause.exitCode === 0, 'pause failed')
-      const play = await ctx.cli('sonos', ['play'], [room(ctx)])
-      ctx.check(play.exitCode === 0, 'play (restore) failed')
     },
   },
   {
     name: 'group-join-leave',
     module: 'sonos',
     async run(ctx) {
-      // join test speaker to the second room's group, then leave — ends solo either way
-      ctx.defer(async () => {
-        await ctx.cli('sonos', ['groups', 'leave'], [room(ctx)])
-      })
+      // Snapshot topology first: blindly ending standalone would permanently
+      // change the house whenever the speaker started grouped.
+      const before = await ctx.cli('sonos', ['groups', 'get'], [room(ctx)])
+      ctx.check(before.exitCode === 0, 'groups get failed')
+      const coordinator = String(field(before.json, 'coordinator') ?? '')
+      const members = field(before.json, 'members')
+      const memberCount = Array.isArray(members) ? members.length : 0
+      const isSelfCoordinator = coordinator.toLowerCase() === room(ctx).toLowerCase()
+
+      if (memberCount > 1 && isSelfCoordinator) {
+        // The test speaker coordinates a group with other members; leaving
+        // would strand them and the original topology can't be reconstructed
+        // from this side. Skip rather than perturb.
+        return
+      }
+
+      if (memberCount > 1) {
+        // Member of someone else's group — restore that exact membership.
+        ctx.defer(async () => {
+          await ctx.cliOk('sonos', ['groups', 'join'], [room(ctx), coordinator])
+        })
+      } else {
+        // Started standalone — make sure it ends standalone.
+        ctx.defer(async () => {
+          await ctx.cliOk('sonos', ['groups', 'leave'], [room(ctx)])
+        })
+      }
+
       const join = await ctx.cli('sonos', ['groups', 'join'], [room(ctx), ctx.fixtures.sonosSecondRoom])
       ctx.check(join.exitCode === 0, 'groups join failed')
       const leave = await ctx.cli('sonos', ['groups', 'leave'], [room(ctx)])

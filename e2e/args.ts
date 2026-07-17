@@ -85,7 +85,8 @@ export const argProviders: Record<string, Provider> = {
   'protect liveviews get': firstField('protect', ['liveviews', 'list'], 'id', 'ref'),
   'protect users get': firstField('protect', ['users', 'list'], 'id', 'ref'),
   'protect groups get': firstField('protect', ['groups', 'list'], 'id', 'ref'),
-  'protect snapshot': firstField('protect', ['cameras', 'list'], 'name', 'camera'),
+  // no 'protect snapshot' provider: it writes ./<camera>.jpg, so it's
+  // classified write and excluded from auto-reads (same for tts synth).
   // assistant
   'assistant states search': fixed({ query: 'light' }),
   'assistant state get': firstField('assistant', ['states', 'list'], 'entity_id', 'entity'),
@@ -116,8 +117,6 @@ export const argProviders: Record<string, Provider> = {
   'sonos alarms get': firstField('sonos', ['alarms', 'list'], 'id', 'id'),
   'sonos library browse': fixed({ category: 'albums' }),
   'sonos library search': fixed({ category: 'albums', query: 'daft' }),
-  // tts
-  'tts synth': fixed({ text: 'e2e harness test' }),
   // gmail/gdrive: modules are skipped at preflight while unconfigured;
   // trivial chains included so they light up once configured
   'gmail messages get': firstField('gmail', ['messages', 'list'], 'id', 'id'),

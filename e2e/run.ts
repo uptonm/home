@@ -1,4 +1,4 @@
-import { modules } from '../src/registry'
+import { moduleByName, modules } from '../src/registry'
 import type { ArgSpec, CommandSpec } from '../src/core/types'
 import { commandKey, exercised, runCli, runStatus } from './cli'
 import { Unresolved, argProviders } from './args'
@@ -49,20 +49,50 @@ async function autoRead(module: string, cmd: CommandSpec): Promise<ReadResult> {
       detail: `exit ${res.exitCode}: ${res.stderr.trim() || res.stdout.trim()}`.slice(0, 300),
     }
   }
+  // Exit 0 is not enough: every command runs with --json, so non-JSON stdout
+  // means the read regressed even though the process claims success.
+  if (res.json === null) {
+    return { key, outcome: 'fail', detail: 'exit 0 but stdout was not valid JSON' }
+  }
   return { key, outcome: 'pass' }
 }
 
+/**
+ * Strict, fail-closed argv parsing. A typo here must never widen the run: a
+ * `--module` with a missing or unknown value would otherwise silently select
+ * every module and execute all write scenarios against the house.
+ */
+function parseArgs(argv: string[]): { dryRun: boolean; readsOnly: boolean; moduleFilter: string | null } {
+  let dryRun = false
+  let readsOnly = false
+  let moduleFilter: string | null = null
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!
+    if (arg === '--dry-run') dryRun = true
+    else if (arg === '--reads-only') readsOnly = true
+    else if (arg === '--module') {
+      const value = argv[++i]
+      if (value === undefined || value.startsWith('-')) {
+        console.error('--module requires a module name')
+        process.exit(1)
+      }
+      if (!moduleByName[value]) {
+        console.error(`unknown module: ${value}`)
+        process.exit(1)
+      }
+      moduleFilter = value
+    } else {
+      console.error(`unknown argument: ${arg}`)
+      process.exit(1)
+    }
+  }
+  return { dryRun, readsOnly, moduleFilter }
+}
+
 async function main() {
-  const argv = process.argv.slice(2)
-  const dryRun = argv.includes('--dry-run')
-  const readsOnly = argv.includes('--reads-only')
-  const moduleFilter = argv.includes('--module') ? argv[argv.indexOf('--module') + 1] : null
+  const { dryRun, readsOnly, moduleFilter } = parseArgs(process.argv.slice(2))
 
   const targets = modules.filter((m) => !moduleFilter || m.name === moduleFilter)
-  if (moduleFilter && targets.length === 0) {
-    console.error(`unknown module: ${moduleFilter}`)
-    process.exit(1)
-  }
 
   const skippedModules: Array<{ module: string; reason: string }> = []
   const reads: ReadResult[] = []

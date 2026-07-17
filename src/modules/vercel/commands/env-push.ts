@@ -12,6 +12,7 @@ import { collectLocal, decodeKey } from '../sync'
 
 export const envPushCmd: CommandSpec = {
   path: ['env', 'push'],
+  effect: 'write',
   description: 'Upload this host\'s config and secrets to Vercel shared environment variables',
   args: [
     { name: 'dry-run', kind: 'boolean', description: 'Report what would change without writing', required: false },
