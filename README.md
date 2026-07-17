@@ -14,7 +14,7 @@ Modules:
 - **`gmail`** — Google Gmail (read-only: search messages/threads, list labels/drafts, mailbox profile)
 - **`gcal`** — Google Calendar (read-only: calendars, events with recurring expansion, merged agenda, free/busy)
 - **`gdrive`** — Google Drive (list/get/download/export files)
-- **`linear`** — Linear (read-only: issues, projects with milestones, cycles, teams, your assigned work, planning summary)
+- **`linear`** — Linear (issues, projects with milestones, cycles, teams, your assigned work, planning summary; guarded writes with `--yes`)
 
 `spotify`, `sonos`, and `tts` are designed to pair: search the catalog with
 `spotify` and hand the URI to `sonos play-uri`, or synthesize an announcement
@@ -478,10 +478,17 @@ working tree.
 | `home graphite repo trunk` | The repository's trunk branch as gt reports it |
 ### `linear`
 
-Read-only view of Linear over its GraphQL API — the module owns work planning
-and issue state. Team/state/assignee arguments accept an exact key/id first,
-then an exact case-insensitive name; an ambiguous name is refused with the
-candidates listed.
+Linear over its GraphQL API — the module owns work planning and issue state.
+Team/state/assignee/project arguments accept an exact key/id first, then an
+exact case-insensitive name; an ambiguous name is refused with the candidates
+listed — on reads and writes alike.
+
+Writes are guarded: every mutation requires `--yes` and refuses with the stable
+`confirmation_required` code otherwise (never an interactive prompt). Body and
+description text arrives via stdin (`--body-stdin` / `--description-stdin`),
+never argv. Priority takes names (`urgent`, `high`, `medium`, `low`, `none`);
+unknown names are rejected. Every mutation result names its exact target and
+echoes what changed. There are no delete or archive commands.
 
 Setup: `home linear configure` (personal API key from linear.app → Settings →
 Security & access; optional default team).
@@ -491,8 +498,12 @@ Security & access; optional default team).
 | `home linear issues list [--team] [--state] [--assignee] [--project] [--limit N]` | List issues by last update: identifier, title, state (name + type), assignee, priority, project. `--assignee me` targets the viewer. |
 | `home linear issues get <identifier\|id>` | One issue in full — description, relations, labels, project, cycle, comment count. Accepts `UPT-123` or a UUID. |
 | `home linear issues search <query> [--team] [--limit N]` | Full-text search over issues |
+| `home linear issues create --title <t> --team <team> [--description-stdin] [--project] [--assignee] [--priority] [--state] --yes` | Create an issue in an exactly-resolved team (no defaultTeam fallback); returns the created identifier and URL |
+| `home linear issues update <identifier\|id> [--title] [--description-stdin] [--assignee] [--priority] [--state] --yes` | Update an issue — only the fields passed are sent; returns the issue identifier and the changed fields |
+| `home linear issues comment <identifier\|id> --body-stdin --yes` | Comment on an issue, body piped via stdin; returns the comment id and issue identifier |
 | `home linear projects list [--state]` | Projects with state, health, progress, target date, lead |
 | `home linear projects get <id\|name>` | One project in full, including milestones |
+| `home linear projects update <id\|name> [--name] [--description-stdin] [--state] [--target-date] --yes` | Update a project resolved exactly by id or name; returns the project id and the changed fields |
 | `home linear cycles list [--team] [--active] [--limit N]` | Cycles with number, start/end, progress |
 | `home linear teams list` | Teams — id, key, name |
 | `home linear my-work list [--state] [--limit N]` | Your assigned issues in actionable order (in-progress first, then triage/todo/backlog; higher priority first) |

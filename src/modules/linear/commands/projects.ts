@@ -1,10 +1,15 @@
-import { UserError } from '../../../core/errors'
 import type { CommandSpec } from '../../../core/types'
-import { RESOLVE_LIMIT, getProject, isUuid, listProjects, type ProjectDetail, type ProjectNode } from '../client'
+import {
+  PROJECT_STATES,
+  RESOLVE_LIMIT,
+  getProject,
+  isUuid,
+  listProjects,
+  resolveProject,
+  type ProjectDetail,
+  type ProjectNode,
+} from '../client'
 import { getLinearConfig, optionalString, withWarnings } from './shared'
-
-/** Project.state values in Linear's API. */
-const PROJECT_STATES = ['backlog', 'planned', 'started', 'paused', 'completed', 'canceled'] as const
 
 function shapeProjectRow(p: ProjectNode) {
   return {
@@ -82,13 +87,7 @@ export const projectsGet: CommandSpec = {
     if (!isUuid(raw)) {
       const page = await listProjects(cfg, RESOLVE_LIMIT)
       warnings.push(...page.warnings)
-      const matches = page.nodes.filter((p) => p.name.toLowerCase() === raw.toLowerCase())
-      if (matches.length === 0) throw new UserError(`project "${raw}" not found`, 'linear_not_found')
-      if (matches.length > 1) {
-        const candidates = matches.map((p) => `${p.name} (${p.id})`).join(', ')
-        throw new UserError(`project "${raw}" is ambiguous — candidates: ${candidates}`, 'linear_ambiguous')
-      }
-      id = matches[0]!.id
+      id = resolveProject(page.nodes, raw).id
     }
     const { data, warnings: getWarnings } = await getProject(cfg, id)
     return { ok: true, data: withWarnings({ project: shapeProjectDetail(data) }, [...warnings, ...getWarnings]) }
