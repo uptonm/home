@@ -12,8 +12,9 @@ import discordManifest from './modules/discord'
 import vercelManifest from './modules/vercel'
 import githubManifest from './modules/github'
 import graphiteManifest from './modules/graphite'
+import linearManifest from './modules/linear'
 
-export const modules: ModuleManifest[] = [unifiManifest, protectManifest, assistantManifest, spotifyManifest, sonosManifest, ttsManifest, gdriveManifest, gmailManifest, gcalManifest, discordManifest, vercelManifest, githubManifest, graphiteManifest]
+export const modules: ModuleManifest[] = [unifiManifest, protectManifest, assistantManifest, spotifyManifest, sonosManifest, ttsManifest, gdriveManifest, gmailManifest, gcalManifest, discordManifest, vercelManifest, githubManifest, graphiteManifest, linearManifest]
 
 export const moduleByName: Record<string, ModuleManifest> = Object.fromEntries(
   modules.map((m) => [m.name, m] as const),

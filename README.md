@@ -14,6 +14,7 @@ Modules:
 - **`gmail`** — Google Gmail (read-only: search messages/threads, list labels/drafts, mailbox profile)
 - **`gcal`** — Google Calendar (read-only: calendars, events with recurring expansion, merged agenda, free/busy)
 - **`gdrive`** — Google Drive (list/get/download/export files)
+- **`linear`** — Linear (read-only: issues, projects with milestones, cycles, teams, your assigned work, planning summary)
 
 `spotify`, `sonos`, and `tts` are designed to pair: search the catalog with
 `spotify` and hand the URI to `sonos play-uri`, or synthesize an announcement
@@ -475,6 +476,27 @@ working tree.
 | `home graphite branch create <name> --message <msg> --yes` | Stack a new branch committing only already-staged changes — never stages anything |
 | `home graphite branch track <branch> --parent <p> --yes` | Start tracking an existing branch under an already-tracked parent |
 | `home graphite repo trunk` | The repository's trunk branch as gt reports it |
+### `linear`
+
+Read-only view of Linear over its GraphQL API — the module owns work planning
+and issue state. Team/state/assignee arguments accept an exact key/id first,
+then an exact case-insensitive name; an ambiguous name is refused with the
+candidates listed.
+
+Setup: `home linear configure` (personal API key from linear.app → Settings →
+Security & access; optional default team).
+
+| Command | Purpose |
+| --- | --- |
+| `home linear issues list [--team] [--state] [--assignee] [--project] [--limit N]` | List issues by last update: identifier, title, state (name + type), assignee, priority, project. `--assignee me` targets the viewer. |
+| `home linear issues get <identifier\|id>` | One issue in full — description, relations, labels, project, cycle, comment count. Accepts `UPT-123` or a UUID. |
+| `home linear issues search <query> [--team] [--limit N]` | Full-text search over issues |
+| `home linear projects list [--state]` | Projects with state, health, progress, target date, lead |
+| `home linear projects get <id\|name>` | One project in full, including milestones |
+| `home linear cycles list [--team] [--active] [--limit N]` | Cycles with number, start/end, progress |
+| `home linear teams list` | Teams — id, key, name |
+| `home linear my-work list [--state] [--limit N]` | Your assigned issues in actionable order (in-progress first, then triage/todo/backlog; higher priority first) |
+| `home linear summary [--team]` | One planning snapshot: your active issues, blocked issues, active cycle with progress, projects at risk |
 
 ## Development
 
