@@ -13,6 +13,8 @@ export interface GlobalConfig {
   secretsBackend?: SecretsBackend
   defaultOutput?: 'human' | 'json'
   logLevel?: 'error' | 'warn' | 'info' | 'debug'
+  /** Set to false to silence the "newer version available" preflight banner. */
+  updateCheck?: boolean
 }
 
 export type ModuleConfigData = {

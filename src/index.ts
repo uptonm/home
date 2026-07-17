@@ -9,8 +9,17 @@ import { doctorCmd } from './commands/doctor'
 import { secretsCmd } from './commands/secrets'
 import { configCmd } from './commands/config'
 import { completionsCmd } from './commands/completions'
+import { upgradeCmd } from './commands/upgrade'
 import { modules } from './registry'
 import { HOME_COMMIT, HOME_VERSION } from './core/version'
+import { performUpdateCheck, preflight } from './core/update'
+
+// Hidden internal: the detached refresh the preflight spawns. Handle it before
+// anything else so it stays silent and never triggers its own preflight.
+if (process.argv[2] === '__update-check') {
+  await performUpdateCheck()
+  process.exit(0)
+}
 
 const moduleSubCommands = Object.fromEntries(modules.map((m) => [m.name, buildCommandTree(m)] as const))
 
@@ -21,6 +30,9 @@ if (process.argv.includes('--version') || process.argv.includes('-v')) {
   process.stdout.write(versionString + '\n')
   process.exit(0)
 }
+
+// The `upgrade` command reports version state itself — no banner right above it.
+if (process.argv[2] !== 'upgrade') preflight(process.argv)
 
 const root = defineCommand({
   meta: {
@@ -39,6 +51,7 @@ const root = defineCommand({
     secrets: secretsCmd,
     config: configCmd,
     completions: completionsCmd,
+    upgrade: upgradeCmd,
   },
 })
 
