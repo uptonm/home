@@ -27,6 +27,16 @@ export const manifest: ModuleManifest = {
       required: true,
       help: 'Same credential as the Client ID — the "Client secret" field on the OAuth client',
     },
+    {
+      // Written by `gdrive auth login`, not by configure — declared here (like
+      // gmail's) so migration, `secrets export`, and vercel sync can see it.
+      // An undeclared secret is invisible to every schema-driven inventory.
+      key: 'refreshToken',
+      label: 'OAuth refresh token',
+      kind: 'secret',
+      required: false,
+      help: 'Leave blank — populated automatically by `home gdrive auth login` (browser consent).',
+    },
   ],
   commands: [filesList, filesGet, filesDownload, filesExport, authLogin, authLogout],
   async status(cfg) {

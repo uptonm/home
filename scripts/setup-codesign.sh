@@ -19,8 +19,33 @@ set -euo pipefail
 CERT_NAME="Home CLI Dev"
 KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 
+# Let codesign use the private key without a dialog on every build. This needs
+# the login keychain password: `-k ""` only works on a passwordless keychain, so
+# fall back to letting `security` prompt for it on the terminal rather than
+# silently leaving the partition list unset (which costs a GUI dialog per build).
+repair_partition_list() {
+  local partitions="apple-tool:,apple:,codesign:"
+  if security set-key-partition-list -S "$partitions" -s -k "" "$KEYCHAIN" >/dev/null 2>&1; then
+    echo "✓ codesign can use the key without prompting."
+  else
+    echo
+    echo "Enter your login keychain password so codesign can use the signing key"
+    echo "without a dialog on every build (it is not stored):"
+    if security set-key-partition-list -S "$partitions" -s "$KEYCHAIN" >/dev/null; then
+      echo "✓ codesign can use the key without prompting."
+    else
+      echo "⚠️  partition list not set — codesign will show a dialog per build."
+      echo "    Click 'Always Allow' (not 'Allow') and it will stop asking."
+    fi
+  fi
+}
+
 if security find-certificate -c "$CERT_NAME" "$KEYCHAIN" >/dev/null 2>&1; then
   echo "✓ '$CERT_NAME' code-signing certificate already exists."
+  # Earlier versions of this script silently failed to set the partition list
+  # (`-k ""` fails on any password-protected keychain and the error was
+  # swallowed), so existing installs are exactly the ones that need the repair.
+  repair_partition_list
   exit 0
 fi
 
@@ -55,26 +80,9 @@ security import "$WORK/cert.p12" \
   -T /usr/bin/codesign \
   -A
 
-# Let codesign use the private key without a dialog on every build. This needs
-# the login keychain password: `-k ""` only works on a passwordless keychain, so
-# fall back to letting `security` prompt for it on the terminal rather than
-# silently leaving the partition list unset (which costs a GUI dialog per build).
-PARTITIONS="apple-tool:,apple:,codesign:"
-if security set-key-partition-list -S "$PARTITIONS" -s -k "" "$KEYCHAIN" >/dev/null 2>&1; then
-  echo "✓ codesign can use the key without prompting."
-else
-  echo
-  echo "Enter your login keychain password so codesign can use the signing key"
-  echo "without a dialog on every build (it is not stored):"
-  if security set-key-partition-list -S "$PARTITIONS" -s "$KEYCHAIN" >/dev/null 2>&1; then
-    echo "✓ codesign can use the key without prompting."
-  else
-    echo "⚠️  partition list not set — codesign will show a dialog per build."
-    echo "    Click 'Always Allow' (not 'Allow') and it will stop asking."
-  fi
-fi
+repair_partition_list
 
 echo
 echo "✓ Created '$CERT_NAME' code-signing identity."
 echo "Run \`bun run build:mac\` (or \`bun run build:linux\`) and the binary will be signed."
-echo "First secret access will prompt — click 'Always Allow' once per secret."
+echo "First secret access will prompt once — click 'Always Allow'."

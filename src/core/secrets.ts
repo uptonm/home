@@ -1,5 +1,16 @@
-import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { consola } from 'consola'
+import {
+  chmodSync,
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+  writeSync,
+} from 'node:fs'
+import { join } from 'node:path'
 import { paths } from './paths'
 import { loadGlobalConfig, saveGlobalConfig, type SecretsBackend } from './config'
 import { SystemError } from './errors'
@@ -55,16 +66,99 @@ function account(module: string, key: string): string {
   return `${module}:${key}`
 }
 
+/**
+ * Validate a decoded store. A type assertion establishes nothing: syntactically
+ * valid corruption such as `{"entries":[]}` would otherwise pass, migration
+ * would assign a named property to the array, JSON.stringify would silently
+ * drop it, and the legacy item would then be deleted — losing the secret.
+ * Reject anything that is not a plain string-valued object so a corrupt store
+ * refuses mutations instead of destroying data.
+ */
+function validateEntries(parsed: unknown, source: string): Record<string, string> {
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new SystemError(`failed to read secrets from ${source}: root is not an object`, 'secrets_parse')
+  }
+  const entries = (parsed as SecretStore).entries
+  if (entries === undefined) return {}
+  if (typeof entries !== 'object' || entries === null || Array.isArray(entries)) {
+    throw new SystemError(`failed to read secrets from ${source}: "entries" is not an object`, 'secrets_parse')
+  }
+  for (const [key, value] of Object.entries(entries)) {
+    if (typeof value !== 'string') {
+      throw new SystemError(`failed to read secrets from ${source}: entry "${key}" is not a string`, 'secrets_parse')
+    }
+  }
+  return entries as Record<string, string>
+}
+
 function parseStore(raw: string, source: string): Record<string, string> {
+  let parsed: unknown
   try {
-    return (JSON.parse(raw) as SecretStore).entries ?? {}
+    parsed = JSON.parse(raw)
   } catch (err) {
     throw new SystemError(`failed to read secrets from ${source}: ${(err as Error).message}`, 'secrets_parse')
   }
+  return validateEntries(parsed, source)
 }
 
 function serializeStore(entries: Record<string, string>): string {
   return JSON.stringify({ $schemaVersion: 1, entries }, null, 2)
+}
+
+// ── cross-process lock ──────────────────────────────────────────────────────
+
+/**
+ * Every mutation is a read/modify/write of one shared value, so two concurrent
+ * processes (e.g. both lazily migrating) could each write a store missing the
+ * other's key and then delete their legacy items — losing a credential
+ * permanently. An O_EXCL lockfile serializes mutations across processes.
+ *
+ * Keychain dialogs make lock-hold potentially slow, so anything that can pop a
+ * dialog (legacy reads) happens *before* the lock is taken; only the re-read,
+ * write, and cleanup run under it.
+ */
+const LOCK_TIMEOUT_MS = Number(process.env.HOME_SECRETS_LOCK_TIMEOUT_MS || 10_000)
+const LOCK_STALE_MS = Number(process.env.HOME_SECRETS_LOCK_STALE_MS || 30_000)
+
+function lockFile(): string {
+  return join(paths.configRoot, '.secrets.lock')
+}
+
+function withStoreLock<T>(fn: () => T): T {
+  if (!existsSync(paths.configRoot)) mkdirSync(paths.configRoot, { recursive: true })
+  const lock = lockFile()
+  const deadline = Date.now() + LOCK_TIMEOUT_MS
+  for (;;) {
+    try {
+      const fd = openSync(lock, 'wx')
+      writeSync(fd, `${process.pid}\n`)
+      closeSync(fd)
+      break
+    } catch {
+      // Lock held. Break it only when the holder is clearly gone (crashed
+      // before its finally ran); otherwise wait our turn.
+      try {
+        if (Date.now() - statSync(lock).mtimeMs > LOCK_STALE_MS) {
+          rmSync(lock, { force: true })
+          continue
+        }
+      } catch {
+        continue // raced with the holder's release — retry immediately
+      }
+      if (Date.now() >= deadline) {
+        throw new SystemError(
+          `timed out waiting for ${lock} — another home process holds the secrets lock`,
+          'secrets_lock_timeout',
+        )
+      }
+      Bun.sleepSync(25)
+    }
+  }
+  try {
+    return fn()
+  } finally {
+    rmSync(lock, { force: true })
+  }
 }
 
 // ── file backend ────────────────────────────────────────────────────────────
@@ -81,63 +175,32 @@ function writeFileStore(entries: Record<string, string>): void {
 
 // ── keyring backend ─────────────────────────────────────────────────────────
 
-interface KeyringRead {
-  entries: Record<string, string>
-  /**
-   * Non-null when the item may exist but could not be read — the user denied
-   * the keychain dialog, the blob is corrupt, etc. Distinct from "no item
-   * yet", which is just an empty store. Callers that write MUST treat this as
-   * fatal: a store rebuilt from `{}` and written back would destroy every
-   * stored secret.
-   */
-  readError: string | null
-}
-
 /**
  * A missing item is not an error: @napi-rs/keyring returns null for it on
  * macOS, and some platforms throw a NoEntry-style error instead. Anything
- * else (denied dialog, corrupt blob) is a real failure and must be surfaced.
+ * else (denied dialog, corrupt blob) is a real failure and must surface —
+ * treating it as "absent" turns an unreadable credential into a baffling
+ * remote 401, and lets a failed legacy delete report success.
  */
 function isNoEntry(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err)
   return /no matching entry|no entry|not.?found/i.test(msg)
 }
 
-function readKeyringStore(): KeyringRead {
+/** Read the consolidated store. No item yet → empty; unreadable → throw. */
+function readKeyringEntries(): Record<string, string> {
   const entry = new (requireKeyring().Entry)(KEYRING_SERVICE, KEYRING_ACCOUNT)
+  let raw: string | null
   try {
-    const raw = entry.getPassword()
-    return { entries: raw ? parseStore(raw, 'keyring') : {}, readError: null }
+    raw = entry.getPassword()
   } catch (err) {
-    if (isNoEntry(err)) return { entries: {}, readError: null }
-    return { entries: {}, readError: (err as Error).message }
-  }
-}
-
-let warnedKeyringRead = false
-
-/** A failed read masquerading as "secret missing" produces baffling remote
- * 401s; say what actually happened, once per process. */
-function warnKeyringReadOnce(message: string): void {
-  if (warnedKeyringRead) return
-  warnedKeyringRead = true
-  consola.warn(`keychain read failed — secrets will read as missing: ${message}`)
-}
-
-/**
- * Entries for read-modify-write and export. A failed read must abort here:
- * writing a store rebuilt from `{}` would silently destroy every secret, and
- * exporting from one would silently produce an empty set.
- */
-function requireReadableEntries(): Record<string, string> {
-  const read = readKeyringStore()
-  if (read.readError !== null) {
+    if (isNoEntry(err)) return {}
     throw new SystemError(
-      `refusing to touch secrets: keychain item could not be read (denied dialog or corrupt data): ${read.readError}`,
+      `keychain item could not be read (denied dialog or keychain failure): ${(err as Error).message}`,
       'keyring_read_failed',
     )
   }
-  return read.entries
+  return raw ? parseStore(raw, 'keyring') : {}
 }
 
 function writeKeyringStore(entries: Record<string, string>): void {
@@ -146,39 +209,36 @@ function writeKeyringStore(entries: Record<string, string>): void {
 
 /**
  * Read a secret from the pre-consolidation layout (one keychain item per
- * `module:key`). Returns null when absent.
+ * `module:key`). Missing → null; any other failure throws — a denied read
+ * here must not masquerade as "no such secret".
  */
 function readLegacyEntry(acct: string): string | null {
   try {
     return new (requireKeyring().Entry)(KEYRING_SERVICE, acct).getPassword()
-  } catch {
-    return null
-  }
-}
-
-function deleteLegacyEntry(acct: string): void {
-  try {
-    new (requireKeyring().Entry)(KEYRING_SERVICE, acct).deletePassword()
-  } catch {
-    /* already gone — fine */
+  } catch (err) {
+    if (isNoEntry(err)) return null
+    throw new SystemError(
+      `legacy keychain item "${acct}" could not be read: ${(err as Error).message}`,
+      'keyring_read_failed',
+    )
   }
 }
 
 /**
- * Fold a legacy per-secret item into the consolidated one and drop the original.
- *
- * Migration is lazy and per-key on purpose: `core` can't see the module registry
- * (that would invert the dependency), so there is no way to enumerate which
- * secrets exist up front. Each secret therefore migrates the first time it's
- * read — one prompt each, once — after which every read hits the single item.
+ * Delete a legacy item. Missing is fine; any other failure throws — reporting
+ * success on a failed delete lets the stale item migrate back on the next
+ * read, silently undoing e.g. `gdrive auth logout`.
  */
-function migrateLegacySecret(acct: string, store: Record<string, string>): string | null {
-  const legacy = readLegacyEntry(acct)
-  if (legacy === null) return null
-  store[acct] = legacy
-  writeKeyringStore(store)
-  deleteLegacyEntry(acct)
-  return legacy
+function deleteLegacyEntry(acct: string): void {
+  try {
+    new (requireKeyring().Entry)(KEYRING_SERVICE, acct).deletePassword()
+  } catch (err) {
+    if (isNoEntry(err)) return
+    throw new SystemError(
+      `legacy keychain item "${acct}" could not be deleted: ${(err as Error).message}`,
+      'keyring_delete_failed',
+    )
+  }
 }
 
 // ── public API ──────────────────────────────────────────────────────────────
@@ -190,65 +250,76 @@ function backendOrDefault(): SecretsBackend {
 
 export function getSecret(module: string, key: string): string | null {
   const acct = account(module, key)
-  if (backendOrDefault() === 'keyring') {
-    const read = readKeyringStore()
-    if (acct in read.entries) return read.entries[acct] ?? null
-    if (read.readError !== null) {
-      // Can't distinguish "absent" from "unreadable" — report missing, but say
-      // why, and skip migration entirely: migration writes, and a write from a
-      // failed read would clobber the store.
-      warnKeyringReadOnce(read.readError)
-      return null
+  if (backendOrDefault() !== 'keyring') return fileStore()[acct] ?? null
+
+  const entries = readKeyringEntries()
+  if (acct in entries) return entries[acct] ?? null
+
+  // Lazy per-key migration from the pre-consolidation layout. The legacy read
+  // can pop a keychain dialog, so it happens before the lock; the store is
+  // re-read and re-checked under the lock because another process may have
+  // migrated or set this key in the meantime.
+  const legacy = readLegacyEntry(acct)
+  if (legacy === null) return null
+  return withStoreLock(() => {
+    const fresh = readKeyringEntries()
+    if (acct in fresh) {
+      deleteLegacyEntry(acct)
+      return fresh[acct] ?? null
     }
-    return migrateLegacySecret(acct, read.entries)
-  }
-  return fileStore()[acct] ?? null
+    fresh[acct] = legacy
+    writeKeyringStore(fresh)
+    deleteLegacyEntry(acct)
+    return legacy
+  })
 }
 
 export function setSecret(module: string, key: string, value: string): void {
   const acct = account(module, key)
-  if (backendOrDefault() === 'keyring') {
-    const store = requireReadableEntries()
-    store[acct] = value
-    writeKeyringStore(store)
-    // Drop any stale pre-consolidation copy so it can't shadow this later.
-    deleteLegacyEntry(acct)
-    return
-  }
-  const entries = fileStore()
-  entries[acct] = value
-  writeFileStore(entries)
+  withStoreLock(() => {
+    if (backendOrDefault() === 'keyring') {
+      const store = readKeyringEntries()
+      store[acct] = value
+      writeKeyringStore(store)
+      // Drop any stale pre-consolidation copy so it can't migrate back after a
+      // later deleteSecret. Ordered after the write: if this throws, the new
+      // value is already stored and consolidated reads win over legacy items.
+      deleteLegacyEntry(acct)
+      return
+    }
+    const entries = fileStore()
+    entries[acct] = value
+    writeFileStore(entries)
+  })
 }
 
 export function deleteSecret(module: string, key: string): void {
   const acct = account(module, key)
-  if (backendOrDefault() === 'keyring') {
-    const store = requireReadableEntries()
-    delete store[acct]
-    writeKeyringStore(store)
-    deleteLegacyEntry(acct)
-    return
-  }
-  const entries = fileStore()
-  delete entries[acct]
-  writeFileStore(entries)
-}
-
-/** Best-effort entries for pure lookups: a failed read warns and reads as empty. */
-function lenientEntries(): Record<string, string> {
-  if (backendOrDefault() !== 'keyring') return fileStore()
-  const read = readKeyringStore()
-  if (read.readError !== null) warnKeyringReadOnce(read.readError)
-  return read.entries
+  withStoreLock(() => {
+    if (backendOrDefault() === 'keyring') {
+      // Legacy first: if this throws, nothing has changed — whereas removing
+      // the store entry first would let a surviving legacy item migrate right
+      // back, silently undoing the delete.
+      deleteLegacyEntry(acct)
+      const store = readKeyringEntries()
+      delete store[acct]
+      writeKeyringStore(store)
+      return
+    }
+    const entries = fileStore()
+    delete entries[acct]
+    writeFileStore(entries)
+  })
 }
 
 /**
- * Secret keys held for `module`. Now works on both backends — the consolidated
+ * Secret keys held for `module`. Works on both backends — the consolidated
  * keyring item is enumerable, where the old item-per-secret layout was not.
  */
 export function listSecretKeys(module: string): string[] {
   const prefix = `${module}:`
-  return Object.keys(lenientEntries())
+  const entries = backendOrDefault() === 'keyring' ? readKeyringEntries() : fileStore()
+  return Object.keys(entries)
     .filter((k) => k.startsWith(prefix))
     .map((k) => k.slice(prefix.length))
 }
@@ -259,8 +330,8 @@ export function probeKeyring(): boolean {
   try {
     new mod.Entry(KEYRING_SERVICE, '__probe__').getPassword()
     return true
-  } catch {
-    return false
+  } catch (err) {
+    return isNoEntry(err)
   }
 }
 
@@ -280,11 +351,11 @@ export interface SecretRow {
  * Every stored secret. `modules` is retained for callers that still want to
  * force legacy migration by looking up declared keys first; the consolidated
  * store is enumerable on both backends, so it is no longer required.
- * Throws rather than silently exporting an incomplete set when the keyring
- * item cannot be read.
+ * Throws rather than silently exporting an incomplete set when the store
+ * cannot be read.
  */
 export function exportAll(_modules: string[] = []): SecretRow[] {
-  const entries = backendOrDefault() === 'keyring' ? requireReadableEntries() : fileStore()
+  const entries = backendOrDefault() === 'keyring' ? readKeyringEntries() : fileStore()
   const out: SecretRow[] = []
   for (const [combo, value] of Object.entries(entries)) {
     const [mod, ...rest] = combo.split(':')
@@ -294,17 +365,19 @@ export function exportAll(_modules: string[] = []): SecretRow[] {
   return out
 }
 
-/** Bulk write — one store read/write for the whole batch rather than per row. */
+/** Bulk write — one locked store read/write for the whole batch rather than per row. */
 export function importAll(rows: SecretRow[]): void {
   if (rows.length === 0) return
-  const backend = backendOrDefault()
-  const store = backend === 'keyring' ? requireReadableEntries() : fileStore()
-  for (const row of rows) store[account(row.module, row.key)] = row.value
+  withStoreLock(() => {
+    const backend = backendOrDefault()
+    const store = backend === 'keyring' ? readKeyringEntries() : fileStore()
+    for (const row of rows) store[account(row.module, row.key)] = row.value
 
-  if (backend === 'keyring') {
-    writeKeyringStore(store)
-    for (const row of rows) deleteLegacyEntry(account(row.module, row.key))
-    return
-  }
-  writeFileStore(store)
+    if (backend === 'keyring') {
+      writeKeyringStore(store)
+      for (const row of rows) deleteLegacyEntry(account(row.module, row.key))
+      return
+    }
+    writeFileStore(store)
+  })
 }
