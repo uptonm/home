@@ -1,4 +1,5 @@
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { consola } from 'consola'
 import { paths } from './paths'
 import { loadGlobalConfig, saveGlobalConfig, type SecretsBackend } from './config'
 import { SystemError } from './errors'
@@ -80,18 +81,63 @@ function writeFileStore(entries: Record<string, string>): void {
 
 // ── keyring backend ─────────────────────────────────────────────────────────
 
-function keyringStore(): Record<string, string> {
+interface KeyringRead {
+  entries: Record<string, string>
+  /**
+   * Non-null when the item may exist but could not be read — the user denied
+   * the keychain dialog, the blob is corrupt, etc. Distinct from "no item
+   * yet", which is just an empty store. Callers that write MUST treat this as
+   * fatal: a store rebuilt from `{}` and written back would destroy every
+   * stored secret.
+   */
+  readError: string | null
+}
+
+/**
+ * A missing item is not an error: @napi-rs/keyring returns null for it on
+ * macOS, and some platforms throw a NoEntry-style error instead. Anything
+ * else (denied dialog, corrupt blob) is a real failure and must be surfaced.
+ */
+function isNoEntry(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return /no matching entry|no entry|not.?found/i.test(msg)
+}
+
+function readKeyringStore(): KeyringRead {
   const entry = new (requireKeyring().Entry)(KEYRING_SERVICE, KEYRING_ACCOUNT)
-  let raw: string | null
   try {
-    raw = entry.getPassword()
-  } catch {
-    // No item yet, or access denied — treat as empty and let the caller fall
-    // back to the legacy layout rather than hard-failing.
-    return {}
+    const raw = entry.getPassword()
+    return { entries: raw ? parseStore(raw, 'keyring') : {}, readError: null }
+  } catch (err) {
+    if (isNoEntry(err)) return { entries: {}, readError: null }
+    return { entries: {}, readError: (err as Error).message }
   }
-  if (!raw) return {}
-  return parseStore(raw, 'keyring')
+}
+
+let warnedKeyringRead = false
+
+/** A failed read masquerading as "secret missing" produces baffling remote
+ * 401s; say what actually happened, once per process. */
+function warnKeyringReadOnce(message: string): void {
+  if (warnedKeyringRead) return
+  warnedKeyringRead = true
+  consola.warn(`keychain read failed — secrets will read as missing: ${message}`)
+}
+
+/**
+ * Entries for read-modify-write and export. A failed read must abort here:
+ * writing a store rebuilt from `{}` would silently destroy every secret, and
+ * exporting from one would silently produce an empty set.
+ */
+function requireReadableEntries(): Record<string, string> {
+  const read = readKeyringStore()
+  if (read.readError !== null) {
+    throw new SystemError(
+      `refusing to touch secrets: keychain item could not be read (denied dialog or corrupt data): ${read.readError}`,
+      'keyring_read_failed',
+    )
+  }
+  return read.entries
 }
 
 function writeKeyringStore(entries: Record<string, string>): void {
@@ -145,9 +191,16 @@ function backendOrDefault(): SecretsBackend {
 export function getSecret(module: string, key: string): string | null {
   const acct = account(module, key)
   if (backendOrDefault() === 'keyring') {
-    const store = keyringStore()
-    if (acct in store) return store[acct] ?? null
-    return migrateLegacySecret(acct, store)
+    const read = readKeyringStore()
+    if (acct in read.entries) return read.entries[acct] ?? null
+    if (read.readError !== null) {
+      // Can't distinguish "absent" from "unreadable" — report missing, but say
+      // why, and skip migration entirely: migration writes, and a write from a
+      // failed read would clobber the store.
+      warnKeyringReadOnce(read.readError)
+      return null
+    }
+    return migrateLegacySecret(acct, read.entries)
   }
   return fileStore()[acct] ?? null
 }
@@ -155,7 +208,7 @@ export function getSecret(module: string, key: string): string | null {
 export function setSecret(module: string, key: string, value: string): void {
   const acct = account(module, key)
   if (backendOrDefault() === 'keyring') {
-    const store = keyringStore()
+    const store = requireReadableEntries()
     store[acct] = value
     writeKeyringStore(store)
     // Drop any stale pre-consolidation copy so it can't shadow this later.
@@ -170,7 +223,7 @@ export function setSecret(module: string, key: string, value: string): void {
 export function deleteSecret(module: string, key: string): void {
   const acct = account(module, key)
   if (backendOrDefault() === 'keyring') {
-    const store = keyringStore()
+    const store = requireReadableEntries()
     delete store[acct]
     writeKeyringStore(store)
     deleteLegacyEntry(acct)
@@ -181,8 +234,12 @@ export function deleteSecret(module: string, key: string): void {
   writeFileStore(entries)
 }
 
-function storeFor(backend: SecretsBackend): Record<string, string> {
-  return backend === 'keyring' ? keyringStore() : fileStore()
+/** Best-effort entries for pure lookups: a failed read warns and reads as empty. */
+function lenientEntries(): Record<string, string> {
+  if (backendOrDefault() !== 'keyring') return fileStore()
+  const read = readKeyringStore()
+  if (read.readError !== null) warnKeyringReadOnce(read.readError)
+  return read.entries
 }
 
 /**
@@ -191,7 +248,7 @@ function storeFor(backend: SecretsBackend): Record<string, string> {
  */
 export function listSecretKeys(module: string): string[] {
   const prefix = `${module}:`
-  return Object.keys(storeFor(backendOrDefault()))
+  return Object.keys(lenientEntries())
     .filter((k) => k.startsWith(prefix))
     .map((k) => k.slice(prefix.length))
 }
@@ -223,10 +280,13 @@ export interface SecretRow {
  * Every stored secret. `modules` is retained for callers that still want to
  * force legacy migration by looking up declared keys first; the consolidated
  * store is enumerable on both backends, so it is no longer required.
+ * Throws rather than silently exporting an incomplete set when the keyring
+ * item cannot be read.
  */
 export function exportAll(_modules: string[] = []): SecretRow[] {
+  const entries = backendOrDefault() === 'keyring' ? requireReadableEntries() : fileStore()
   const out: SecretRow[] = []
-  for (const [combo, value] of Object.entries(storeFor(backendOrDefault()))) {
+  for (const [combo, value] of Object.entries(entries)) {
     const [mod, ...rest] = combo.split(':')
     if (!mod || rest.length === 0) continue
     out.push({ module: mod, key: rest.join(':'), value })
@@ -238,7 +298,7 @@ export function exportAll(_modules: string[] = []): SecretRow[] {
 export function importAll(rows: SecretRow[]): void {
   if (rows.length === 0) return
   const backend = backendOrDefault()
-  const store = storeFor(backend)
+  const store = backend === 'keyring' ? requireReadableEntries() : fileStore()
   for (const row of rows) store[account(row.module, row.key)] = row.value
 
   if (backend === 'keyring') {
