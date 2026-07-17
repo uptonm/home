@@ -97,6 +97,43 @@ describe('overview ops composition', () => {
     expect(overview.unmapped.systems[0]).toMatchObject({ alerts: [], containers: [] })
   })
 
+  test('a beszel ref resolves case-insensitively, matching `beszel systems get`', async () => {
+    const upper: OpsConfig = {
+      projects: [{ vercelProject: 'uptonm-dev', kumaMonitors: [1], beszelSystems: ['Boris'] }],
+    }
+    const overview = dataOf(await composeOpsOverview(upper, probesReturning()))
+    const group = overview.projects[0]!
+    expect(group.systems.map((s) => s.id)).toEqual(['sys_boris'])
+    expect(group.unresolved.systems).toEqual([])
+    expect(overview.status).toBe('ok')
+  })
+
+  test('dangling mapping refs are surfaced and degrade status, not silently dropped', async () => {
+    const bad: OpsConfig = {
+      projects: [{ vercelProject: 'uptonm-dev', kumaMonitors: [1, 404], beszelSystems: ['boris', 'ghost'] }],
+    }
+    const overview = dataOf(await composeOpsOverview(bad, probesReturning()))
+    const group = overview.projects[0]!
+    expect(group.monitors.map((m) => m.id)).toEqual(['1'])
+    expect(group.systems.map((s) => s.id)).toEqual(['sys_boris'])
+    expect(group.unresolved.monitors).toEqual(['404'])
+    expect(group.unresolved.systems).toEqual(['ghost'])
+    expect(overview.status).toBe('degraded')
+  })
+
+  test('a down module does not flood unresolved with its refs — its section note covers it', async () => {
+    const probes = probesReturning({
+      beszel: async () => {
+        throw new SystemError('hub unreachable', 'beszel_http_502')
+      },
+    })
+    const overview = dataOf(await composeOpsOverview(config, probes))
+    const group = overview.projects[0]!
+    expect(group.systems).toEqual([])
+    expect(group.unresolved.systems).toEqual([])
+    expect(overview.status).toBe('degraded')
+  })
+
   test('a failing module degrades its section and leaves the rest intact', async () => {
     const probes = probesReturning({
       beszel: async () => {
