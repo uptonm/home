@@ -14,8 +14,9 @@ import githubManifest from './modules/github'
 import graphiteManifest from './modules/graphite'
 import linearManifest from './modules/linear'
 import beszelManifest from './modules/beszel'
+import uptimeKumaManifest from './modules/uptime-kuma'
 
-export const modules: ModuleManifest[] = [unifiManifest, protectManifest, assistantManifest, spotifyManifest, sonosManifest, ttsManifest, gdriveManifest, gmailManifest, gcalManifest, discordManifest, vercelManifest, githubManifest, graphiteManifest, linearManifest, beszelManifest]
+export const modules: ModuleManifest[] = [unifiManifest, protectManifest, assistantManifest, spotifyManifest, sonosManifest, ttsManifest, gdriveManifest, gmailManifest, gcalManifest, discordManifest, vercelManifest, githubManifest, graphiteManifest, linearManifest, beszelManifest, uptimeKumaManifest]
 
 export const moduleByName: Record<string, ModuleManifest> = Object.fromEntries(
   modules.map((m) => [m.name, m] as const),

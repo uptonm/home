@@ -556,6 +556,43 @@ window holds more than `--max` points the most recent ones win with
 | `home beszel alerts list [--system <id\|name>] [--active] [--limit N]` | Configured alerts (type, threshold, triggered), newest change first |
 | `home beszel overview` | Compact all-system summary: up/down counts, active alerts, per-host cpu/mem/disk % |
 
+### `uptime-kuma`
+
+Read-only view of an [Uptime Kuma](https://github.com/louislam/uptime-kuma)
+instance — it answers "can a user or dependent system reach the service?":
+endpoint up/down, response latency, TLS certificate expiry, published
+incidents, and maintenance windows. When a service is down, the host or
+container *cause* (CPU, memory, disk, docker health) is beszel's job, and
+network gear belongs to `unifi`.
+
+Setup: `home uptime-kuma configure` (instance URL, access mode, status page
+slug). The only mode implemented today is `public-status`, which reads the
+instance's public status-page API (targets 1.23.x) without credentials;
+`authenticated-socket` is accepted by the config schema but rejected at
+runtime with `kuma_mode_unsupported` until it lands in a later release.
+
+**Public data is cached.** The status-page routes are served from Kuma's
+server-side cache (heartbeat ~1 min, page config ~5 min) on top of each
+monitor's poll interval, so results can trail reality by ~5 minutes. Every
+command therefore carries a `freshness` object: `cachedTransport: true` plus
+`newestBeatAt`, the newest heartbeat timestamp that command saw (null when it
+read only page metadata).
+
+Timestamps are normalized to ISO 8601, heartbeat status ints to
+`up`/`down`/`pending`/`maintenance`. `<monitor>` accepts an exact id or exact
+case-insensitive name; ambiguous names list the candidates instead of picking.
+Stable codes: `kuma_page_not_found` (instance reachable, slug missing —
+distinct from `kuma_unreachable`), `kuma_api_failed`, `kuma_mode_unsupported`.
+
+| Command | Purpose |
+| --- | --- |
+| `home uptime-kuma pages get [slug]` | Status-page metadata: title, groups with monitors, published incident, maintenance windows |
+| `home uptime-kuma monitors list [--status up\|down\|pending\|maintenance]` | Monitors on the page with latest public heartbeat state, latency, 24h uptime |
+| `home uptime-kuma monitors get <id\|name>` | One monitor: state, avg/min/max latency over the recent beats (≤50), cert expiry when exposed |
+| `home uptime-kuma incidents list` | Currently published (pinned) incidents |
+| `home uptime-kuma maintenances list` | Maintenance windows active right now |
+| `home uptime-kuma summary` | Counts by state, worst state, avg latency, freshness timestamp |
+
 ## Development
 
 Requires Bun ≥ 1.3.
