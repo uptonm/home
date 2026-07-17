@@ -107,7 +107,7 @@ interface RefreshTokenResponse {
  * Exchange the stored refresh token for a fresh access token, caching it until
  * ~60s before expiry. Throws a typed `SystemError` the caller can branch on:
  *   - `google_unconfigured`  — clientId/clientSecret absent (run `configure`)
- *   - `google_unauthorized`  — no refresh token (run `auth login`)
+ *   - `google_unauthorized`  — no refresh token (run the module's `configure`)
  *   - `google_refresh_rejected` — Google rejected the grant (revoked/expired)
  */
 export async function getGoogleAccessToken(creds: GoogleOAuthCredentials): Promise<string> {
@@ -137,7 +137,7 @@ export async function getGoogleAccessToken(creds: GoogleOAuthCredentials): Promi
   if (!res.ok) {
     const text = await res.text().catch(() => '')
     // 400 invalid_grant / 401 → the refresh token itself is bad; surface a
-    // distinct code so the module can tell the user to re-run `auth login`.
+    // distinct code so the module can tell the user to re-run its `configure`.
     const code = res.status === 400 || res.status === 401 ? 'google_refresh_rejected' : `http_${res.status}`
     throw new SystemError(
       `google token refresh failed (HTTP ${res.status})${text ? `: ${text.slice(0, 200)}` : ''}`,

@@ -227,7 +227,7 @@ function readLegacyEntry(acct: string): string | null {
 /**
  * Delete a legacy item. Missing is fine; any other failure throws — reporting
  * success on a failed delete lets the stale item migrate back on the next
- * read, silently undoing e.g. `gdrive auth logout`.
+ * read, silently undoing e.g. `home google logout`.
  */
 function deleteLegacyEntry(acct: string): void {
   try {

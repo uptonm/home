@@ -35,7 +35,7 @@ export const filesExport: CommandSpec = {
     const mimeArg = ctx.args.mime !== undefined ? String(ctx.args.mime).trim() : ''
     if (!mimeArg) return { ok: false, kind: 'user', message: '--mime is required', code: 'missing_arg' }
 
-    const creds = readGdriveCredentials(ctx.config)
+    const creds = readGdriveCredentials()
     const resolution = unwrapResolution(await resolveFile(creds, ref), ref)
     if (!resolution.ok) return resolution.error
     const file = resolution.file
