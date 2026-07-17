@@ -98,24 +98,26 @@ Installs predating this migrate automatically: each secret folds into the shared
 entry the first time it's read, and the old item is removed. Expect one last
 prompt per secret while that happens, then no more.
 
-### macOS: stop the repeat prompts
+### macOS keychain prompts
 
-If macOS re-asks for keychain access after every rebuild, the binary is
-ad-hoc signed — its identity *is* its own hash, so each build looks like a new
-app to the ACL. Run once:
+macOS pins a keychain grant to the **exact binary**, not to its signing
+identity. A rebuild changes the bytes, so it re-asks — even when both builds
+share a designated requirement (`identifier home and certificate leaf = …`).
+Codesigning does not avoid this; it was verified not to.
 
-```bash
-bash scripts/setup-codesign.sh    # self-signed "Home CLI Dev" identity
-bun run build:install             # rebuild + sign
-```
+What consolidation buys is that the dialog is now **one, not one per module**.
+Click *Always Allow* (not *Allow*) so it sticks for that build.
 
-Builds then share a stable designated requirement (`identifier home and
-certificate leaf = …`), so the grant sticks across rebuilds. Note that secrets
-stored *before* that cert existed keep their old hash-pinned ACL; read them once
-with the signed binary to re-seed, or `home vercel env pull` to rewrite them.
+For a tight edit/run loop, prefer `bun run src/index.ts …` over rebuilding: the
+identity macOS sees is `bun`, which doesn't change as you edit, so the grant
+holds. The compiled binary then costs one dialog per `bun run build:install`.
 
-Running via `bun run src/index.ts` is a different identity than the compiled
-binary, so each gets its own grant — once each, not once per module.
+`scripts/setup-codesign.sh` is still worth running once — it gives builds a
+stable identity and lets `codesign` use its key without a dialog per build — but
+it will not stop the per-rebuild secrets prompt.
+
+If prompts persist per *module* rather than once, some secrets are still in the
+pre-consolidation layout: read them once (`home doctor`) to fold them in.
 
 Rotate / migrate:
 

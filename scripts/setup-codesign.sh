@@ -2,11 +2,18 @@
 # Create a self-signed code-signing certificate for local `home` builds.
 # Run once per developer machine — idempotent (won't recreate if present).
 #
-# After this runs:
-#   1. The build will codesign with "Home CLI Dev"
-#   2. On first codesign use, macOS prompts for keychain access — click Always Allow
-#   3. On first `home <cmd>` run, macOS prompts to read each secret — click Always Allow
-#   4. After that, rebuilds reuse the same signature → no more prompts
+# After this runs the build codesigns with "Home CLI Dev" instead of ad-hoc.
+#
+# What this does NOT do: stop macOS asking for keychain access after a rebuild.
+# The keychain ACL pins the grant to the exact binary, not to its signing
+# identity, so a rebuild (new bytes → new cdhash) re-asks even though the
+# designated requirement is unchanged. Verified empirically: two builds sharing
+# `identifier home and certificate leaf = H"…"` still prompt separately.
+#
+# What signing is still worth: a stable identity for anything that *does* check
+# the designated requirement, and one dialog rather than a fresh one per item.
+# Secrets live in a single keychain entry, so that dialog is one, not one per
+# module. Click 'Always Allow' (not 'Allow') so it sticks for that build.
 set -euo pipefail
 
 CERT_NAME="Home CLI Dev"
@@ -48,12 +55,24 @@ security import "$WORK/cert.p12" \
   -T /usr/bin/codesign \
   -A
 
-# Allow codesign + system tools to use the private key without password prompts.
-# Needs the keychain password; if we can't set it non-interactively, you'll be
-# prompted once on first codesign use, which is fine.
-security set-key-partition-list \
-  -S apple-tool:,apple:,codesign: \
-  -s -k "" "$KEYCHAIN" >/dev/null 2>&1 || true
+# Let codesign use the private key without a dialog on every build. This needs
+# the login keychain password: `-k ""` only works on a passwordless keychain, so
+# fall back to letting `security` prompt for it on the terminal rather than
+# silently leaving the partition list unset (which costs a GUI dialog per build).
+PARTITIONS="apple-tool:,apple:,codesign:"
+if security set-key-partition-list -S "$PARTITIONS" -s -k "" "$KEYCHAIN" >/dev/null 2>&1; then
+  echo "✓ codesign can use the key without prompting."
+else
+  echo
+  echo "Enter your login keychain password so codesign can use the signing key"
+  echo "without a dialog on every build (it is not stored):"
+  if security set-key-partition-list -S "$PARTITIONS" -s "$KEYCHAIN" >/dev/null 2>&1; then
+    echo "✓ codesign can use the key without prompting."
+  else
+    echo "⚠️  partition list not set — codesign will show a dialog per build."
+    echo "    Click 'Always Allow' (not 'Allow') and it will stop asking."
+  fi
+fi
 
 echo
 echo "✓ Created '$CERT_NAME' code-signing identity."
