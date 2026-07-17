@@ -5,7 +5,7 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-OUTFILE="${1:-$HOME/.local/bin/home}"
+OUTFILE="${1:-$REPO/dist/home}"
 TARGET="${HOME_BUILD_TARGET:-}"
 
 # Make sure bun is discoverable even when invoked from a non-interactive shell.
