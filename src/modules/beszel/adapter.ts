@@ -11,6 +11,15 @@
  *  - containers columns (name/status/health/cpu/memory/net/image/ports/updated):
  *    internal/hub/systems/system.go `createContainerRecords` (memory MB, net bytes/s,
  *    updated epoch ms; health 0–3 per entities/container `DockerHealth`)
+ *  - container_stats.stats JSON is an ARRAY of per-container entries: hub's
+ *    `createRecords` stores []*container.Stats whole (n name, c cpu %, m memory MB,
+ *    b [sent, recv] bytes/s since 0.18.3; ns/nr deprecated MB/s kept for older
+ *    records; health/status/id/image/ports are json:"-" and thus absent)
+ *  - smart_devices columns (system/name/model/state/capacity/temp/firmware/serial/
+ *    type/hours/cycles/attributes/updated — no created): migration snapshot +
+ *    internal/hub/systems/system_smart.go `upsertSmartDeviceRecord` (state is
+ *    smartctl's PASSED/FAILED, capacity bytes, temp °C); `attributes` entries are
+ *    entities/smart `SmartAttribute` json {id, n, v, w, t, rv, rs, wf}
  *  - alerts.name select values: Status/CPU/Memory/Disk/Temperature/Bandwidth/GPU/
  *    LoadAvg1/LoadAvg5/LoadAvg15/Battery
  *
@@ -165,6 +174,126 @@ export function normalizeSystemStats(raw: RawRecord): BeszelSystemStats {
     temperaturesC:
       stats.t && typeof stats.t === 'object' ? (stats.t as Record<string, number>) : null,
     extraFilesystems,
+  }
+}
+
+export type BeszelSystemStatsPoint = Omit<BeszelSystemStats, 'collectedAt'> & { timestamp: string | null }
+
+/** One history row: the same normalized metrics as `normalizeSystemStats`, keyed by `timestamp`. */
+export function normalizeSystemStatsPoint(raw: RawRecord): BeszelSystemStatsPoint {
+  const { collectedAt, ...metrics } = normalizeSystemStats(raw)
+  return { timestamp: collectedAt, ...metrics }
+}
+
+export interface BeszelContainerStatsSample {
+  name: string
+  cpuPct: number | null
+  memoryMb: number | null
+  netSentBytesPerSec: number | null
+  netRecvBytesPerSec: number | null
+}
+
+export interface BeszelContainerStatsRecord {
+  timestamp: string | null
+  containers: BeszelContainerStatsSample[]
+}
+
+/** The hub's own ns/nr→bytes fallback multiplies by 1024² (createContainerRecords). */
+const MB_IN_BYTES = 1024 * 1024
+
+function deprecatedMbPerSecToBytes(v: unknown): number | null {
+  const n = optNumber(v)
+  return n === null ? null : n * MB_IN_BYTES
+}
+
+/** Normalize one `container_stats` record: `stats` is an array of per-container entries. */
+export function normalizeContainerStats(raw: RawRecord): BeszelContainerStatsRecord {
+  if (!Array.isArray(raw.stats)) throw incompatible('container_stats', 'stats')
+  const containers: BeszelContainerStatsSample[] = []
+  for (const entry of raw.stats) {
+    const e = entry && typeof entry === 'object' ? (entry as Record<string, unknown>) : null
+    if (!e || typeof e.n !== 'string' || e.n === '') throw incompatible('container_stats', 'stats[].n')
+    const bandwidth = Array.isArray(e.b) && e.b.length === 2 ? (e.b as number[]) : null
+    containers.push({
+      name: e.n,
+      cpuPct: optNumber(e.c),
+      memoryMb: optNumber(e.m),
+      // `b` [sent, recv] bytes/s (agents ≥ 0.18.3); older records carry only ns/nr in MB/s
+      netSentBytesPerSec: bandwidth ? (bandwidth[0] ?? 0) : deprecatedMbPerSecToBytes(e.ns),
+      netRecvBytesPerSec: bandwidth ? (bandwidth[1] ?? 0) : deprecatedMbPerSecToBytes(e.nr),
+    })
+  }
+  return { timestamp: pbDateToIso(raw.created), containers }
+}
+
+/** Bound on the raw attribute table — smartctl reports at most a few dozen rows. */
+export const SMART_ATTRIBUTES_MAX = 64
+
+export interface BeszelSmartAttribute {
+  id: number | null
+  name: string
+  value: number | null
+  worst: number | null
+  threshold: number | null
+  rawValue: number | null
+  rawString: string | null
+  whenFailed: string | null
+}
+
+export interface BeszelSmartDevice {
+  id: string
+  name: string
+  model: string | null
+  serial: string | null
+  firmware: string | null
+  /** smartctl verdict: PASSED / FAILED. */
+  state: string | null
+  /** Device protocol as reported: nvme / sat / scsi / … */
+  type: string | null
+  capacityBytes: number | null
+  temperatureC: number | null
+  powerOnHours: number | null
+  powerCycles: number | null
+  /** Raw SMART attribute table, bounded to SMART_ATTRIBUTES_MAX entries. */
+  attributes: BeszelSmartAttribute[]
+  updatedAt: string | null
+}
+
+export function normalizeSmartDevice(raw: RawRecord): BeszelSmartDevice {
+  const id = requireString(raw, 'smart_devices', 'id')
+  const name = requireString(raw, 'smart_devices', 'name')
+  const rawAttrs = Array.isArray(raw.attributes) ? raw.attributes : []
+  const attributes: BeszelSmartAttribute[] = []
+  for (const entry of rawAttrs.slice(0, SMART_ATTRIBUTES_MAX)) {
+    if (!entry || typeof entry !== 'object') continue
+    const a = entry as Record<string, unknown>
+    const attrName = optString(a.n)
+    if (!attrName) continue // attribute rows are advisory — drop malformed entries, don't fail the device
+    attributes.push({
+      id: optNumber(a.id),
+      name: attrName,
+      value: optNumber(a.v),
+      worst: optNumber(a.w),
+      threshold: optNumber(a.t),
+      rawValue: optNumber(a.rv),
+      rawString: optString(a.rs),
+      whenFailed: optString(a.wf),
+    })
+  }
+  return {
+    id,
+    name,
+    model: optString(raw.model),
+    serial: optString(raw.serial),
+    firmware: optString(raw.firmware),
+    state: optString(raw.state),
+    type: optString(raw.type),
+    capacityBytes: optNumber(raw.capacity),
+    temperatureC: optNumber(raw.temp),
+    powerOnHours: optNumber(raw.hours),
+    powerCycles: optNumber(raw.cycles),
+    attributes,
+    updatedAt: pbDateToIso(raw.updated),
   }
 }
 

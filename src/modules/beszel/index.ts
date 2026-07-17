@@ -2,6 +2,8 @@ import type { ModuleManifest } from '../../core/types'
 import { createTransport, readBeszelConfig } from './client'
 import { systemsGetCmd, systemsListCmd } from './commands/systems'
 import { containersGetCmd, containersListCmd } from './commands/containers'
+import { containerMetricsGetCmd, metricsGetCmd } from './commands/metrics'
+import { smartGetCmd } from './commands/smart'
 import { alertsListCmd } from './commands/alerts'
 import { overviewCmd } from './commands/overview'
 import { fetchSystems, summarizeSystems } from './commands/shared'
@@ -12,7 +14,7 @@ export const manifest: ModuleManifest = {
   name: 'beszel',
   description: 'Query Beszel server monitoring — host and container status, resource pressure, and alerts',
   whenToUse:
-    'Use when the user asks "what is wrong with the machine or container?": which hosts are up or down, CPU/memory/disk pressure, load average, per-container resource usage and docker health, or which Beszel alerts are firing. Beszel owns hosts, containers, disks, and resource pressure. Synthetic service availability (is a URL or service responding) is uptime-kuma\'s job, not this module\'s; network gear belongs to `home-unifi`. Read-only — it never mutates the hub.',
+    'Use when the user asks "what is wrong with the machine or container?": which hosts are up or down, CPU/memory/disk pressure, load average, per-container resource usage and docker health, bounded metric history over time (system or per-container), disk SMART health, or which Beszel alerts are firing. Beszel owns hosts, containers, disks, and resource pressure. Synthetic service availability (is a URL or service responding) is uptime-kuma\'s job, not this module\'s; network gear belongs to `home-unifi`. Read-only — it never mutates the hub.',
   configSchema: [
     {
       key: 'url',
@@ -41,7 +43,17 @@ export const manifest: ModuleManifest = {
       default: false,
     },
   ],
-  commands: [systemsListCmd, systemsGetCmd, containersListCmd, containersGetCmd, alertsListCmd, overviewCmd],
+  commands: [
+    systemsListCmd,
+    systemsGetCmd,
+    containersListCmd,
+    containersGetCmd,
+    metricsGetCmd,
+    containerMetricsGetCmd,
+    smartGetCmd,
+    alertsListCmd,
+    overviewCmd,
+  ],
   async status(cfg) {
     try {
       const t = createTransport(readBeszelConfig(cfg))

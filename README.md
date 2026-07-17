@@ -524,8 +524,9 @@ Security & access; optional default team).
 
 Read-only view of the [Beszel](https://beszel.dev) monitoring hub — it answers
 "what is wrong with the machine or container?": host up/down, CPU/memory/disk
-pressure, per-container resource usage and docker health, and which alerts are
-firing. Synthetic service availability checks belong to uptime-kuma, not here.
+pressure, per-container resource usage and docker health, bounded metric
+history, disk SMART health, and which alerts are firing. Synthetic service
+availability checks belong to uptime-kuma, not here.
 
 Setup: `home beszel configure` (hub URL, a regular hub user's email + password;
 OIDC-only accounts can't authenticate — the module reports
@@ -538,6 +539,10 @@ is missing. Raw PocketBase records never leak — every command returns
 normalized shapes (ISO 8601 timestamps, explicit units: `cpuPct`, `memoryGb`,
 `memoryMb`, `netBytesPerSec`, …). `<system>` accepts an exact id or exact
 case-insensitive name; ambiguous names list the candidates instead of picking.
+History is never unbounded: when `--interval` is omitted it is auto-selected
+from the window (≤2h→1m, ≤8h→10m, ≤24h→20m, ≤5d→120m, else 480m), and when a
+window holds more than `--max` points the most recent ones win with
+`truncated: true`.
 
 | Command | Purpose |
 | --- | --- |
@@ -545,6 +550,9 @@ case-insensitive name; ambiguous names list the candidates instead of picking.
 | `home beszel systems get <id\|name>` | One system plus its latest 1-minute stats sample (memory, swap, disk, network, temps, load) |
 | `home beszel containers list <system> [--limit N]` | A system's containers: status, health, cpu %, memory MB, network bytes/s |
 | `home beszel containers get <system> <id\|name>` | One container on a system |
+| `home beszel metrics get <system> [--since <30m\|6h\|2d\|ISO>] [--interval 1m\|10m\|20m\|120m\|480m] [--max N]` | Bounded system metric history; default last 60m, max 120 points (cap 500), `truncated: true` when the window held more |
+| `home beszel container-metrics get <system> <container> [--since …] [--max N]` | Bounded per-container history (cpu %, memory MB, net bytes/s) from `container_stats` |
+| `home beszel smart get <system>` | SMART/eMMC disk health: state, temperature, power-on hours, cycles, bounded raw attributes; empty is ok-with-note, not an error |
 | `home beszel alerts list [--system <id\|name>] [--active] [--limit N]` | Configured alerts (type, threshold, triggered), newest change first |
 | `home beszel overview` | Compact all-system summary: up/down counts, active alerts, per-host cpu/mem/disk % |
 
