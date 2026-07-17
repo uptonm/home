@@ -32,26 +32,37 @@ export interface CalendarEvents {
 }
 
 /**
- * Sort key in epoch ms. All-day starts are bare dates keyed to local midnight
- * — the same expansion `--from`/`--to` use — so they lead their day; timed
- * starts are RFC 3339 and compare by absolute instant, which is what
- * interleaves calendars in different time zones correctly.
+ * Sort key in epoch ms for timed events — their absolute instant, which is
+ * what interleaves calendars in different time zones correctly within a day.
  */
-export function agendaStartMs(start: string | undefined, allDay: boolean): number {
-  if (!start) return Number.POSITIVE_INFINITY
-  if (allDay) {
-    const [year, month, day] = start.split('-').map(Number)
-    return new Date(year!, month! - 1, day!).getTime()
-  }
-  return Date.parse(start)
+export function agendaStartMs(start: string | undefined): number {
+  return start ? Date.parse(start) : Number.POSITIVE_INFINITY
 }
 
-/** Merge per-calendar event pages into one strictly chronological briefing. */
+/**
+ * The calendar day a row belongs to. All-day starts are already `YYYY-MM-DD`;
+ * a timed start carries its own local date in the first 10 chars, so an event
+ * on a calendar ahead of the host still groups under its own day instead of
+ * leaking into the host-timezone day of its absolute instant.
+ */
+export function agendaDayKey(start: string | undefined): string {
+  return start ? start.slice(0, 10) : '9999-99-99'
+}
+
+/** Merge per-calendar event pages into one chronological briefing. */
 export function mergeAgenda(perCalendar: CalendarEvents[]): AgendaRow[] {
-  const rows: AgendaRow[] = perCalendar.flatMap((cal) =>
-    cal.events.map((event) => {
+  const seen = new Set<string>()
+  const rows: AgendaRow[] = []
+  for (const cal of perCalendar) {
+    for (const event of cal.events) {
       const e = summarizeEvent(event)
-      return {
+      // The same underlying event surfaces on several subscribed calendars (an
+      // invitee copy on primary plus the shared-calendar copy); keep the first
+      // calendar's row so duplicates don't inflate the count toward `--max`.
+      const key = e.id || `${e.recurringEventId ?? ''}::${e.start ?? ''}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      rows.push({
         calendarId: cal.calendarId,
         calendarSummary: cal.calendarSummary,
         id: e.id,
@@ -60,14 +71,17 @@ export function mergeAgenda(perCalendar: CalendarEvents[]): AgendaRow[] {
         end: e.end,
         allDay: e.allDay,
         location: e.location,
-      }
-    }),
-  )
+      })
+    }
+  }
   return rows.sort((a, b) => {
-    const diff = agendaStartMs(a.start, a.allDay) - agendaStartMs(b.start, b.allDay)
-    if (diff !== 0) return diff
-    // Exact-midnight tie: the all-day event leads its day.
+    const dayA = agendaDayKey(a.start)
+    const dayB = agendaDayKey(b.start)
+    if (dayA !== dayB) return dayA < dayB ? -1 : 1
+    // Within a day, all-day events lead, then timed events by absolute instant.
     if (a.allDay !== b.allDay) return a.allDay ? -1 : 1
+    const diff = agendaStartMs(a.start) - agendaStartMs(b.start)
+    if (diff !== 0) return diff
     return (a.start ?? '').localeCompare(b.start ?? '')
   })
 }

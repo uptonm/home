@@ -100,6 +100,17 @@ describe('gcal freebusy', () => {
     expect(queryCalls).toHaveLength(1)
   })
 
+  test('accepts 90 calendar days that span an extra fall-back DST hour', async () => {
+    // 90*24h + 1h — what a 90-calendar-day bare-date range measures when its
+    // local midnights straddle a fall-back transition.
+    const res = await freebusy.run({
+      ...CTX,
+      args: { from: '2026-01-01T00:00:00Z', to: '2026-04-01T01:00:00Z' },
+    })
+    expect(res.ok).toBe(true)
+    expect(queryCalls).toHaveLength(1)
+  })
+
   test('normalizes busy intervals and passes per-calendar errors through as data', async () => {
     queryResponse = {
       timeMin: '2026-07-17T09:00:00.000Z',

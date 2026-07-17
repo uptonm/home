@@ -4,6 +4,10 @@ import { DAY_MS, parseCalendarIds, parseTimeBound } from './shared'
 
 // The freeBusy endpoint itself degrades past ~3 months; reject early with a clear error.
 export const FREEBUSY_RANGE_CAP_DAYS = 90
+// Bare-date bounds are local midnights, so a 90-calendar-day range that crosses
+// a DST transition spans 90*24h ± 1h. Allow 2h of slack so an exactly-90-day
+// span isn't refused for a fall-back hour it can't control.
+const DST_TOLERANCE_MS = 2 * 60 * 60 * 1000
 
 export const freebusy: CommandSpec = {
   path: ['freebusy'],
@@ -31,7 +35,7 @@ export const freebusy: CommandSpec = {
     if (rangeMs <= 0) {
       return { ok: false, kind: 'user', message: '--to must be after --from', code: 'bad_arg' }
     }
-    if (rangeMs > FREEBUSY_RANGE_CAP_DAYS * DAY_MS) {
+    if (rangeMs > FREEBUSY_RANGE_CAP_DAYS * DAY_MS + DST_TOLERANCE_MS) {
       return {
         ok: false,
         kind: 'user',

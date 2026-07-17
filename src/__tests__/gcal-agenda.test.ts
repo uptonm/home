@@ -100,6 +100,31 @@ describe('mergeAgenda', () => {
     })
   })
 
+  test('dedupes the same event id shared across calendars, keeping the first calendar', () => {
+    const shared = { id: 'invite', summary: 'All-hands', start: { dateTime: '2026-07-17T13:00:00Z' }, end: { dateTime: '2026-07-17T14:00:00Z' } }
+    const rows = mergeAgenda([
+      { calendarId: 'primary', events: [shared] },
+      { calendarId: 'team', events: [shared] },
+    ])
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.calendarId).toBe('primary')
+  })
+
+  test('an all-day event leads a timed event on the same date in a calendar ahead of the host', () => {
+    const rows = mergeAgenda([
+      {
+        calendarId: 'sydney',
+        // 2026-07-16T23:00Z — an earlier absolute instant than host-local midnight of the 17th
+        events: [{ id: 'sydney-am', summary: 'Sydney morning', start: { dateTime: '2026-07-17T09:00:00+10:00' }, end: { dateTime: '2026-07-17T10:00:00+10:00' } }],
+      },
+      {
+        calendarId: 'personal',
+        events: [{ id: 'holiday', summary: 'Holiday', start: { date: '2026-07-17' }, end: { date: '2026-07-18' } }],
+      },
+    ])
+    expect(rows.map((r) => r.id)).toEqual(['holiday', 'sydney-am'])
+  })
+
   test('DST fall-back boundary: offsets pass through verbatim and ordering honors them', () => {
     const rows = mergeAgenda([
       {
