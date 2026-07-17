@@ -2,14 +2,14 @@ import type { CommandSpec } from '../../../core/types'
 import { getSharedEnvValues, listSharedEnv, readVercelConfig } from '../client'
 import { collectLocal, decodeKey, fieldFor } from '../sync'
 
-export const envDiffCmd: CommandSpec = {
-  path: ['env', 'diff'],
+export const configDiffCmd: CommandSpec = {
+  path: ['config', 'diff'],
   effect: 'read',
   description: 'Compare this host\'s config and secrets against Vercel without writing either side',
   args: [],
   examples: [
-    'home vercel env diff',
-    'home vercel env diff --json',
+    'home vercel config diff',
+    'home vercel config diff --json',
   ],
   async run(ctx) {
     try {
@@ -51,14 +51,14 @@ export const envDiffCmd: CommandSpec = {
           unknownRemote,
           hint:
             onlyLocal.length || differs.length
-              ? 'run `home vercel env push` to upload local values'
+              ? 'run `home vercel config push` to upload local values'
               : onlyRemote.length
-                ? 'run `home vercel env pull` to apply remote values'
+                ? 'run `home vercel config pull` to apply remote values'
                 : 'in sync',
         },
       }
     } catch (err) {
-      return { ok: false, kind: 'system', message: (err as Error).message, code: 'env_diff_failed' }
+      return { ok: false, kind: 'system', message: (err as Error).message, code: 'config_diff_failed' }
     }
   },
 }
