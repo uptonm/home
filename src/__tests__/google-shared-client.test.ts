@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterAll, afterEach, describe, expect, test } from 'bun:test'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -133,4 +133,9 @@ describe('google logout', () => {
   })
 })
 
-rmSync(CONFIG_ROOT, { recursive: true, force: true })
+// Cleanup runs AFTER all test bodies. A bare top-level rmSync would fire at
+// collection time — before any test — deleting the pinned `secretsBackend: file`
+// config so the store falls back to the real OS keyring mid-run.
+afterAll(() => {
+  rmSync(CONFIG_ROOT, { recursive: true, force: true })
+})
