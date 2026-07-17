@@ -1,0 +1,68 @@
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # Maintains a rolling release PR from conventional commits. Merging it bumps
+  # package.json + CHANGELOG.md, tags vX.Y.Z, and creates the GitHub Release.
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
+      version: ${{ steps.rp.outputs.version }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: rp
+
+  # Only after a release is cut. The default GITHUB_TOKEN that release-please
+  # uses to push the tag deliberately does NOT trigger tag-triggered workflows
+  # (anti-recursion), so the binary build has to live in the same run and
+  # upload onto the release release-please just created.
+  publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: bun-linux-x64-baseline
+            asset: home-linux-x64
+          - runner: macos-14
+            target: bun-darwin-arm64
+            asset: home-darwin-arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      - name: Build binary
+        run: |
+          mkdir -p dist
+          bun build --compile \
+            --target=${{ matrix.target }} \
+            --define "__HOME_VERSION=\"${{ needs.release-please.outputs.version }}\"" \
+            --define "__HOME_COMMIT=\"$(git rev-parse --short HEAD)\"" \
+            src/index.ts \
+            --outfile dist/${{ matrix.asset }}
+      - name: Upload binary to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ needs.release-please.outputs.tag_name }}" "dist/${{ matrix.asset }}" --clobber
+      - name: Upload installer to release
+        if: ${{ matrix.asset == 'home-linux-x64' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ needs.release-please.outputs.tag_name }}" scripts/install.sh --clobber
