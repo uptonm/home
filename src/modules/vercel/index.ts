@@ -1,16 +1,16 @@
 import type { ModuleManifest } from '../../core/types'
 import { listTeams, readVercelConfig, listSharedEnv } from './client'
 import { hasToken } from './auth'
-import { envPushCmd } from './commands/env-push'
-import { envPullCmd } from './commands/env-pull'
-import { envDiffCmd } from './commands/env-diff'
+import { configPushCmd } from './commands/config-push'
+import { configPullCmd } from './commands/config-pull'
+import { configDiffCmd } from './commands/config-diff'
 import { decodeKey } from './sync'
 
 export const manifest: ModuleManifest = {
   name: 'vercel',
   description: 'Share `home` config and secrets between machines via Vercel shared environment variables',
   whenToUse:
-    'Use to keep the same `home` setup on more than one machine. `home vercel env push` uploads this host\'s module config and secrets to your Vercel team as shared environment variables; `home vercel env pull` applies them on another host; `home vercel env diff` compares the two without writing. Both directions are additive — neither deletes anything the other side lacks. Authentication comes from `vercel login` (or VERCEL_TOKEN); host-specific settings such as the sonos speaker subnet are never synced. Do not use for deploying to Vercel — this module only reads and writes shared environment variables.',
+    'Use to keep the same `home` setup on more than one machine. The `config` commands sync the home CLI\'s own config and secrets, using Vercel *shared* environment variables as the store — they do not touch any Vercel project\'s environment variables. `home vercel config push` uploads this host\'s module config and secrets to your Vercel team; `home vercel config pull` applies them on another host; `home vercel config diff` compares the two without writing. Both directions are additive — neither deletes anything the other side lacks. Authentication comes from `vercel login` (or VERCEL_TOKEN); host-specific settings such as the sonos speaker subnet are never synced. Do not use for deploying to Vercel.',
   configSchema: [
     {
       key: 'teamSlug',
@@ -24,7 +24,7 @@ export const manifest: ModuleManifest = {
       },
     },
   ],
-  commands: [envPushCmd, envPullCmd, envDiffCmd],
+  commands: [configPushCmd, configPullCmd, configDiffCmd],
   async status(cfg) {
     if (!hasToken()) {
       return { ok: false, kind: 'config', message: 'not logged in — run `vercel login`, or set VERCEL_TOKEN', code: 'vercel_no_token' }

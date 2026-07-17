@@ -144,9 +144,9 @@ so there is no plaintext file to hand-carry between machines.
 vercel login                    # the only auth step; or export VERCEL_TOKEN
 home vercel configure           # pick the team that holds your variables
 
-home vercel env diff            # compare this host against the store
-home vercel env push            # upload this host's config + secrets
-home vercel env pull            # apply the store to this host
+home vercel config diff         # compare this host against the store
+home vercel config push         # upload this host's config + secrets
+home vercel config pull         # apply the store to this host
 ```
 
 Both directions take `--dry-run`.
@@ -156,7 +156,7 @@ Notes:
 - **Additive both ways.** Neither `push` nor `pull` deletes anything: a value
   the other side lacks is left alone. Use the Vercel dashboard to remove one.
 - **Last write wins.** `push` overwrites the store, `pull` overwrites this host.
-  Run `env diff` first if both may have changed.
+  Run `config diff` first if both may have changed.
 - **Host-specific settings never sync.** Fields marked `hostLocal` in a module's
   schema describe *this* machine's vantage point rather than the service, so
   they stay put — currently sonos `subnet`, which depends on the VLAN the host
@@ -410,9 +410,9 @@ Setup: `vercel login`, then `home vercel configure` (pick the team).
 
 | Command | Purpose |
 | --- | --- |
-| `home vercel env diff` | Compare this host against the store; reports only names, never values |
-| `home vercel env push [--dry-run]` | Upload this host's config + secrets; creates and updates, never deletes |
-| `home vercel env pull [--dry-run]` | Apply the store to this host; writes secrets to the keyring, config to `~/.config/home/modules/` |
+| `home vercel config diff` | Compare this host against the store; reports only names, never values |
+| `home vercel config push [--dry-run]` | Upload this host's config + secrets; creates and updates, never deletes |
+| `home vercel config pull [--dry-run]` | Apply the store to this host; writes secrets to the keyring, config to `~/.config/home/modules/` |
 
 ### `github`
 

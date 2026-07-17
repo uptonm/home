@@ -10,17 +10,17 @@ import {
 } from '../client'
 import { collectLocal, decodeKey } from '../sync'
 
-export const envPushCmd: CommandSpec = {
-  path: ['env', 'push'],
+export const configPushCmd: CommandSpec = {
+  path: ['config', 'push'],
   effect: 'write',
   description: 'Upload this host\'s config and secrets to Vercel shared environment variables',
   args: [
     { name: 'dry-run', kind: 'boolean', description: 'Report what would change without writing', required: false },
   ],
   examples: [
-    'home vercel env push --dry-run',
-    'home vercel env push',
-    'home vercel env push --json',
+    'home vercel config push --dry-run',
+    'home vercel config push',
+    'home vercel config push --json',
   ],
   async run(ctx) {
     const dryRun = Boolean(ctx.args['dry-run'])
@@ -66,7 +66,7 @@ export const envPushCmd: CommandSpec = {
 
       return { ok: true, data: { dryRun, created, updated, unchanged } }
     } catch (err) {
-      return { ok: false, kind: 'system', message: (err as Error).message, code: 'env_push_failed' }
+      return { ok: false, kind: 'system', message: (err as Error).message, code: 'config_push_failed' }
     }
   },
 }
