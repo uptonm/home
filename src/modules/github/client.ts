@@ -794,6 +794,385 @@ export async function getIssue(
 }
 
 // ---------------------------------------------------------------------------
+// notifications
+
+/** The notifications API caps per_page at 50, unlike most list endpoints. */
+const NOTIFICATIONS_MAX_PAGE = 50
+
+/** gh api has no --repo; a non-default host rides --hostname instead. */
+function apiHostArgs(cfg: GithubConfig): string[] {
+  return cfg.host === 'github.com' ? [] : ['--hostname', cfg.host]
+}
+
+interface RawNotification {
+  id?: string
+  unread?: boolean
+  reason?: string
+  updated_at?: string
+  subject?: { title?: string; url?: string | null; type?: string } | null
+  repository?: { full_name?: string } | null
+}
+
+export interface NotificationItem {
+  id: string
+  reason: string
+  repo: string
+  title: string
+  type: string
+  url: string | null
+  updatedAt: string | null
+  unread: boolean
+}
+
+export function normalizeNotification(raw: RawNotification): NotificationItem {
+  return {
+    id: raw.id ?? '',
+    reason: raw.reason ?? '',
+    repo: raw.repository?.full_name ?? '',
+    title: raw.subject?.title ?? '',
+    type: raw.subject?.type ?? '',
+    url: raw.subject?.url ?? null,
+    updatedAt: raw.updated_at ?? null,
+    unread: raw.unread ?? false,
+  }
+}
+
+export interface NotificationListOptions {
+  reason?: string
+  limit?: number
+}
+
+export async function listNotifications(
+  cfg: GithubConfig,
+  opts: NotificationListOptions,
+  run: GhRunner = runProcess,
+): Promise<NotificationItem[]> {
+  const limit = opts.limit ?? DEFAULT_LIMIT
+  const reason = opts.reason?.trim().toLowerCase()
+  // The reason filter is ours, not the API's — fetch the full page cap so a
+  // sparse reason can still fill up to the limit.
+  const perPage = reason ? NOTIFICATIONS_MAX_PAGE : Math.min(limit, NOTIFICATIONS_MAX_PAGE)
+  const args = ['api', ...apiHostArgs(cfg), `notifications?per_page=${perPage}`]
+  const result = await execGh(cfg, args, {}, run)
+  const items = parseGhJson<RawNotification[]>('api notifications', result).map(normalizeNotification)
+  return (reason ? items.filter((n) => n.reason === reason) : items).slice(0, limit)
+}
+
+// ---------------------------------------------------------------------------
+// releases
+
+interface RawRelease {
+  tag_name?: string
+  name?: string | null
+  draft?: boolean
+  prerelease?: boolean
+  published_at?: string | null
+  html_url?: string
+}
+
+export interface ReleaseItem {
+  tag: string
+  name: string | null
+  publishedAt: string | null
+  prerelease: boolean
+  draft: boolean
+  url: string
+}
+
+export function normalizeRelease(raw: RawRelease): ReleaseItem {
+  return {
+    tag: raw.tag_name ?? '',
+    name: raw.name ?? null,
+    publishedAt: raw.published_at ?? null,
+    prerelease: raw.prerelease ?? false,
+    draft: raw.draft ?? false,
+    url: raw.html_url ?? '',
+  }
+}
+
+/**
+ * Path segment for `gh api repos/<owner>/<name>/...`. When nothing resolves,
+ * gh's {owner}/{repo} placeholders make it infer from the cwd checkout — the
+ * gh-api analogue of omitting --repo. A host prefix never belongs in an API
+ * path; apiHostArgs carries it.
+ */
+function apiRepoPath(cfg: GithubConfig, repoArg: string | undefined): string {
+  const value = resolveRepoFlag(cfg, repoArg)
+  if (!value) return '{owner}/{repo}'
+  return value.split('/').slice(-2).join('/')
+}
+
+export interface ReleaseListOptions {
+  repo?: string
+  limit?: number
+}
+
+/**
+ * `gh release list --json` has no URL field, so this goes through the REST
+ * endpoint, which has html_url and the same flags otherwise.
+ */
+export async function listReleases(
+  cfg: GithubConfig,
+  opts: ReleaseListOptions,
+  run: GhRunner = runProcess,
+): Promise<ReleaseItem[]> {
+  const limit = opts.limit ?? DEFAULT_LIMIT
+  const args = ['api', ...apiHostArgs(cfg), `repos/${apiRepoPath(cfg, opts.repo)}/releases?per_page=${limit}`]
+  const result = await execGh(cfg, args, {}, run)
+  return parseGhJson<RawRelease[]>('api releases', result).map(normalizeRelease)
+}
+
+// ---------------------------------------------------------------------------
+// code search
+
+const MAX_FRAGMENTS = 3
+const FRAGMENT_MAX_CHARS = 300
+
+interface RawCodeMatch {
+  path?: string
+  repository?: { nameWithOwner?: string } | null
+  url?: string
+  textMatches?: { fragment?: string }[]
+}
+
+export interface CodeSearchItem {
+  repo: string
+  path: string
+  url: string
+  fragments: string[]
+}
+
+export function normalizeCodeMatch(raw: RawCodeMatch): CodeSearchItem {
+  return {
+    repo: raw.repository?.nameWithOwner ?? '',
+    path: raw.path ?? '',
+    url: raw.url ?? '',
+    fragments: (raw.textMatches ?? [])
+      .slice(0, MAX_FRAGMENTS)
+      .map((m) => boundText(m.fragment, FRAGMENT_MAX_CHARS).text)
+      .filter(Boolean),
+  }
+}
+
+export interface CodeSearchOptions {
+  owner?: string
+  repo?: string
+  limit?: number
+}
+
+/**
+ * Code search is global by design, so --repo here is a plain qualifier with
+ * no defaultRepo/cwd fallback — an implicit narrowing would silently hide
+ * hits everywhere else.
+ */
+export async function searchCode(
+  cfg: GithubConfig,
+  query: string,
+  opts: CodeSearchOptions,
+  run: GhRunner = runProcess,
+): Promise<CodeSearchItem[]> {
+  const q = query.trim()
+  if (!q) throw new UserError('search query must not be empty', 'bad_arg')
+  const repo = opts.repo?.trim()
+  if (repo && !/^[\w.-]+\/[\w.-]+$/.test(repo)) {
+    throw new UserError(`--repo must be owner/name — got ${JSON.stringify(opts.repo)}`, 'bad_arg')
+  }
+  const args = [
+    'search',
+    'code',
+    q,
+    ...(opts.owner ? ['--owner', opts.owner] : []),
+    ...(repo ? ['--repo', repo] : []),
+    '--limit',
+    String(opts.limit ?? DEFAULT_LIMIT),
+    '--json',
+    'path,repository,url,textMatches',
+  ]
+  const result = await execGh(cfg, args, {}, run)
+  return parseGhJson<RawCodeMatch[]>('search code', result).map(normalizeCodeMatch)
+}
+
+// ---------------------------------------------------------------------------
+// summary briefing
+
+const SUMMARY_PR_LIMIT = 20
+const SUMMARY_RUN_LIMIT = 10
+const MAX_FAILING_CHECKS = 10
+
+const SUMMARY_PR_FIELDS = 'number,title,isDraft,headRefName,url,updatedAt,statusCheckRollup'
+const REVIEW_REQUEST_FIELDS = 'number,title,author,isDraft,url,updatedAt'
+
+/** CheckRun rows carry status/conclusion; StatusContext rows carry state. */
+interface RawRollupItem {
+  name?: string
+  context?: string
+  status?: string
+  conclusion?: string | null
+  state?: string
+  detailsUrl?: string | null
+  targetUrl?: string | null
+}
+
+export interface RollupSummary {
+  total: number
+  failed: number
+  pending: number
+  failing: { name: string; url: string | null }[]
+}
+
+const FAILURE_CONCLUSIONS = new Set(['FAILURE', 'TIMED_OUT', 'STARTUP_FAILURE'])
+const FAILURE_STATES = new Set(['FAILURE', 'ERROR'])
+const PENDING_STATES = new Set(['PENDING', 'EXPECTED'])
+
+export function summarizeRollup(items: RawRollupItem[]): RollupSummary {
+  const summary: RollupSummary = { total: items.length, failed: 0, pending: 0, failing: [] }
+  for (const item of items) {
+    const isFailed = item.state
+      ? FAILURE_STATES.has(item.state)
+      : FAILURE_CONCLUSIONS.has(item.conclusion ?? '')
+    const isPending = item.state ? PENDING_STATES.has(item.state) : (item.status ?? '') !== 'COMPLETED'
+    if (isFailed) {
+      summary.failed++
+      if (summary.failing.length < MAX_FAILING_CHECKS) {
+        summary.failing.push({
+          name: item.name ?? item.context ?? '',
+          url: item.detailsUrl ?? item.targetUrl ?? null,
+        })
+      }
+    } else if (isPending) {
+      summary.pending++
+    }
+  }
+  return summary
+}
+
+export function repoFromUrl(url: string): string | null {
+  const match = /^https?:\/\/[^/]+\/([^/\s]+\/[^/\s]+)\//.exec(url)
+  return match?.[1] ?? null
+}
+
+interface RawSummaryPr extends RawPr {
+  statusCheckRollup?: RawRollupItem[]
+}
+
+export interface SummaryPr {
+  number: number
+  title: string
+  isDraft: boolean
+  headRef: string
+  url: string
+  repo: string | null
+  updatedAt: string | null
+  checks: RollupSummary
+}
+
+export interface ReviewRequestPr {
+  number: number
+  title: string
+  author: string | null
+  isDraft: boolean
+  url: string
+  repo: string | null
+  updatedAt: string | null
+}
+
+export interface SummaryRun extends RunSummary {
+  repo: string | null
+}
+
+export interface GithubSummary {
+  myOpenPrs: SummaryPr[]
+  reviewRequested: ReviewRequestPr[]
+  failedRuns: SummaryRun[]
+}
+
+function normalizeSummaryPr(raw: RawSummaryPr): SummaryPr {
+  const url = raw.url ?? ''
+  return {
+    number: raw.number ?? 0,
+    title: raw.title ?? '',
+    isDraft: raw.isDraft ?? false,
+    headRef: raw.headRefName ?? '',
+    url,
+    repo: repoFromUrl(url),
+    updatedAt: raw.updatedAt ?? null,
+    checks: summarizeRollup(raw.statusCheckRollup ?? []),
+  }
+}
+
+function normalizeReviewRequest(raw: RawPr): ReviewRequestPr {
+  const url = raw.url ?? ''
+  return {
+    number: raw.number ?? 0,
+    title: raw.title ?? '',
+    author: raw.author?.login ?? null,
+    isDraft: raw.isDraft ?? false,
+    url,
+    repo: repoFromUrl(url),
+    updatedAt: raw.updatedAt ?? null,
+  }
+}
+
+/**
+ * One briefing from exactly three gh calls — no per-PR fan-out. Failing checks
+ * on my PRs come from pr list's statusCheckRollup, review requests from a
+ * search qualifier, failed runs from run list's status filter.
+ */
+export async function getSummary(
+  cfg: GithubConfig,
+  repoArg: string | undefined,
+  run: GhRunner = runProcess,
+): Promise<GithubSummary> {
+  const repoFlag = repoFlagArgs(cfg, repoArg)
+  const mineArgs = [
+    'pr',
+    'list',
+    ...repoFlag,
+    '--author',
+    '@me',
+    '--limit',
+    String(SUMMARY_PR_LIMIT),
+    '--json',
+    SUMMARY_PR_FIELDS,
+  ]
+  const reviewArgs = [
+    'pr',
+    'list',
+    ...repoFlag,
+    '--search',
+    'review-requested:@me',
+    '--limit',
+    String(SUMMARY_PR_LIMIT),
+    '--json',
+    REVIEW_REQUEST_FIELDS,
+  ]
+  const runsArgs = [
+    'run',
+    'list',
+    ...repoFlag,
+    '--status',
+    'failure',
+    '--limit',
+    String(SUMMARY_RUN_LIMIT),
+    '--json',
+    RUN_LIST_FIELDS,
+  ]
+  const [mine, review, failed] = await Promise.all([
+    execGh(cfg, mineArgs, {}, run),
+    execGh(cfg, reviewArgs, {}, run),
+    execGh(cfg, runsArgs, {}, run),
+  ])
+  return {
+    myOpenPrs: parseGhJson<RawSummaryPr[]>('pr list', mine).map(normalizeSummaryPr),
+    reviewRequested: parseGhJson<RawPr[]>('pr list', review).map(normalizeReviewRequest),
+    failedRuns: parseGhJson<RawRun[]>('run list', failed).map((raw) => {
+      const summary = normalizeRunSummary(raw)
+      return { ...summary, repo: repoFromUrl(summary.url) }
+    }),
+  }
+}
+
+// ---------------------------------------------------------------------------
 // auth
 
 interface RawAuthEntry {
