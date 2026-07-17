@@ -47,7 +47,7 @@ export const filesList: CommandSpec = {
     if (ctx.args['page-token'] !== undefined) params.pageToken = String(ctx.args['page-token'])
     if (ctx.args.fields !== undefined) params.fields = String(ctx.args.fields)
 
-    const creds = readGdriveCredentials(ctx.config)
+    const creds = readGdriveCredentials()
     const result = await listFiles(creds, params)
     return { ok: true, data: result }
   },

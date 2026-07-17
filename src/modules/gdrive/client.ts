@@ -1,8 +1,7 @@
-import type { ModuleConfig } from '../../core/types'
-import { getSecret } from '../../core/secrets'
 import {
   authedRequest,
   authedRequestJson,
+  requireGoogleCredentials,
   type GoogleOAuthCredentials,
 } from '../../core/google-auth'
 import { SystemError } from '../../core/errors'
@@ -17,36 +16,14 @@ export const DRIVE_API = 'https://www.googleapis.com/drive/v3'
  */
 export const DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
-/** Secret key (outside the config schema) holding the OAuth refresh token. Managed by `auth login`/`auth logout`. */
+/** Secret key holding the OAuth refresh token, written by `home gdrive configure`. */
 export const REFRESH_TOKEN_KEY = 'refreshToken'
 
 export const MODULE_NAME = 'gdrive'
 
-export interface GdriveConfig {
-  clientId: string
-  clientSecret: string
-}
-
-export function readGdriveConfig(cfg: ModuleConfig): GdriveConfig {
-  return {
-    clientId: String(cfg.clientId ?? ''),
-    clientSecret: String(cfg.clientSecret ?? ''),
-  }
-}
-
-/**
- * Assemble the full OAuth credential set. `clientId`/`clientSecret` arrive via
- * the module config (declared in `configSchema`); the `refreshToken` is stored
- * out-of-schema (it's obtained via the browser flow, not typed at a prompt) so
- * we read it straight from the secrets store here.
- */
-export function readGdriveCredentials(cfg: ModuleConfig): GoogleOAuthCredentials {
-  const { clientId, clientSecret } = readGdriveConfig(cfg)
-  return {
-    clientId,
-    clientSecret,
-    refreshToken: getSecret(MODULE_NAME, REFRESH_TOKEN_KEY) ?? '',
-  }
+/** Shared OAuth client + gdrive's own refresh token. Throws when either is absent. */
+export function readGdriveCredentials(): GoogleOAuthCredentials {
+  return requireGoogleCredentials(MODULE_NAME)
 }
 
 // ---------------------------------------------------------------------------

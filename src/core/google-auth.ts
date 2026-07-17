@@ -3,7 +3,9 @@ import { createServer } from 'node:http'
 import { spawn } from 'node:child_process'
 import type { AddressInfo } from 'node:net'
 import { request, type HttpOptions } from './http'
-import { SystemError, UserError } from './errors'
+import { NotConfiguredError, SystemError, UserError } from './errors'
+import { loadModuleConfig } from './config'
+import { getSecret } from './secrets'
 
 /**
  * Shared Google OAuth 2.0 helper — the three-legged "installed app"
@@ -28,6 +30,45 @@ export interface GoogleOAuthCredentials {
   clientId: string
   clientSecret: string
   refreshToken: string
+}
+
+/** Module name owning the shared OAuth client — also its secret namespace. */
+export const GOOGLE_MODULE = 'google'
+
+/** The half of a credential set that every Google module shares. */
+export interface GoogleClient {
+  clientId: string
+  clientSecret: string
+}
+
+/**
+ * The OAuth client shared by every Google module, or null when `google` has not
+ * been configured. One Cloud project's "Desktop app" client serves every Google
+ * API, so the client half lives in one namespace while each module keeps its own
+ * refresh token.
+ */
+export function readSharedGoogleClient(): GoogleClient | null {
+  const cfg = loadModuleConfig(GOOGLE_MODULE)
+  const clientId = String(cfg?.clientId ?? '')
+  const clientSecret = getSecret(GOOGLE_MODULE, 'clientSecret') ?? ''
+  if (!clientId || !clientSecret) return null
+  return { clientId, clientSecret }
+}
+
+/**
+ * Full credentials for `module`: the shared client plus that module's own
+ * refresh token. Throws the typed errors a caller can branch on, each naming the
+ * exact command that fixes it.
+ */
+export function requireGoogleCredentials(module: string): GoogleOAuthCredentials {
+  const client = readSharedGoogleClient()
+  // NotConfiguredError generates "module "x" is not configured — run
+  // `home x configure`", which is already the exact remedy in both cases; only
+  // the subject differs — the shared client, or this module's own grant.
+  if (!client) throw new NotConfiguredError(GOOGLE_MODULE, 'google_unconfigured')
+  const refreshToken = getSecret(module, 'refreshToken') ?? ''
+  if (!refreshToken) throw new NotConfiguredError(module, 'google_unauthorized')
+  return { ...client, refreshToken }
 }
 
 // ---------------------------------------------------------------------------
@@ -66,7 +107,7 @@ interface RefreshTokenResponse {
  * Exchange the stored refresh token for a fresh access token, caching it until
  * ~60s before expiry. Throws a typed `SystemError` the caller can branch on:
  *   - `google_unconfigured`  — clientId/clientSecret absent (run `configure`)
- *   - `google_unauthorized`  — no refresh token (run `auth login`)
+ *   - `google_unauthorized`  — no refresh token (run the module's `configure`)
  *   - `google_refresh_rejected` — Google rejected the grant (revoked/expired)
  */
 export async function getGoogleAccessToken(creds: GoogleOAuthCredentials): Promise<string> {
@@ -74,7 +115,7 @@ export async function getGoogleAccessToken(creds: GoogleOAuthCredentials): Promi
     throw new SystemError('google clientId/clientSecret not configured', 'google_unconfigured')
   }
   if (!creds.refreshToken) {
-    throw new SystemError('google refresh token missing — run `auth login` to authorize', 'google_unauthorized')
+    throw new SystemError("google refresh token missing — run the module's `configure` to authorize", 'google_unauthorized')
   }
 
   const cached = tokenCache.get(creds.refreshToken)
@@ -96,7 +137,7 @@ export async function getGoogleAccessToken(creds: GoogleOAuthCredentials): Promi
   if (!res.ok) {
     const text = await res.text().catch(() => '')
     // 400 invalid_grant / 401 → the refresh token itself is bad; surface a
-    // distinct code so the module can tell the user to re-run `auth login`.
+    // distinct code so the module can tell the user to re-run its `configure`.
     const code = res.status === 400 || res.status === 401 ? 'google_refresh_rejected' : `http_${res.status}`
     throw new SystemError(
       `google token refresh failed (HTTP ${res.status})${text ? `: ${text.slice(0, 200)}` : ''}`,

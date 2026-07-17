@@ -13,7 +13,6 @@ import {
   messageGetUrl,
   messagesListUrl,
   profileUrl,
-  readGmailConfig,
   summarizeMessage,
   threadGetUrl,
   threadsListUrl,
@@ -89,17 +88,6 @@ describe('other URL builders', () => {
     expect(draftsListUrl()).toBe(`${GMAIL_API_BASE}/drafts`)
     expect(new URL(draftsListUrl({ q: 'x', maxResults: 3 })).searchParams.get('maxResults')).toBe('3')
     expect(draftGetUrl('d1', { format: 'metadata' })).toBe(`${GMAIL_API_BASE}/drafts/d1?format=metadata`)
-  })
-})
-
-describe('readGmailConfig', () => {
-  test('pulls credentials from module config, coercing missing values to empty', () => {
-    expect(readGmailConfig({ clientId: 'c', clientSecret: 's', refreshToken: 'r' })).toEqual({
-      clientId: 'c',
-      clientSecret: 's',
-      refreshToken: 'r',
-    })
-    expect(readGmailConfig({})).toEqual({ clientId: '', clientSecret: '', refreshToken: '' })
   })
 })
 

@@ -3,7 +3,7 @@ import { createConsola } from 'consola'
 import type { ArgSpec, CommandSpec, ModuleConfig, ModuleManifest, RunContext, RunResult } from './types'
 import { loadModuleConfig } from './config'
 import { getSecret } from './secrets'
-import { runConfigure } from './configure'
+import { configureRunnerFor } from './configure'
 import { writeSkill } from './skill'
 import { emit } from './output'
 import { SystemError, UserError, NotConfiguredError } from './errors'
@@ -144,7 +144,10 @@ function makeConfigureCommand(manifest: ModuleManifest): CommandDef {
       const raw = args as Record<string, unknown>
       const env = ctxFromArgs(raw)
       try {
-        await runConfigure(manifest, { rotate: Boolean(raw.rotate), force: Boolean(raw.force) })
+        await configureRunnerFor(manifest)({
+          rotate: Boolean(raw.rotate),
+          force: Boolean(raw.force),
+        })
         await emit({ ok: true, data: `${manifest.name}: configured` }, { json: env.json })
       } catch (err) {
         await emit(

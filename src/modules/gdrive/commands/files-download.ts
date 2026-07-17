@@ -28,7 +28,7 @@ export const filesDownload: CommandSpec = {
     const ref = String(ctx.args.file ?? '').trim()
     if (!ref) return { ok: false, kind: 'user', message: 'file is required', code: 'missing_arg' }
 
-    const creds = readGdriveCredentials(ctx.config)
+    const creds = readGdriveCredentials()
     const resolution = unwrapResolution(await resolveFile(creds, ref), ref)
     if (!resolution.ok) return resolution.error
     const file = resolution.file

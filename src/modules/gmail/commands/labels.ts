@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { getLabel, listLabels, readGmailConfig } from '../client'
+import { getLabel, listLabels, readGmailCredentials } from '../client'
 
 export const labelsList: CommandSpec = {
   path: ['labels', 'list'],
@@ -11,7 +11,7 @@ export const labelsList: CommandSpec = {
     'home gmail labels list --json | jq \'.labels[] | {id, name}\'',
   ],
   async run(ctx) {
-    const cfg = readGmailConfig(ctx.config)
+    const cfg = readGmailCredentials()
     const data = await listLabels(cfg)
     return { ok: true, data }
   },
@@ -30,7 +30,7 @@ export const labelsGet: CommandSpec = {
     const id = String(ctx.args.id ?? '').trim()
     if (!id) return { ok: false, kind: 'user', message: 'id is required', code: 'missing_arg' }
 
-    const cfg = readGmailConfig(ctx.config)
+    const cfg = readGmailCredentials()
     const data = await getLabel(cfg, id)
     return { ok: true, data }
   },

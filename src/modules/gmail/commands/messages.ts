@@ -4,7 +4,7 @@ import {
   getMessage,
   listMessages,
   listMessagesHydrated,
-  readGmailConfig,
+  readGmailCredentials,
 } from '../client'
 import { optionalString, parseFormat, parseLabels, parseMax } from './shared'
 
@@ -44,7 +44,7 @@ export const messagesList: CommandSpec = {
       includeSpamTrash: Boolean(ctx.args['include-spam-trash']),
     }
 
-    const cfg = readGmailConfig(ctx.config)
+    const cfg = readGmailCredentials()
     if (ctx.args.hydrate) {
       const data = await listMessagesHydrated(cfg, opts)
       return { ok: true, data }
@@ -79,7 +79,7 @@ export const messagesGet: CommandSpec = {
     const fmt = parseFormat(ctx, MESSAGE_FORMATS)
     if (fmt.error) return { ok: false, kind: 'user', message: fmt.error, code: 'bad_arg' }
 
-    const cfg = readGmailConfig(ctx.config)
+    const cfg = readGmailCredentials()
     const data = await getMessage(cfg, id, { format: fmt.value })
     return { ok: true, data }
   },

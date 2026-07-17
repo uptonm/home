@@ -20,9 +20,9 @@ export function collectSecretRows(): SecretRow[] {
   // Read every declared secret first: on the keyring backend that pulls any
   // pre-consolidation entry into the single item. Without this pass a partly
   // migrated install would export only what had already been consolidated.
-  // Program-managed secrets (e.g. gdrive/gmail refreshToken, written by `auth
-  // login` rather than configure) are declared in their module's schema
-  // precisely so this inventory can see them.
+  // Program-managed secrets (e.g. gdrive/gmail refreshToken, written by
+  // `configure`'s browser flow rather than typed at a prompt) are declared in
+  // their module's schema precisely so this inventory can see them.
   for (const m of modules) {
     for (const field of m.configSchema) {
       if (field.kind === 'secret') getSecret(m.name, field.key)
