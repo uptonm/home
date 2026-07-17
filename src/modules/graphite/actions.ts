@@ -26,6 +26,19 @@ const DELETED_RE = /^deleted (?:empty )?branch\b/i
 export const RESOLVE_MANUALLY_HINT =
   'resolve the conflict manually in the working tree, then run `gt continue` (or abort the rebase) — this module never auto-resolves conflicts'
 
+// gt takes branch names positionally, so a name beginning with `-` is parsed as
+// a flag: `-a` becomes gt create's stage-all switch and `-f` becomes a force
+// flag, silently breaking the "never stages / never forces" guarantee. gt gives
+// no escape — its parser drops everything after a `--` separator from both
+// positionals and flags (verified against gt 1.8.6), so `gt create -- <name>`
+// discards the name outright. A git branch name cannot legitimately begin with
+// `-`, so the only safe course is to reject such a ref before it reaches gt.
+function assertNotFlagLike(label: string, ref: string): void {
+  if (ref.startsWith('-')) {
+    throw new UserError(`${label} ${JSON.stringify(ref)} cannot begin with '-'`, 'bad_arg')
+  }
+}
+
 function linesMatching(text: string, re: RegExp): string[] {
   return text
     .split('\n')
@@ -133,6 +146,7 @@ export async function createBranch(
   message: string,
   run: GtRunner = runProcess,
 ): Promise<StackActionResult> {
+  assertNotFlagLike('branch name', name)
   // No -a/-u/-p: in gt 1.8.6 all staging flags default off, so gt create
   // commits only what is already staged; an empty index yields an empty branch.
   return runGtAction(cfg, ['create', name, '-m', message, '--no-interactive'], QUICK_ACTION_TIMEOUT_MS, run)
@@ -144,6 +158,8 @@ export async function trackBranch(
   parent: string,
   run: GtRunner = runProcess,
 ): Promise<StackActionResult> {
+  assertNotFlagLike('branch name', branch)
+  assertNotFlagLike('parent', parent)
   // gt 1.8.6 track takes the branch positionally (there is no --branch flag)
   // and the parent via -p/--parent.
   return runGtAction(cfg, ['track', branch, '--parent', parent, '--no-interactive'], QUICK_ACTION_TIMEOUT_MS, run)

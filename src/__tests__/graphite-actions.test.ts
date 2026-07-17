@@ -234,6 +234,36 @@ describe('required args', () => {
 })
 
 // ---------------------------------------------------------------------------
+// flag-like refs: a dash-leading name/parent would be parsed by gt as a flag
+// (`-a` → stage-all, `-f` → force), so the guard rejects it before any spawn
+
+describe('flag-like ref rejection', () => {
+  test('branch create with a dash-leading name → bad_arg, gt never runs', async () => {
+    const { run, calls } = fakeGt()
+    const err = await errorFrom(runBranchCreate(ctx({ yes: true, name: '-a', message: 'feat: x' }), run))
+    expect(err).toBeInstanceOf(UserError)
+    expect(err.code).toBe('bad_arg')
+    expect(calls).toHaveLength(0)
+  })
+
+  test('branch track with a dash-leading branch → bad_arg, gt never runs', async () => {
+    const { run, calls } = fakeGt()
+    const err = await errorFrom(runBranchTrack(ctx({ yes: true, branch: '-f', parent: 'main' }), run))
+    expect(err).toBeInstanceOf(UserError)
+    expect(err.code).toBe('bad_arg')
+    expect(calls).toHaveLength(0)
+  })
+
+  test('branch track with a dash-leading parent → bad_arg, gt never runs', async () => {
+    const { run, calls } = fakeGt()
+    const err = await errorFrom(runBranchTrack(ctx({ yes: true, branch: 'feat/x', parent: '-f' }), run))
+    expect(err).toBeInstanceOf(UserError)
+    expect(err.code).toBe('bad_arg')
+    expect(calls).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // conflicts: never auto-resolved, gt's text verbatim, stable code
 
 describe('conflicts', () => {
