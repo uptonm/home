@@ -88,6 +88,35 @@ Exit codes:
   mode-0600 `~/.config/home/secrets.json` on headless Linux without libsecret
   (you'll be prompted during `home init`)
 
+All secrets live in a **single** keyring entry (`home-cli` / `secrets`) holding
+one JSON blob, rather than an entry per module. macOS attaches an ACL to each
+keychain *item*, so an item-per-secret layout costs one "allow access?" prompt
+per module — and every one of them repeats whenever the binary's identity
+changes. One item means one grant.
+
+Installs predating this migrate automatically: each secret folds into the shared
+entry the first time it's read, and the old item is removed. Expect one last
+prompt per secret while that happens, then no more.
+
+### macOS: stop the repeat prompts
+
+If macOS re-asks for keychain access after every rebuild, the binary is
+ad-hoc signed — its identity *is* its own hash, so each build looks like a new
+app to the ACL. Run once:
+
+```bash
+bash scripts/setup-codesign.sh    # self-signed "Home CLI Dev" identity
+bun run build:install             # rebuild + sign
+```
+
+Builds then share a stable designated requirement (`identifier home and
+certificate leaf = …`), so the grant sticks across rebuilds. Note that secrets
+stored *before* that cert existed keep their old hash-pinned ACL; read them once
+with the signed binary to re-seed, or `home vercel env pull` to rewrite them.
+
+Running via `bun run src/index.ts` is a different identity than the compiled
+binary, so each gets its own grant — once each, not once per module.
+
 Rotate / migrate:
 
 ```bash

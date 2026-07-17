@@ -16,18 +16,15 @@ const importArgs: ArgsDef = {
 }
 
 function collectSecretRows(): SecretRow[] {
-  const direct = exportAll(modules.map((m) => m.name))
-  if (direct.length) return direct
-  // Keyring backend: walk manifests for declared secret keys, look them up.
-  const out: SecretRow[] = []
+  // Read every declared secret first: on the keyring backend that pulls any
+  // pre-consolidation entry into the single item. Without this pass a partly
+  // migrated install would export only what had already been consolidated.
   for (const m of modules) {
     for (const field of m.configSchema) {
-      if (field.kind !== 'secret') continue
-      const v = getSecret(m.name, field.key)
-      if (v !== null) out.push({ module: m.name, key: field.key, value: v })
+      if (field.kind === 'secret') getSecret(m.name, field.key)
     }
   }
-  return out
+  return exportAll()
 }
 
 export const secretsCmd: CommandDef = defineCommand({
