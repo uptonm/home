@@ -10,12 +10,14 @@ import {
   getViewer,
   isUuid,
   listProjects,
+  listProjectStatuses,
   listTeams,
   listTeamStates,
   listUsers,
   parseIssueRef,
   parsePriority,
   resolveProject,
+  resolveProjectStatus,
   resolveState,
   resolveTeam,
   resolveUser,
@@ -86,6 +88,13 @@ async function resolveStateIdInTeam(
   const page = await listTeamStates(cfg, teamId)
   warnings.push(...page.warnings)
   return resolveState(page.nodes, ref).id
+}
+
+async function resolveProjectStatusId(cfg: LinearConfig, ref: string, warnings: string[]): Promise<string> {
+  if (isUuid(ref)) return ref.toLowerCase()
+  const page = await listProjectStatuses(cfg)
+  warnings.push(...page.warnings)
+  return resolveProjectStatus(page.nodes, ref).id
 }
 
 export const issuesCreate: CommandSpec = {
@@ -293,7 +302,11 @@ export const projectsUpdate: CommandSpec = {
     { name: 'project', kind: 'positional', description: 'Project UUID or exact name (ambiguity refused)', required: true },
     { name: 'name', kind: 'string', description: 'New project name' },
     { name: 'description-stdin', kind: 'boolean', description: 'Read the new description (markdown) from stdin' },
-    { name: 'state', kind: 'string', description: `New state (${PROJECT_STATES.join(', ')})`, enum: PROJECT_STATES },
+    {
+      name: 'state',
+      kind: 'string',
+      description: `New status — a category (${PROJECT_STATES.join(', ')}, backlog), an exact status name, or a status id; ambiguity refused`,
+    },
     { name: 'target-date', kind: 'string', description: 'New target date (YYYY-MM-DD)' },
     YES_ARG,
   ],
@@ -317,14 +330,6 @@ export const projectsUpdate: CommandSpec = {
         code: 'missing_arg',
       }
     }
-    if (state && !(PROJECT_STATES as readonly string[]).includes(state)) {
-      return {
-        ok: false,
-        kind: 'user',
-        message: `unknown project state "${state}" — one of: ${PROJECT_STATES.join(', ')}`,
-        code: 'bad_arg',
-      }
-    }
     if (targetDate && !TARGET_DATE_RE.test(targetDate)) {
       return { ok: false, kind: 'user', message: `target-date "${targetDate}" must be YYYY-MM-DD`, code: 'bad_arg' }
     }
@@ -336,10 +341,13 @@ export const projectsUpdate: CommandSpec = {
     const warnings: string[] = []
     const id = await resolveProjectId(cfg, raw, warnings)
 
+    // Linear's ProjectUpdateInput has no `state` field; the requested category
+    // (or exact status name/id) is resolved to a ProjectStatus id and sent as
+    // statusId. Resolution runs after the --yes gate, like every other resolver.
     const input: ProjectUpdateInputFields = {}
     if (name) input.name = name
     if (wantsDescription) input.description = await readStdinText('--description-stdin')
-    if (state) input.state = state
+    if (state) input.statusId = await resolveProjectStatusId(cfg, state, warnings)
     if (targetDate) input.targetDate = targetDate
 
     const { data, warnings: mutationWarnings } = await updateProject(cfg, id, input)
@@ -349,7 +357,7 @@ export const projectsUpdate: CommandSpec = {
       data: withWarnings(
         {
           project: { id: data.id, name: data.name, url: data.url },
-          changed: input,
+          changed: { ...input, ...(state ? { state } : {}) },
         },
         warnings,
       ),

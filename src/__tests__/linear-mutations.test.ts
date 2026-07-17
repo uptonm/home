@@ -6,6 +6,7 @@ import {
   CREATE_COMMENT_MUTATION,
   CREATE_ISSUE_MUTATION,
   ISSUE_TEAM_QUERY,
+  PROJECT_STATUSES_QUERY,
   PROJECTS_QUERY,
   TEAMS_QUERY,
   UPDATE_ISSUE_MUTATION,
@@ -13,6 +14,7 @@ import {
   USERS_QUERY,
   VIEWER_STATUS_QUERY,
   WORKFLOW_STATES_QUERY,
+  createIssue,
   parsePriority,
 } from '../modules/linear/client'
 import { issuesComment, issuesCreate, issuesUpdate, projectsUpdate } from '../modules/linear/commands/mutations'
@@ -387,9 +389,20 @@ describe('projects update', () => {
     { id: 'p3', name: 'dup name', state: 'paused' },
   ])
 
-  test('resolves an exact name and sends only the fields passed', async () => {
+  // A realistic workspace flow: two started-type statuses make `started` ambiguous.
+  const PROJECT_STATUSES = conn([
+    { id: 'ps-backlog', name: 'Backlog', type: 'backlog' },
+    { id: 'ps-planned', name: 'Planned', type: 'planned' },
+    { id: 'ps-progress', name: 'In Progress', type: 'started' },
+    { id: 'ps-review', name: 'In Review', type: 'started' },
+    { id: 'ps-paused', name: 'Paused', type: 'paused' },
+    { id: 'ps-done', name: 'Done', type: 'completed' },
+  ])
+
+  test('resolves --state to a ProjectStatus id (statusId), not the nonexistent state field', async () => {
     const calls = installGqlFetch({
       [PROJECTS_QUERY]: () => ({ projects: PROJECTS }),
+      [PROJECT_STATUSES_QUERY]: () => ({ projectStatuses: PROJECT_STATUSES }),
       [UPDATE_PROJECT_MUTATION]: () => ({
         projectUpdate: { success: true, project: { id: 'p1', name: 'Hermes swarm', url: 'https://linear.app/u/project/p1' } },
       }),
@@ -398,13 +411,40 @@ describe('projects update', () => {
       ctx({ project: 'hermes swarm', state: 'paused', 'target-date': '2026-09-01', yes: true }),
     )
     expect(res.ok).toBe(true)
+    // The mutation input carries statusId — ProjectUpdateInput has no `state`.
     expect(calls.find((c) => c.query === UPDATE_PROJECT_MUTATION)!.variables).toEqual({
       id: 'p1',
-      input: { state: 'paused', targetDate: '2026-09-01' },
+      input: { statusId: 'ps-paused', targetDate: '2026-09-01' },
     })
     const data = (res as { data: Record<string, unknown> }).data
     expect(data.project).toEqual({ id: 'p1', name: 'Hermes swarm', url: 'https://linear.app/u/project/p1' })
-    expect(data.changed).toEqual({ state: 'paused', targetDate: '2026-09-01' })
+    // The echo keeps the human-facing requested state alongside the sent statusId.
+    expect(data.changed).toEqual({ statusId: 'ps-paused', targetDate: '2026-09-01', state: 'paused' })
+  })
+
+  test('an exact status name resolves even when its category is ambiguous', async () => {
+    const calls = installGqlFetch({
+      [PROJECTS_QUERY]: () => ({ projects: PROJECTS }),
+      [PROJECT_STATUSES_QUERY]: () => ({ projectStatuses: PROJECT_STATUSES }),
+      [UPDATE_PROJECT_MUTATION]: () => ({ projectUpdate: { success: true, project: { id: 'p1', name: 'Hermes swarm' } } }),
+    })
+    await projectsUpdate.run(ctx({ project: 'hermes swarm', state: 'In Review', yes: true }))
+    expect(calls.find((c) => c.query === UPDATE_PROJECT_MUTATION)!.variables).toEqual({
+      id: 'p1',
+      input: { statusId: 'ps-review' },
+    })
+  })
+
+  test('a category matching more than one status is refused, mutation never sent', async () => {
+    const calls = installGqlFetch({
+      [PROJECTS_QUERY]: () => ({ projects: PROJECTS }),
+      [PROJECT_STATUSES_QUERY]: () => ({ projectStatuses: PROJECT_STATUSES }),
+    })
+    const err = await thrown(() => projectsUpdate.run(ctx({ project: 'hermes swarm', state: 'started', yes: true })))
+    expect((err as UserError).code).toBe('linear_ambiguous')
+    expect((err as UserError).message).toContain('In Progress')
+    expect((err as UserError).message).toContain('In Review')
+    expect(calls.some((c) => c.query === UPDATE_PROJECT_MUTATION)).toBe(false)
   })
 
   test('a UUID target skips the catalog lookup', async () => {
@@ -433,13 +473,21 @@ describe('projects update', () => {
     expect(calls.some((c) => c.query === UPDATE_PROJECT_MUTATION)).toBe(false)
   })
 
-  test('rejects an unknown state and a malformed target date before any request', async () => {
+  test('a malformed target date is rejected before any request', async () => {
     const calls = installGqlFetch({})
-    const badState = await projectsUpdate.run(ctx({ project: 'Hermes swarm', state: 'archived', yes: true }))
-    expect((badState as { code?: string }).code).toBe('bad_arg')
     const badDate = await projectsUpdate.run(ctx({ project: 'Hermes swarm', 'target-date': 'Sept 1', yes: true }))
     expect((badDate as { code?: string }).code).toBe('bad_arg')
     expect(calls.length).toBe(0)
+  })
+
+  test('an unknown state is refused by the live-status resolver, mutation never sent', async () => {
+    const calls = installGqlFetch({
+      [PROJECTS_QUERY]: () => ({ projects: PROJECTS }),
+      [PROJECT_STATUSES_QUERY]: () => ({ projectStatuses: PROJECT_STATUSES }),
+    })
+    const err = await thrown(() => projectsUpdate.run(ctx({ project: 'Hermes swarm', state: 'archived', yes: true })))
+    expect((err as UserError).code).toBe('linear_not_found')
+    expect(calls.some((c) => c.query === UPDATE_PROJECT_MUTATION)).toBe(false)
   })
 
   test('with nothing to update it refuses before any request', async () => {
@@ -447,5 +495,20 @@ describe('projects update', () => {
     const res = await projectsUpdate.run(ctx({ project: 'Hermes swarm', yes: true }))
     expect((res as { code?: string }).code).toBe('missing_arg')
     expect(calls.length).toBe(0)
+  })
+})
+
+describe('mutation transport never retries', () => {
+  test('a 5xx on a mutation is not retried — exactly one POST, so no duplicate write', async () => {
+    let posts = 0
+    globalThis.fetch = (async (_url: string, _init?: RequestInit) => {
+      posts++
+      return new Response(JSON.stringify({ data: null, errors: [{ message: 'server exploded' }] }), { status: 500 })
+    }) as typeof fetch
+    // The write fails, but it must fail after a SINGLE attempt — a retry could
+    // create a second issue if the first actually committed before the 5xx.
+    const err = await thrown(() => createIssue({ apiKey: API_KEY }, { title: 'T', teamId: 't1' }))
+    expect(err).toBeInstanceOf(SystemError)
+    expect(posts).toBe(1)
   })
 })

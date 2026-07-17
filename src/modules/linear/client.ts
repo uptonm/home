@@ -1,4 +1,4 @@
-import { request } from '../../core/http'
+import { request, type HttpOptions } from '../../core/http'
 import { HomeError, SystemError, UserError } from '../../core/errors'
 import type { ModuleConfig, RunResult } from '../../core/types'
 
@@ -229,14 +229,19 @@ export async function gql<T>(
   cfg: LinearConfig,
   document: string,
   variables: Record<string, unknown> = {},
+  httpOpts: HttpOptions = {},
 ): Promise<GqlResponse<T>> {
   let res: Response
   try {
-    res = await request(LINEAR_API_URL, {
-      method: 'POST',
-      headers: { Authorization: cfg.apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: document, variables }),
-    })
+    res = await request(
+      LINEAR_API_URL,
+      {
+        method: 'POST',
+        headers: { Authorization: cfg.apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: document, variables }),
+      },
+      httpOpts,
+    )
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     throw new SystemError(redactKey(`Linear API unreachable: ${message}`, cfg.apiKey), 'linear_api_failed')
@@ -619,6 +624,46 @@ export function listTeamStates(cfg: LinearConfig, teamId: string): Promise<Paged
   }, RESOLVE_LIMIT)
 }
 
+export const PROJECT_STATUSES_QUERY = `query ProjectStatuses {
+  projectStatuses { nodes { id name type } }
+}`
+
+export interface ProjectStatusRow {
+  id: string
+  name: string
+  /** ProjectStatusType category: backlog | planned | started | paused | completed | canceled. */
+  type: string
+}
+
+export async function listProjectStatuses(cfg: LinearConfig): Promise<Paged<ProjectStatusRow>> {
+  const res = await gql<{ projectStatuses: Connection<ProjectStatusRow> }>(cfg, PROJECT_STATUSES_QUERY)
+  return { nodes: res.data.projectStatuses.nodes, warnings: res.warnings }
+}
+
+/**
+ * Resolve a project-status reference to a concrete ProjectStatus id: an exact id
+ * first, then an exact status name, then a ProjectStatusType category (e.g.
+ * `paused`). A workspace can hold several statuses of one category, so a category
+ * matching more than one is refused with the status names to pick from — the
+ * same exact-or-refuse contract as the team/state resolvers.
+ */
+export function resolveProjectStatus(statuses: ProjectStatusRow[], ref: string): ProjectStatusRow {
+  const wanted = ref.trim()
+  const byId = statuses.find((s) => s.id === wanted)
+  if (byId) return byId
+  const lower = wanted.toLowerCase()
+  const byName = statuses.filter((s) => s.name.toLowerCase() === lower)
+  if (byName.length === 1) return byName[0]!
+  const byType = byName.length === 0 ? statuses.filter((s) => s.type.toLowerCase() === lower) : byName
+  if (byType.length === 1) return byType[0]!
+  if (byType.length > 1) {
+    const candidates = byType.map((s) => `${s.name} (${s.type})`).join(', ')
+    throw new UserError(`project status "${ref}" is ambiguous — name one exactly: ${candidates}`, 'linear_ambiguous')
+  }
+  const available = [...new Set(statuses.map((s) => s.type))].join(', ')
+  throw new UserError(`project status "${ref}" not found — status types: ${available || 'none'}`, 'linear_not_found')
+}
+
 export function listIssues(
   cfg: LinearConfig,
   filter: Record<string, unknown> | undefined,
@@ -783,7 +828,8 @@ export interface IssueUpdateInput {
 export interface ProjectUpdateInputFields {
   name?: string
   description?: string
-  state?: string
+  /** ProjectStatus id — Linear's ProjectUpdateInput has no `state`; status is written by id. */
+  statusId?: string
   targetDate?: string
 }
 
@@ -806,6 +852,15 @@ export interface MutatedProject {
   url?: string
 }
 
+/**
+ * Mutations must never auto-retry. Linear has no idempotency keys, so re-sending
+ * after a lost response — a 5xx, or the request timeout firing after the server
+ * already committed — would create a duplicate issue/comment or re-apply an
+ * update. The read transport's retries are dropped here; a longer timeout
+ * offsets the lost retry budget for a single attempt.
+ */
+const MUTATION_HTTP: HttpOptions = { retries: 0, timeoutMs: 30_000 }
+
 function mutationFailed(what: string): SystemError {
   return new SystemError(`Linear reported the ${what} did not succeed`, 'linear_api_failed')
 }
@@ -815,6 +870,7 @@ export async function createIssue(cfg: LinearConfig, input: IssueCreateInput): P
     cfg,
     CREATE_ISSUE_MUTATION,
     { input },
+    MUTATION_HTTP,
   )
   const payload = res.data.issueCreate
   if (!payload.success || !payload.issue) throw mutationFailed('issue create')
@@ -830,6 +886,7 @@ export async function updateIssue(
     cfg,
     UPDATE_ISSUE_MUTATION,
     { id, input },
+    MUTATION_HTTP,
   )
   const payload = res.data.issueUpdate
   if (!payload.success || !payload.issue) throw mutationFailed('issue update')
@@ -844,6 +901,7 @@ export async function createComment(
     cfg,
     CREATE_COMMENT_MUTATION,
     { input },
+    MUTATION_HTTP,
   )
   const payload = res.data.commentCreate
   if (!payload.success || !payload.comment) throw mutationFailed('comment create')
@@ -859,6 +917,7 @@ export async function updateProject(
     cfg,
     UPDATE_PROJECT_MUTATION,
     { id, input },
+    MUTATION_HTTP,
   )
   const payload = res.data.projectUpdate
   if (!payload.success || !payload.project) throw mutationFailed('project update')
