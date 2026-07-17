@@ -73,4 +73,27 @@ describe('root status collector', () => {
     expect(report.modules[0]).toMatchObject({ code: 'status_failed', message: 'probe exploded' })
     expect(report.modules[1]).toMatchObject({ code: 'config_failed', message: 'bad config' })
   })
+
+  test('maps a status() not_configured result to the not_configured board state', async () => {
+    const oauthMissing = manifest(
+      'gcal',
+      async () => ({
+        ok: false,
+        kind: 'config',
+        code: 'not_configured',
+        message: 'module "gcal" is not configured — run `home gcal configure`',
+      }),
+      { requiresConfig: false, configured: false },
+    )
+
+    const report = await collectModuleStatuses([oauthMissing.manifest], () => null)
+
+    expect(report.modules[0]).toEqual({
+      module: 'gcal',
+      configured: false,
+      status: 'not_configured',
+      message: 'module "gcal" is not configured — run `home gcal configure`',
+      code: 'not_configured',
+    })
+  })
 })

@@ -60,7 +60,7 @@ async function collectOneStatus(
     return {
       module: manifest.name,
       configured: config !== null,
-      status: 'error',
+      status: result.code === 'not_configured' ? 'not_configured' : 'error',
       message: result.message,
       ...(result.code === undefined ? {} : { code: result.code }),
     }
