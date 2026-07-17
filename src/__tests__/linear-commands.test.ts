@@ -3,6 +3,7 @@ import { createConsola } from 'consola'
 import { UserError } from '../core/errors'
 import type { RunContext } from '../core/types'
 import {
+  CYCLES_QUERY,
   ISSUES_QUERY,
   ISSUE_QUERY,
   MY_ISSUES_QUERY,
@@ -12,8 +13,10 @@ import {
   TEAM_ACTIVE_CYCLE_QUERY,
   WORKFLOW_STATES_QUERY,
 } from '../modules/linear/client'
+import { cyclesList } from '../modules/linear/commands/cycles'
 import { issuesGet, issuesList } from '../modules/linear/commands/issues'
 import { myWorkList } from '../modules/linear/commands/my-work'
+import { projectsList } from '../modules/linear/commands/projects'
 import { summaryCmd } from '../modules/linear/commands/summary'
 
 const API_KEY = 'lin_api_supersecret123'
@@ -309,5 +312,80 @@ describe('summary', () => {
     expect(res.ok).toBe(true)
     const data = (res as { data: { warnings?: string[] } }).data
     expect(data.warnings).toEqual(['partial failure in issues', 'partial failure in projects'])
+  })
+})
+
+describe('projects list', () => {
+  test('accepts --state backlog and filters to backlog projects', async () => {
+    installGqlFetch({
+      [PROJECTS_QUERY]: () => ({
+        projects: conn([
+          { id: 'p1', name: 'Later', state: 'backlog', health: null, progress: 0, targetDate: null },
+          { id: 'p2', name: 'Now', state: 'started', health: 'onTrack', progress: 0.5, targetDate: null },
+        ]),
+      }),
+    })
+    const res = await projectsList.run(ctx({ state: 'backlog' }))
+    expect(res.ok).toBe(true)
+    const projects = (res as { data: { projects: { id: string; state: string }[] } }).data.projects
+    expect(projects.map((p) => p.id)).toEqual(['p1'])
+    expect(projects[0]!.state).toBe('backlog')
+  })
+})
+
+describe('cycles list', () => {
+  test('--active with a team resolves the running cycle via getTeamActiveCycle', async () => {
+    const calls = installGqlFetch({
+      [TEAMS_QUERY]: () => ({ teams: TEAMS }),
+      [TEAM_ACTIVE_CYCLE_QUERY]: (v) => {
+        expect(v).toEqual({ id: 't1' })
+        return {
+          team: {
+            id: 't1',
+            key: 'UPT',
+            name: 'Upton',
+            activeCycle: { id: 'cy-now', number: 12, name: null, startsAt: '2026-07-14T00:00:00.000Z', endsAt: '2026-07-28T00:00:00.000Z', progress: 0.4 },
+          },
+        }
+      },
+    })
+    const res = await cyclesList.run(ctx({ team: 'UPT', active: true }))
+    expect(res.ok).toBe(true)
+    // The list query is never touched — the server answers the active cycle directly.
+    expect(calls.some((c) => c.query === CYCLES_QUERY)).toBe(false)
+    const cycles = (res as { data: { cycles: { id: string; team: string | null }[] } }).data.cycles
+    expect(cycles.map((c) => c.id)).toEqual(['cy-now'])
+    expect(cycles[0]!.team).toBe('UPT')
+  })
+
+  test('--active without a team applies --limit after filtering, so a running cycle past the first N is still found', async () => {
+    const now = Date.now()
+    const day = 24 * 60 * 60 * 1000
+    const past = (n: number) => ({
+      id: `old-${n}`,
+      number: n,
+      name: null,
+      startsAt: new Date(now - (n + 1) * 14 * day).toISOString(),
+      endsAt: new Date(now - n * 14 * day).toISOString(),
+      progress: 1,
+      team: null,
+    })
+    const running = {
+      id: 'cy-now',
+      number: 99,
+      name: null,
+      startsAt: new Date(now - day).toISOString(),
+      endsAt: new Date(now + day).toISOString(),
+      progress: 0.5,
+      team: null,
+    }
+    installGqlFetch({
+      [CYCLES_QUERY]: () => ({ cycles: conn([past(1), past(2), running]) }),
+    })
+    // --limit 2 would, if it bounded the pre-filter fetch, drop the running cycle.
+    const res = await cyclesList.run(ctx({ active: true, limit: 2 }))
+    expect(res.ok).toBe(true)
+    const cycles = (res as { data: { cycles: { id: string }[] } }).data.cycles
+    expect(cycles.map((c) => c.id)).toEqual(['cy-now'])
   })
 })

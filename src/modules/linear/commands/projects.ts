@@ -4,7 +4,7 @@ import { RESOLVE_LIMIT, getProject, isUuid, listProjects, type ProjectDetail, ty
 import { getLinearConfig, optionalString, withWarnings } from './shared'
 
 /** Project.state values in Linear's API. */
-const PROJECT_STATES = ['planned', 'started', 'paused', 'completed', 'canceled'] as const
+const PROJECT_STATES = ['backlog', 'planned', 'started', 'paused', 'completed', 'canceled'] as const
 
 function shapeProjectRow(p: ProjectNode) {
   return {
