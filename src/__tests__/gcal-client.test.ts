@@ -143,7 +143,8 @@ describe('summarizeEvent', () => {
     })
   })
 
-  test('all-day event: bare date, allDay true', () => {
+  test('all-day event: bare date, allDay true, exclusive end collapsed to the inclusive last day', () => {
+    // One-day event: Google end.date 2026-07-21 is exclusive → inclusive last day 2026-07-20.
     const row = summarizeEvent({
       id: 'ev2',
       summary: 'Vacation',
@@ -152,8 +153,15 @@ describe('summarizeEvent', () => {
     })
     expect(row.allDay).toBe(true)
     expect(row.start).toBe('2026-07-20')
-    expect(row.end).toBe('2026-07-21')
+    expect(row.end).toBe('2026-07-20')
     expect(row.timeZone).toBeUndefined()
+  })
+
+  test('multi-day all-day event: end is the inclusive last day, across a month boundary', () => {
+    // Jul 17 → Aug 01 exclusive spans Jul 17–31 inclusive; the collapse must not underflow the month.
+    const row = summarizeEvent({ id: 'ev2b', start: { date: '2026-07-17' }, end: { date: '2026-08-01' } })
+    expect(row.start).toBe('2026-07-17')
+    expect(row.end).toBe('2026-07-31')
   })
 
   test('recurring instance carries parent id and original slot', () => {

@@ -180,6 +180,7 @@ export interface EventSummary {
   status?: string
   /** ISO 8601 — a bare date (YYYY-MM-DD) for all-day events, RFC 3339 otherwise. */
   start?: string
+  /** For all-day events this is the INCLUSIVE last day (YYYY-MM-DD); RFC 3339 instant otherwise. */
   end?: string
   allDay: boolean
   timeZone?: string
@@ -188,6 +189,17 @@ export interface EventSummary {
   /** Set on recurring-event instances (singleEvents expansion). */
   recurringEventId?: string
   originalStart?: string
+}
+
+/**
+ * Google reports an all-day event's `end.date` as EXCLUSIVE — a one-day event
+ * on 2026-07-17 comes back with end 2026-07-18. Collapse it to the inclusive
+ * last day the event actually covers, since `events list` / agenda rows (and
+ * the LLM consumers they feed) read `end` as that last day. Computed in UTC so
+ * the result never shifts with the host timezone.
+ */
+function inclusiveAllDayEnd(exclusiveEnd: string): string {
+  return new Date(Date.parse(`${exclusiveEnd}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
 }
 
 /**
@@ -201,7 +213,7 @@ export function summarizeEvent(event: GcalEvent): EventSummary {
     summary: event.summary,
     status: event.status,
     start: event.start?.dateTime ?? event.start?.date,
-    end: event.end?.dateTime ?? event.end?.date,
+    end: event.end?.dateTime ?? (event.end?.date ? inclusiveAllDayEnd(event.end.date) : undefined),
     allDay: event.start?.date !== undefined,
     timeZone: event.start?.timeZone,
     location: event.location,

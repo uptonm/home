@@ -127,7 +127,8 @@ describe('gcal events list', () => {
         summary: 'Vacation',
         status: 'confirmed',
         start: '2026-07-20',
-        end: '2026-07-21',
+        // Google's all-day end.date (2026-07-21) is exclusive; collapsed to the inclusive last day.
+        end: '2026-07-20',
         allDay: true,
         timeZone: undefined,
         location: undefined,
