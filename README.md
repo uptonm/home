@@ -421,6 +421,30 @@ the current directory's git remotes.
 | `home github releases list [--repo] [--limit N]` | Recent releases: tag, name, publish date, prerelease/draft flags, URL |
 | `home github search code <query> [--owner] [--repo] [--limit N]` | Code search: repo, path, URL, bounded matching fragments |
 
+### `graphite`
+
+Read-only view of *local* Graphite stacked-branch state through the `gt` CLI —
+which branches are tracked, how they stack, and whether a branch is safe to
+restack. It never mutates a stack (no create/restack/submit/delete); remote PR
+state — reviews, checks, mergeability — is the github module's territory.
+
+Setup: install and authenticate `gt` (`gt auth`), then
+`home graphite configure`. `gt` promises no machine-readable output, so every
+inspect result preserves gt's complete raw text in a `raw` field next to the
+best-effort parsed fields; parsers are written against gt 1.8.6 and `home
+graphite status` flags an untested major version (`compatible: false`) without
+blocking commands. All commands except `status` need the cwd inside a git
+working tree.
+
+| Command | Purpose |
+| --- | --- |
+| `home graphite stack list [--all]` | Tracked branches from `gt log short` (raw preserved) with per-branch parents from bounded gt lookups |
+| `home graphite stack get [branch]` | One branch via `gt info`: parent, PR number/state/title, Graphite URL, tip commit |
+| `home graphite stack validate [branch]` | Non-mutating restack readiness: tracked, parent known, restack marker, clean working tree |
+| `home graphite branch parent [branch]` | Parent of the current or named branch; trunk reports `parent: null`, `isTrunk: true` |
+| `home graphite branch children [branch]` | Children of the current branch (`gt children`), or derived for a named branch |
+| `home graphite repo trunk` | The repository's trunk branch as gt reports it |
+
 ## Development
 
 Requires Bun ≥ 1.3.
