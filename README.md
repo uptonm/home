@@ -46,6 +46,7 @@ home configure                  # interactive configure for every module in turn
 home skill install              # write ~/.claude/skills/home-<module>/SKILL.md (one per module)
 home status                     # readiness + structured data across every module
 home doctor                     # module status plus version/update diagnostics
+home overview ops               # cross-module operational report (see below)
 ```
 
 You can also configure modules one at a time — `home unifi configure`,
@@ -196,6 +197,49 @@ show inline descriptions.
 
 None. `home doctor` confirms this. Update checks query the GitHub Releases API
 only (no metadata leaves your machine).
+
+## Operational overview: `home overview ops`
+
+Where `home status` answers "is each module reachable?", `home overview ops`
+answers "how is the stack doing?" in one read-only report: the latest Vercel
+**production** deployment (id, state, url, commit) per configured project,
+Uptime Kuma monitor state with latency and cert expiry, and Beszel systems
+with currently-triggered alerts — plus containers for the mapped systems.
+Every item carries the ids you need for the next exact command
+(`home vercel deployments get <id>`, `home uptime-kuma monitors get <id>`,
+`home beszel containers list <system>`).
+
+Correlation is **explicit, never name-matched**: create
+`~/.config/home/overview.json` mapping each Vercel project to its Kuma monitor
+ids and Beszel system ids/names:
+
+```json
+{
+  "ops": {
+    "projects": [
+      { "vercelProject": "uptonm-dev", "kumaMonitors": [1, 2], "beszelSystems": ["boris"] }
+    ]
+  }
+}
+```
+
+```bash
+home overview ops --json                        # every mapping group
+home overview ops --project uptonm-dev --json   # one group
+```
+
+Behavior:
+
+- Modules are probed **concurrently**, and a module that is unconfigured or
+  failing degrades gracefully: its data is omitted and a structured note
+  (`{module, status, code?}`) lands in `notes`, with `status: "degraded"` on
+  the report. Only an empty/missing mapping fails outright
+  (`overview_failed`, exit 3).
+- Monitors and systems that no group claims still appear, in the flat
+  `unmapped` sections (bounded at 100 each).
+- `--project` with an unknown name errors (`unknown_project`) listing the
+  configured project names.
+- Timestamps are ISO 8601; the command never mutates anything.
 
 ## Module commands
 

@@ -136,6 +136,19 @@ export function buildCompletionTree(manifests: ModuleManifest[]): CompletionNode
     root.subcommands.set(name, node)
   }
 
+  // `overview` groups cross-module composites; `ops` is its only leaf.
+  const overview = newNode(['overview'], 'Cross-module composite overviews')
+  const ops = newNode(
+    ['overview', 'ops'],
+    'Operational overview: Vercel deployments, Uptime Kuma monitors, Beszel systems',
+  )
+  ops.flags = [
+    { name: '--project', description: 'Only the mapping group whose vercelProject matches' },
+    { name: '--json', description: 'Emit JSON to stdout' },
+  ]
+  overview.subcommands.set('ops', ops)
+  root.subcommands.set('overview', overview)
+
   // `skill` top-level has an `install` subcommand.
   const skill = newNode(['skill'], 'Manage Claude skills for home modules')
   const install = newNode(['skill', 'install'], 'Write SKILL.md for every module under ~/.claude/skills/')

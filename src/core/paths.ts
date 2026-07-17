@@ -8,6 +8,7 @@ export const paths = {
   home: HOME,
   configRoot: join(XDG_CONFIG_HOME, 'home'),
   globalConfig: join(XDG_CONFIG_HOME, 'home', 'config.json'),
+  overviewConfig: join(XDG_CONFIG_HOME, 'home', 'overview.json'),
   modulesDir: join(XDG_CONFIG_HOME, 'home', 'modules'),
   moduleConfig: (name: string) => join(XDG_CONFIG_HOME, 'home', 'modules', `${name}.json`),
   secretsFile: join(XDG_CONFIG_HOME, 'home', 'secrets.json'),
