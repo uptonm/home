@@ -13,6 +13,8 @@ import {
 import { parseBoundedInt, requiredPositional, resolveSystemArg } from './shared'
 
 const INTERVAL_DOC = 'auto-selected from the window when omitted: ≤2h→1m, ≤8h→10m, ≤24h→20m, ≤5d→120m, else 480m'
+const CONTAINER_INTERVAL_DOC =
+  'auto-selected from the window (not overridable): ≤2h→1m, ≤8h→10m, ≤24h→20m, ≤5d→120m, else 480m'
 const SINCE_DOC = 'Window start: 30m | 6h | 2d | ISO 8601 timestamp (default 60m)'
 const MAX_DOC = `Max points returned, most recent win (default ${DEFAULT_MAX_POINTS}, cap ${MAX_POINTS_CAP})`
 /** Candidate names in a not-found message stay readable even on container-heavy hosts. */
@@ -110,7 +112,7 @@ export const metricsGetCmd: CommandSpec = {
 export const containerMetricsGetCmd: CommandSpec = {
   path: ['container-metrics', 'get'],
   effect: 'read',
-  description: `Bounded per-container metric history (cpu %, memory MB, network bytes/s); interval ${INTERVAL_DOC}`,
+  description: `Bounded per-container metric history (cpu %, memory MB, network bytes/s); interval ${CONTAINER_INTERVAL_DOC}`,
   args: [
     { name: 'system', kind: 'positional', description: 'System id or exact name', required: true },
     { name: 'container', kind: 'positional', description: 'Container name as reported in container_stats', required: true },
