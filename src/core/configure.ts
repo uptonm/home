@@ -267,3 +267,8 @@ export async function runConfigure(manifest: ModuleManifest, opts: ConfigureOpts
   }
   consola.success(`${manifest.name}: configuration saved`)
 }
+
+export function configureRunnerFor(manifest: ModuleManifest): (opts?: ConfigureOpts) => Promise<void> {
+  if (manifest.configure) return () => manifest.configure!()
+  return (opts: ConfigureOpts = {}) => runConfigure(manifest, opts)
+}

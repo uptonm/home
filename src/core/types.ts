@@ -83,6 +83,12 @@ export interface ModuleManifest {
    * SSDP multicast needs no config; the subnet field is only for split-VLAN).
    */
   requiresConfig?: boolean
+  /**
+   * Replaces the generic prompt-driven `configure` for modules whose setup is
+   * not a set of typed answers — the Google modules authorize via a browser
+   * instead. Absent means `runConfigure`.
+   */
+  configure?: () => Promise<void>
   commands: CommandSpec[]
   /** Async readiness probe used by both module-level and root-level status. */
   status(cfg: ModuleConfig): Promise<RunResult>

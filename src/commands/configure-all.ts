@@ -1,6 +1,6 @@
 import { defineCommand, type ArgsDef, type CommandDef } from 'citty'
 import { consola } from 'consola'
-import { runConfigure } from '../core/configure'
+import { configureRunnerFor } from '../core/configure'
 import { emit } from '../core/output'
 import { modules } from '../registry'
 
@@ -18,7 +18,7 @@ export const configureAllCmd: CommandDef = defineCommand({
     for (const manifest of modules) {
       consola.info(`\n— ${manifest.name} —`)
       try {
-        await runConfigure(manifest)
+        await configureRunnerFor(manifest)()
         results.push({ module: manifest.name, ok: true })
       } catch (err) {
         results.push({ module: manifest.name, ok: false, error: (err as Error).message })
