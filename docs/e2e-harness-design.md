@@ -1,6 +1,20 @@
 # E2E test harness — design
 
-*2026-07-17. Status: approved design, not yet implemented.*
+*2026-07-17. Status: implemented (rollout steps 1–3).*
+
+**Deviations found during implementation:**
+
+- unifi got no scenario file: its only non-destructive write is `vouchers
+  create`; everything else mutating is destructive-class. It is covered by
+  its 52 auto-reads instead.
+- First live runs surfaced real product bugs, which is the point of the
+  harness: the integration-API siteId lookup ignored `internalReference`
+  (fixed in this branch), and `unifi devices stats`, `tags list`,
+  `events list`, `alarms list`, `sessions list` are broken against the
+  current controller version (left failing — the red gate is honest).
+- protect/assistant/spotify currently skip at preflight: their keyring
+  secrets are gone (June 2026 keyring wipe). Re-run `home <mod> configure`
+  to light them up; gmail/gdrive/discord were never configured.
 
 A manual pre-release gate — `bun run e2e` — that exercises the dev CLI
 (`bun src/index.ts`) against the real homelab and reports what works, what

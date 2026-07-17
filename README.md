@@ -426,6 +426,32 @@ Adding a module: create `src/modules/<name>/index.ts` exporting a
 `ModuleManifest`, add it to `src/registry.ts`, and `home skill install`
 will write its SKILL.md alongside the others.
 
+### E2E harness
+
+`bun run e2e` runs the dev CLI against the real homelab — the pre-release
+gate before `build:install`. It is not part of `bun test`, which stays
+fully offline.
+
+```bash
+bun run e2e                     # everything: preflight, auto-reads, scenarios
+bun run e2e -- --module sonos   # one module
+bun run e2e -- --reads-only     # skip write scenarios
+bun run e2e -- --dry-run        # print the plan, spawn nothing
+```
+
+Every command declares `effect: 'read' | 'write' | 'destructive'` (the
+smoke test rejects unclassified commands). The harness auto-runs all
+`read` commands — args come from `e2e/args.ts` providers, usually chained
+off a sibling `list` — and covers `write` commands via snapshot → mutate →
+assert → restore scenarios in `e2e/scenarios/`. `destructive` commands are
+refused by `e2e/cli.ts`, the single spawn choke point, so a scenario
+physically cannot run one. Real-world test targets (which speaker may make
+noise) live in `e2e/fixtures.ts`.
+
+Unconfigured or unreachable modules are skipped and reported, not failed.
+The closing report lists coverage plus anything runnable that was never
+exercised, so new commands can't silently dodge the suite.
+
 ## License
 
 MIT
