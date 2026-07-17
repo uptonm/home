@@ -10,7 +10,7 @@ export const eventsList: CommandSpec = {
   args: [
     { name: 'calendarId', kind: 'positional', description: 'Calendar id from `calendars list` (default primary)', required: false },
     { name: 'from', kind: 'string', description: 'Lower time bound (events ending after) — RFC 3339 or YYYY-MM-DD (local midnight)' },
-    { name: 'to', kind: 'string', description: 'Upper time bound (events starting before) — RFC 3339 or YYYY-MM-DD (local midnight)' },
+    { name: 'to', kind: 'string', description: 'Upper time bound (events starting before) — RFC 3339, or YYYY-MM-DD to include the whole named day' },
     { name: 'q', kind: 'string', description: 'Free-text search over summary/description/location/attendees' },
     { name: 'max', kind: 'number', description: `Max results per page (1-${EVENTS_MAX_CAP}, default ${DEFAULT_EVENTS_MAX})` },
     { name: 'page-token', kind: 'string', description: 'nextPageToken from a previous page' },
@@ -27,7 +27,7 @@ export const eventsList: CommandSpec = {
 
     const from = parseTimeBound(ctx, 'from')
     if (from.error) return { ok: false, kind: 'user', message: from.error, code: 'bad_arg' }
-    const to = parseTimeBound(ctx, 'to')
+    const to = parseTimeBound(ctx, 'to', true)
     if (to.error) return { ok: false, kind: 'user', message: to.error, code: 'bad_arg' }
 
     const calendarId = optionalString(ctx, 'calendarId') ?? 'primary'

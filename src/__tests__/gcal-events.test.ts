@@ -72,9 +72,18 @@ describe('gcal events list', () => {
     })
   })
 
-  test('expands a bare YYYY-MM-DD bound to local midnight', async () => {
+  test('expands a bare YYYY-MM-DD lower bound to local midnight', async () => {
     await eventsList.run({ ...CTX, args: { from: '2026-07-17' } })
     expect(listCalls[0]?.opts.timeMin).toBe(new Date(2026, 6, 17).toISOString())
+  })
+
+  test('expands a bare YYYY-MM-DD --to to the start of the next day so the named day is included', async () => {
+    await eventsList.run({ ...CTX, args: { to: '2026-07-24' } })
+    // timeMax is exclusive on event start; an event at 2026-07-24T23:00 must still fall inside.
+    expect(listCalls[0]?.opts.timeMax).toBe(new Date(2026, 6, 25).toISOString())
+    expect(new Date('2026-07-24T23:00:00').getTime()).toBeLessThan(
+      new Date(listCalls[0]!.opts.timeMax!).getTime(),
+    )
   })
 
   test('rejects an unparseable time bound', async () => {

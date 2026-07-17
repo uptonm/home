@@ -33,15 +33,22 @@ const BARE_DATE = /^\d{4}-\d{2}-\d{2}$/
 /**
  * Parse `--from`/`--to` into the RFC 3339 timestamp `timeMin`/`timeMax`
  * require. RFC 3339 input passes through verbatim; a bare `YYYY-MM-DD`
- * expands to local midnight of that day.
+ * expands to local midnight of that day. `timeMax` is an exclusive bound
+ * on event start, so an upper bare-date bound expands to the START of the
+ * NEXT day — otherwise `--to 2026-07-24` would drop every event on the 24th.
  */
-export function parseTimeBound(ctx: RunContext, name: string): ParseResult<string | undefined> {
+export function parseTimeBound(
+  ctx: RunContext,
+  name: string,
+  isUpperBound = false,
+): ParseResult<string | undefined> {
   if (ctx.args[name] === undefined) return { value: undefined }
   const s = String(ctx.args[name]).trim()
   if (!s) return { value: undefined }
   if (BARE_DATE.test(s)) {
     const [year, month, day] = s.split('-').map(Number)
-    return { value: new Date(year!, month! - 1, day!).toISOString() }
+    const dayOffset = isUpperBound ? 1 : 0
+    return { value: new Date(year!, month! - 1, day! + dayOffset).toISOString() }
   }
   if (Number.isNaN(Date.parse(s))) {
     return { error: `invalid --${name}: "${s}" — use RFC 3339 (2026-07-17T09:00:00Z) or YYYY-MM-DD` }
