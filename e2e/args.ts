@@ -142,13 +142,25 @@ export const argProviders: Record<string, Provider> = {
   'sonos alarms get': firstField('sonos', ['alarms', 'list'], 'id', 'id'),
   'sonos library browse': fixed({ category: 'albums' }),
   'sonos library search': fixed({ category: 'albums', query: 'daft' }),
-  // gmail/gdrive: modules are skipped at preflight while unconfigured;
-  // trivial chains included so they light up once configured
-  'gmail messages get': firstField('gmail', ['messages', 'list'], 'id', 'id'),
-  'gmail threads get': firstField('gmail', ['threads', 'list'], 'id', 'id'),
-  'gmail labels get': firstField('gmail', ['labels', 'list'], 'id', 'id'),
-  'gmail drafts get': firstField('gmail', ['drafts', 'list'], 'id', 'id'),
-  'gdrive files get': firstField('gdrive', ['files', 'list'], 'id', 'file'),
+  // gmail/gdrive/gcal: modules are skipped at preflight while unconfigured;
+  // chains included so they light up once configured. gmail/gdrive list
+  // commands return wrapped Google page objects, hence firstFieldIn.
+  'gmail messages get': firstFieldIn('gmail', ['messages', 'list'], 'messages', 'id', 'id'),
+  'gmail threads get': firstFieldIn('gmail', ['threads', 'list'], 'threads', 'id', 'id'),
+  'gmail labels get': firstFieldIn('gmail', ['labels', 'list'], 'labels', 'id', 'id'),
+  'gmail drafts get': firstFieldIn('gmail', ['drafts', 'list'], 'drafts', 'id', 'id'),
+  'gdrive files get': firstFieldIn('gdrive', ['files', 'list'], 'files', 'id', 'file'),
+  // gcal — event chained off one cached `events list`; freebusy uses a rolling 24h window
+  'gcal events get': async () => {
+    const d = (await cachedJson('gcal', ['events', 'list'])) as { calendarId?: string; events?: { id?: string }[] }
+    const id = d.events?.[0]?.id
+    if (!id) throw new Unresolved('gcal events list: no events[0].id')
+    return { calendarId: d.calendarId ?? 'primary', eventId: id }
+  },
+  'gcal freebusy': async () => {
+    const now = Date.now()
+    return { from: new Date(now).toISOString(), to: new Date(now + 86_400_000).toISOString() }
+  },
   // discord get-messages needs a designated channel fixture — add when configured
   // github — chained off lists; --state all survives zero open PRs
   'github prs get': firstField('github', ['prs', 'list'], 'number', 'ref', ['--state', 'all', '--limit', '1']),
