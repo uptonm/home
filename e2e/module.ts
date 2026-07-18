@@ -6,6 +6,10 @@ import { runScenario, type Scenario, type ScenarioResult } from './scenario'
 import { sonosScenarios } from './scenarios/sonos'
 import type { LiveState } from './live'
 
+const environmentalCodes: Record<string, ReadonlySet<string>> = {
+  graphite: new Set(['graphite_untracked_branch']),
+}
+
 type Module = (typeof modules)[number]
 
 /** Every write scenario the harness knows, across all modules. */
@@ -56,10 +60,16 @@ async function autoRead(module: string, cmd: CommandSpec): Promise<ReadResult> {
   if (res.exitCode !== 0) {
     // 143 = SIGTERM from our own timeout kill; the child's own output is
     // irrelevant noise, so give a detail that explains what actually happened.
-    const detail =
-      res.exitCode === 143
-        ? `read timed out (SIGTERM after ${DEFAULT_TIMEOUT_MS / 1000}s)`
-        : `exit ${res.exitCode}: ${res.stderr.trim() || res.stdout.trim()}`.slice(0, 300)
+    if (res.exitCode === 143) {
+      const detail = `read timed out (SIGTERM after ${DEFAULT_TIMEOUT_MS / 1000}s)`
+      return { key, outcome: 'fail', detail }
+    }
+    // Environmental codes (untracked branch, etc.) classify as unresolved, not fail
+    const body = res.json as { ok?: unknown; code?: unknown; message?: unknown } | null
+    if (body?.ok === false && typeof body.code === 'string' && environmentalCodes[module]?.has(body.code)) {
+      return { key, outcome: 'unresolved', detail: `environmental ${body.code}: ${body.message ?? ''}`.slice(0, 300) }
+    }
+    const detail = `exit ${res.exitCode}: ${res.stderr.trim() || res.stdout.trim()}`.slice(0, 300)
     return { key, outcome: 'fail', detail }
   }
   // Exit 0 is not enough: every command runs with --json, so non-JSON stdout

@@ -33,12 +33,28 @@ export function pickField(rowsIn: unknown[], field: string): string | null {
   return null
 }
 
+export function unwrapItems(data: unknown, itemsKey: string): unknown[] | null {
+  const items = (data as Record<string, unknown> | null)?.[itemsKey]
+  return Array.isArray(items) ? items : null
+}
+
 function firstField(module: string, listPath: string[], field: string, argName: string, listArgs: string[] = []): Provider {
   return async () => {
     const all = await rows(module, listPath, listArgs)
     if (all.length === 0) throw new Unresolved(`${[module, ...listPath].join(' ')}: list empty`)
     const v = pickField(all, field)
     if (v === null) throw new Unresolved(`${[module, ...listPath].join(' ')}: no ${field} on any row`)
+    return { [argName]: v }
+  }
+}
+
+function firstFieldIn(module: string, listPath: string[], itemsKey: string, field: string, argName: string): Provider {
+  return async () => {
+    const key = [module, ...listPath].join(' ')
+    const items = unwrapItems(await cachedJson(module, listPath), itemsKey)
+    if (!items || items.length === 0) throw new Unresolved(`${key}: no ${itemsKey}[] rows`)
+    const v = pickField(items, field)
+    if (v === null) throw new Unresolved(`${key}: no ${field} on any ${itemsKey} row`)
     return { [argName]: v }
   }
 }
