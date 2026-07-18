@@ -97,7 +97,6 @@ export const argProviders: Record<string, Provider> = {
   'unifi routes get': firstField('unifi', ['routes', 'list'], 'name', 'name'),
   'unifi dpi-apps get': firstField('unifi', ['dpi-apps', 'list'], 'name', 'name'),
   'unifi dpi-groups get': firstField('unifi', ['dpi-groups', 'list'], 'name', 'name'),
-  'unifi tags get': firstField('unifi', ['tags', 'list'], 'name', 'name'),
   'unifi settings get': firstField('unifi', ['settings', 'list'], 'key', 'key'),
   // protect
   'protect cameras get': firstField('protect', ['cameras', 'list'], 'id', 'id'),

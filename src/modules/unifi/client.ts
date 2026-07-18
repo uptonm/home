@@ -330,15 +330,6 @@ export async function listDynamicDns(cfg: UnifiConfig): Promise<unknown[]> {
   return body.data ?? []
 }
 
-export async function listTags(cfg: UnifiConfig): Promise<unknown[]> {
-  const body = await requestJson<{ data: unknown[] }>(
-    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/tag`,
-    { headers: headers(cfg) },
-    { insecureTLS: cfg.insecureTLS },
-  )
-  return body.data ?? []
-}
-
 export async function listSettings(cfg: UnifiConfig): Promise<unknown[]> {
   const body = await requestJson<{ data: unknown[] }>(
     `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/setting`,
@@ -396,21 +387,6 @@ export async function listGuests(cfg: UnifiConfig): Promise<unknown[]> {
     { headers: headers(cfg) },
     { insecureTLS: cfg.insecureTLS },
   )
-  return body.data ?? []
-}
-
-export async function listSessions(cfg: UnifiConfig, limit?: number): Promise<unknown[]> {
-  const body = limit
-    ? await requestJson<{ data: unknown[] }>(
-        `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/sessions`,
-        { method: 'POST', headers: { ...headers(cfg), 'Content-Type': 'application/json' }, body: JSON.stringify({ _limit: limit }) },
-        { insecureTLS: cfg.insecureTLS },
-      )
-    : await requestJson<{ data: unknown[] }>(
-        `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/sessions`,
-        { headers: headers(cfg) },
-        { insecureTLS: cfg.insecureTLS },
-      )
   return body.data ?? []
 }
 

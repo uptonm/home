@@ -4,7 +4,6 @@ import { dpiAppsGet, dpiAppsList } from '../modules/unifi/commands/dpi-apps'
 import { dpiGroupsGet, dpiGroupsList } from '../modules/unifi/commands/dpi-groups'
 import { radiusAccountsGet, radiusAccountsList } from '../modules/unifi/commands/radius-accounts'
 import { dynamicDnsList } from '../modules/unifi/commands/dynamic-dns'
-import { tagsGet, tagsList } from '../modules/unifi/commands/tags'
 import { settingsGet, settingsList } from '../modules/unifi/commands/settings'
 
 const EMPTY_CTX = { config: {}, json: false, quiet: true, verbose: false, log: null as unknown as ReturnType<typeof import('consola').createConsola>, args: {} }
@@ -27,7 +26,6 @@ checkListGet('routes', routesList, routesGet, mkRun(routesGet))
 checkListGet('dpi-apps', dpiAppsList, dpiAppsGet, mkRun(dpiAppsGet))
 checkListGet('dpi-groups', dpiGroupsList, dpiGroupsGet, mkRun(dpiGroupsGet))
 checkListGet('radius-accounts', radiusAccountsList, radiusAccountsGet, mkRun(radiusAccountsGet))
-checkListGet('tags', tagsList, tagsGet, mkRun(tagsGet))
 
 describe('dynamic-dns', () => {
   test('list path', () => expect(dynamicDnsList.path).toEqual(['dynamic-dns', 'list']))

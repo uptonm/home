@@ -6,7 +6,6 @@ import {
   listEvents,
   listGuests,
   listRogueAps,
-  listSessions,
   listSiteDpi,
   readUnifiConfig,
 } from '../client'
@@ -82,22 +81,6 @@ export const guestsList: CommandSpec = {
   async run(ctx) {
     const cfg = readUnifiConfig(ctx.config)
     const data = await listGuests(cfg)
-    return { ok: true, data }
-  },
-}
-
-export const sessionsList: CommandSpec = {
-  path: ['sessions', 'list'],
-  effect: 'read',
-  description: 'List historical client connect/disconnect sessions',
-  args: [
-    { name: 'limit', kind: 'number', description: 'Max sessions to return (default: all)', required: false },
-  ],
-  examples: ['home unifi sessions list', 'home unifi sessions list --limit 100 --json'],
-  async run(ctx) {
-    const cfg = readUnifiConfig(ctx.config)
-    const limit = ctx.args.limit ? Number(ctx.args.limit) : undefined
-    const data = await listSessions(cfg, limit)
     return { ok: true, data }
   },
 }

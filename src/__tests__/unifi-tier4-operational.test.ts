@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { clientsAll, dpiStatsClient, dpiStatsSite, eventsList, alarmsList, rogueApsList, guestsList, sessionsList } from '../modules/unifi/commands/operational'
+import { clientsAll, dpiStatsClient, dpiStatsSite, eventsList, alarmsList, rogueApsList, guestsList } from '../modules/unifi/commands/operational'
 
 const EMPTY_CTX = { config: {}, json: false, quiet: true, verbose: false, log: null as unknown as ReturnType<typeof import('consola').createConsola>, args: {} }
 function errCode(r: { ok: boolean; code?: string }): string | undefined { return r.ok ? undefined : r.code }
@@ -27,15 +27,6 @@ describe('unifi rogue-aps', () => {
 
 describe('unifi guests', () => {
   test('path is guests list', () => expect(guestsList.path).toEqual(['guests', 'list']))
-})
-
-describe('unifi sessions', () => {
-  test('path is sessions list', () => expect(sessionsList.path).toEqual(['sessions', 'list']))
-  test('has optional limit arg', () => {
-    const l = sessionsList.args.find((a) => a.name === 'limit')
-    expect(l).toBeDefined()
-    expect(l?.required).toBe(false)
-  })
 })
 
 describe('unifi dpi-stats', () => {
