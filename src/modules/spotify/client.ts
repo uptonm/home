@@ -536,7 +536,7 @@ interface RawCategoriesPage {
 export function shapeTrack(t: RawTrack): TrackMatch {
   return {
     kind: 'track',
-    id: t.id!,
+    id: t.id ?? '',
     uri: `spotify:track:${t.id}`,
     title: t.name ?? '',
     artist: artistName(t.artists),
@@ -550,7 +550,7 @@ export function shapeTrack(t: RawTrack): TrackMatch {
 export function shapeAlbum(a: RawAlbum): AlbumMatch {
   return {
     kind: 'album',
-    id: a.id!,
+    id: a.id ?? '',
     uri: `spotify:album:${a.id}`,
     title: a.name ?? '',
     artist: artistName(a.artists),
@@ -563,7 +563,7 @@ export function shapeAlbum(a: RawAlbum): AlbumMatch {
 export function shapeArtist(a: RawArtist): ArtistMatch {
   return {
     kind: 'artist',
-    id: a.id!,
+    id: a.id ?? '',
     uri: `spotify:artist:${a.id}`,
     name: a.name ?? '',
     genres: a.genres ?? [],
@@ -575,7 +575,7 @@ export function shapeArtist(a: RawArtist): ArtistMatch {
 export function shapePlaylist(p: RawPlaylist): PlaylistMatch {
   return {
     kind: 'playlist',
-    id: p.id!,
+    id: p.id ?? '',
     uri: `spotify:playlist:${p.id}`,
     title: p.name ?? '',
     owner: p.owner?.display_name ?? p.owner?.id ?? '',
