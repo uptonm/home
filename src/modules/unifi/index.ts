@@ -22,9 +22,8 @@ import { dpiAppsList, dpiAppsGet } from './commands/dpi-apps'
 import { dpiGroupsList, dpiGroupsGet } from './commands/dpi-groups'
 import { radiusAccountsList, radiusAccountsGet } from './commands/radius-accounts'
 import { dynamicDnsList } from './commands/dynamic-dns'
-import { tagsList, tagsGet } from './commands/tags'
 import { settingsList, settingsGet } from './commands/settings'
-import { clientsAll, dpiStatsClient, dpiStatsSite, eventsList, alarmsList, rogueApsList, guestsList, sessionsList } from './commands/operational'
+import { clientsAll, dpiStatsClient, dpiStatsSite, eventsList, alarmsList, rogueApsList, guestsList } from './commands/operational'
 import { integrationAppInfo } from './integration-client'
 import { controllerInfoCmd } from './commands/controller'
 import { healthCmd } from './commands/health'
@@ -127,8 +126,6 @@ export const manifest: ModuleManifest = {
     radiusAccountsList,
     radiusAccountsGet,
     dynamicDnsList,
-    tagsList,
-    tagsGet,
     settingsList,
     settingsGet,
     clientsAll,
@@ -136,7 +133,6 @@ export const manifest: ModuleManifest = {
     alarmsList,
     rogueApsList,
     guestsList,
-    sessionsList,
     dpiStatsSite,
     dpiStatsClient,
     controllerInfoCmd,

@@ -25,30 +25,75 @@ async function rows(module: string, path: string[], args: string[] = []): Promis
   return data
 }
 
-function firstField(module: string, listPath: string[], field: string, argName: string): Provider {
+export function pickField(rowsIn: unknown[], field: string): string | null {
+  for (const r of rowsIn) {
+    const v = (r as Record<string, unknown> | null)?.[field]
+    if (v !== undefined && v !== null && v !== '') return String(v)
+  }
+  return null
+}
+
+export function unwrapItems(data: unknown, itemsKey: string): unknown[] | null {
+  const items = (data as Record<string, unknown> | null)?.[itemsKey]
+  return Array.isArray(items) ? items : null
+}
+
+function firstField(module: string, listPath: string[], field: string, argName: string, listArgs: string[] = []): Provider {
   return async () => {
-    const first = (await rows(module, listPath))[0] as Record<string, unknown> | undefined
-    const v = first?.[field]
-    if (v === undefined || v === null || v === '') {
-      throw new Unresolved(`${[module, ...listPath].join(' ')}: no ${field} on first row`)
-    }
-    return { [argName]: String(v) }
+    const all = await rows(module, listPath, listArgs)
+    if (all.length === 0) throw new Unresolved(`${[module, ...listPath].join(' ')}: list empty`)
+    const v = pickField(all, field)
+    if (v === null) throw new Unresolved(`${[module, ...listPath].join(' ')}: no ${field} on any row`)
+    return { [argName]: v }
   }
 }
 
-/** spotify search returns { tracks: [...], albums: [...], ... }; pick first uri of a type. */
+function firstFieldIn(module: string, listPath: string[], itemsKey: string, field: string, argName: string): Provider {
+  return async () => {
+    const key = [module, ...listPath].join(' ')
+    const items = unwrapItems(await cachedJson(module, listPath), itemsKey)
+    if (!items || items.length === 0) throw new Unresolved(`${key}: no ${itemsKey}[] rows`)
+    const v = pickField(items, field)
+    if (v === null) throw new Unresolved(`${key}: no ${field} on any ${itemsKey} row`)
+    return { [argName]: v }
+  }
+}
+
+/** spotify search returns { tracks: [...], albums: [...], ... }; pick the first
+ *  match's canonical `id` — not `uri`, which container matches rewrite to a
+ *  playable `spotify:track:<id>` on successful resolution, destroying the
+ *  container reference `album get`/`artist albums`/`playlist tracks` etc. need. */
 function spotifyRef(type: 'tracks' | 'albums' | 'artists' | 'playlists'): Provider {
   return async () => {
     const data = (await cachedJson('spotify', ['search'], ['daft punk'])) as Record<string, unknown>
     const items = data[type]
     const first = Array.isArray(items) ? (items[0] as Record<string, unknown> | undefined) : undefined
-    const uri = first?.uri
-    if (!uri) throw new Unresolved(`spotify search: no ${type}[0].uri`)
-    return { ref: String(uri) }
+    const id = first?.id
+    if (!id) throw new Unresolved(`spotify search: no ${type}[0].id`)
+    return { ref: String(id) }
   }
 }
 
 const fixed = (values: Record<string, string>): Provider => async () => values
+
+/** Deployment providers must scope to a team project to avoid cross-scope deployments
+ *  returned by `vercel deployments list` (v6 endpoint leak) that fail in `deployments get` (v13 team-scoped).
+ *  Chain: projects list → first project id → deployments list --project <id> → first deployment id. */
+function scopedVercelDeployment(): Provider {
+  return async () => {
+    const projects = await rows('vercel', ['projects', 'list'])
+    if (projects.length === 0) throw new Unresolved('vercel projects list: empty')
+    const projectId = pickField(projects, 'id')
+    if (projectId === null) throw new Unresolved('vercel projects list: no id on any row')
+
+    const deployments = await rows('vercel', ['deployments', 'list'], ['--project', projectId])
+    if (deployments.length === 0) throw new Unresolved(`vercel deployments list --project ${projectId}: empty`)
+    const deploymentId = pickField(deployments, 'id')
+    if (deploymentId === null) throw new Unresolved(`vercel deployments list --project ${projectId}: no id on any row`)
+
+    return { deployment: deploymentId }
+  }
+}
 
 export const argProviders: Record<string, Provider> = {
   // unifi — get/stats chained off their list siblings
@@ -71,11 +116,10 @@ export const argProviders: Record<string, Provider> = {
   'unifi routes get': firstField('unifi', ['routes', 'list'], 'name', 'name'),
   'unifi dpi-apps get': firstField('unifi', ['dpi-apps', 'list'], 'name', 'name'),
   'unifi dpi-groups get': firstField('unifi', ['dpi-groups', 'list'], 'name', 'name'),
-  'unifi tags get': firstField('unifi', ['tags', 'list'], 'name', 'name'),
   'unifi settings get': firstField('unifi', ['settings', 'list'], 'key', 'key'),
   // protect
   'protect cameras get': firstField('protect', ['cameras', 'list'], 'id', 'id'),
-  'protect events get': firstField('protect', ['events', 'list'], 'id', 'id'),
+  'protect events get': firstField('protect', ['events', 'list'], 'id', 'id', ['--since', '7d', '--limit', '1']),
   'protect lights get': firstField('protect', ['lights', 'list'], 'id', 'ref'),
   'protect sensors get': firstField('protect', ['sensors', 'list'], 'id', 'ref'),
   'protect doorlocks get': firstField('protect', ['doorlocks', 'list'], 'id', 'ref'),
@@ -103,7 +147,7 @@ export const argProviders: Record<string, Provider> = {
   'spotify artist top-tracks': spotifyRef('artists'),
   'spotify playlist get': spotifyRef('playlists'),
   'spotify playlist tracks': spotifyRef('playlists'),
-  'spotify categories get': firstField('spotify', ['categories', 'list'], 'id', 'id'),
+  'spotify categories get': firstFieldIn('spotify', ['categories', 'list'], 'items', 'id', 'id'),
   // sonos
   'sonos players get': fixed({ room: fixtures.sonosRoom }),
   'sonos groups get': fixed({ room: fixtures.sonosRoom }),
@@ -113,16 +157,77 @@ export const argProviders: Record<string, Provider> = {
   'sonos sleep-timer get': fixed({ room: fixtures.sonosRoom }),
   'sonos eq get': fixed({ room: fixtures.sonosRoom }),
   'sonos group-volume get': fixed({ room: fixtures.sonosRoom }),
-  'sonos playlists get': firstField('sonos', ['playlists', 'list'], 'name', 'name'),
+  'sonos playlists get': firstField('sonos', ['playlists', 'list'], 'title', 'name'),
   'sonos alarms get': firstField('sonos', ['alarms', 'list'], 'id', 'id'),
   'sonos library browse': fixed({ category: 'albums' }),
   'sonos library search': fixed({ category: 'albums', query: 'daft' }),
-  // gmail/gdrive: modules are skipped at preflight while unconfigured;
-  // trivial chains included so they light up once configured
-  'gmail messages get': firstField('gmail', ['messages', 'list'], 'id', 'id'),
-  'gmail threads get': firstField('gmail', ['threads', 'list'], 'id', 'id'),
-  'gmail labels get': firstField('gmail', ['labels', 'list'], 'id', 'id'),
-  'gmail drafts get': firstField('gmail', ['drafts', 'list'], 'id', 'id'),
-  'gdrive files get': firstField('gdrive', ['files', 'list'], 'id', 'file'),
-  // discord get-messages needs a designated channel fixture — add when configured
+  // gmail/gdrive/gcal: modules are skipped at preflight while unconfigured;
+  // chains included so they light up once configured. gmail/gdrive list
+  // commands return wrapped Google page objects, hence firstFieldIn.
+  'gmail messages get': firstFieldIn('gmail', ['messages', 'list'], 'messages', 'id', 'id'),
+  'gmail threads get': firstFieldIn('gmail', ['threads', 'list'], 'threads', 'id', 'id'),
+  'gmail labels get': firstFieldIn('gmail', ['labels', 'list'], 'labels', 'id', 'id'),
+  'gmail drafts get': firstFieldIn('gmail', ['drafts', 'list'], 'drafts', 'id', 'id'),
+  'gdrive files get': firstFieldIn('gdrive', ['files', 'list'], 'files', 'id', 'file'),
+  // gcal — event chained off one cached `events list`; freebusy uses a rolling 24h window
+  'gcal events get': async () => {
+    const d = (await cachedJson('gcal', ['events', 'list'])) as { calendarId?: string; events?: { id?: string }[] }
+    const id = d.events?.[0]?.id
+    if (!id) throw new Unresolved('gcal events list: no events[0].id')
+    return { calendarId: d.calendarId ?? 'primary', eventId: id }
+  },
+  'gcal freebusy': async () => {
+    const now = Date.now()
+    return { from: new Date(now).toISOString(), to: new Date(now + 86_400_000).toISOString() }
+  },
+  // github — chained off lists; --state all survives zero open PRs
+  'github prs get': firstField('github', ['prs', 'list'], 'number', 'ref', ['--state', 'all', '--limit', '1']),
+  'github prs checks': firstField('github', ['prs', 'list'], 'number', 'ref', ['--state', 'all', '--limit', '1']),
+  'github prs diff': async () => {
+    const base = await firstField('github', ['prs', 'list'], 'number', 'ref', ['--state', 'all', '--limit', '1'])()
+    return { ...base, 'name-only': 'true' }
+  },
+  'github runs get': firstField('github', ['runs', 'list'], 'id', 'id'),
+  'github issues get': firstField('github', ['issues', 'list'], 'number', 'ref', ['--state', 'all']),
+  'github search code': fixed({ query: 'readGithubConfig', repo: fixtures.githubRepo, limit: '5' }),
+  // graphite — pin reads to trunk so they work from untracked worktree branches
+  'graphite stack get': fixed({ branch: fixtures.graphiteTrunk }),
+  'graphite branch parent': fixed({ branch: fixtures.graphiteTrunk }),
+  'graphite branch children': fixed({ branch: fixtures.graphiteTrunk }),
+  // vercel — deployments get/events scope to team project to avoid cross-scope leaks from v6 list
+  'vercel projects get': firstField('vercel', ['projects', 'list'], 'id', 'project'),
+  'vercel deployments get': scopedVercelDeployment(),
+  'vercel deployments events': scopedVercelDeployment(),
+  'vercel domains get': firstField('vercel', ['domains', 'list'], 'name', 'name'),
+  // discord — get-messages reads from the designated alerts channel
+  'discord get-messages': fixed({ channelId: fixtures.discordAlertsChannelId }),
+  // linear — reads only; identifier (UPT-123) preferred over uuid for readable logs
+  'linear issues get': firstFieldIn('linear', ['issues', 'list'], 'issues', 'identifier', 'issue'),
+  'linear issues search': fixed({ query: 'home' }),
+  'linear projects get': firstFieldIn('linear', ['projects', 'list'], 'projects', 'id', 'project'),
+  // beszel — systems list is a bare array; containers/container-metrics need a
+  // system known to be up, since a long-down PVE system would yield stale/empty containers
+  'beszel systems get': firstField('beszel', ['systems', 'list'], 'id', 'system'),
+  'beszel metrics get': firstField('beszel', ['systems', 'list'], 'id', 'system'),
+  'beszel smart get': firstField('beszel', ['systems', 'list'], 'id', 'system'),
+  'beszel containers list': firstField('beszel', ['systems', 'list'], 'id', 'system'),
+  'beszel containers get': beszelContainerRef,
+  'beszel container-metrics get': beszelContainerRef,
+  // uptime-kuma — monitors list wraps as {monitors:[...]}; heartbeats needs the authenticated transport
+  'uptime-kuma monitors get': firstFieldIn('uptime-kuma', ['monitors', 'list'], 'monitors', 'id', 'monitor'),
+  'uptime-kuma heartbeats list': firstFieldIn('uptime-kuma', ['monitors', 'list'], 'monitors', 'id', 'monitor'),
+}
+
+/** beszel containers/container-metrics need a container name from a system that's
+ *  actually up — walking up systems (not just row 0) avoids flaking on the
+ *  long-down PVE host that would otherwise yield stale/empty container sets. */
+async function beszelContainerRef(): Promise<Record<string, string>> {
+  const systems = (await rows('beszel', ['systems', 'list'])) as { id: string; status: string }[]
+  for (const s of systems) {
+    if (s.status !== 'up') continue
+    const data = (await cachedJson('beszel', ['containers', 'list'], [s.id])) as { containers?: { name: string }[] }
+    const name = data.containers?.[0]?.name
+    if (name) return { system: s.id, container: name }
+  }
+  throw new Unresolved('beszel: no up system reporting containers')
 }

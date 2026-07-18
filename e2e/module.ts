@@ -1,10 +1,14 @@
 import type { ArgSpec, CommandSpec } from '../src/core/types'
 import { modules } from '../src/registry'
-import { commandKey, runCli, runStatus } from './cli'
+import { DEFAULT_TIMEOUT_MS, commandKey, runCli, runStatus } from './cli'
 import { Unresolved, argProviders } from './args'
 import { runScenario, type Scenario, type ScenarioResult } from './scenario'
 import { sonosScenarios } from './scenarios/sonos'
 import type { LiveState } from './live'
+
+const environmentalCodes: Record<string, ReadonlySet<string>> = {
+  graphite: new Set(['graphite_untracked_branch']),
+}
 
 type Module = (typeof modules)[number]
 
@@ -54,11 +58,25 @@ async function autoRead(module: string, cmd: CommandSpec): Promise<ReadResult> {
   }
   const res = await runCli(module, cmd.path, buildArgv(cmd, values))
   if (res.exitCode !== 0) {
-    return {
-      key,
-      outcome: 'fail',
-      detail: `exit ${res.exitCode}: ${res.stderr.trim() || res.stdout.trim()}`.slice(0, 300),
+    // 143 = SIGTERM from our own timeout kill; the child's own output is
+    // irrelevant noise, so give a detail that explains what actually happened.
+    if (res.exitCode === 143) {
+      const detail = `read timed out (SIGTERM after ${DEFAULT_TIMEOUT_MS / 1000}s)`
+      return { key, outcome: 'fail', detail }
     }
+    // 137 = SIGKILL escalation: the child ignored our SIGTERM, so cli.ts's
+    // sigkillTimer force-killed it after the kill grace period elapsed.
+    if (res.exitCode === 137) {
+      const detail = 'read timed out (SIGKILL after 35s)'
+      return { key, outcome: 'fail', detail }
+    }
+    // Environmental codes (untracked branch, etc.) classify as unresolved, not fail
+    const body = res.json as { ok?: unknown; code?: unknown; message?: unknown } | null
+    if (body?.ok === false && typeof body.code === 'string' && environmentalCodes[module]?.has(body.code)) {
+      return { key, outcome: 'unresolved', detail: `environmental ${body.code}: ${body.message ?? ''}`.slice(0, 300) }
+    }
+    const detail = `exit ${res.exitCode}: ${res.stderr.trim() || res.stdout.trim()}`.slice(0, 300)
+    return { key, outcome: 'fail', detail }
   }
   // Exit 0 is not enough: every command runs with --json, so non-JSON stdout
   // means the read regressed even though the process claims success.

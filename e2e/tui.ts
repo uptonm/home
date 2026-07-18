@@ -11,7 +11,7 @@ function symbol(s: LiveState, frame: number): string {
   return SPINNER[frame % SPINNER.length]!
 }
 
-function activity(s: LiveState): string {
+export function activity(s: LiveState): string {
   switch (s.phase) {
     case 'pending':
       return 'queued'

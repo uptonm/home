@@ -14,14 +14,15 @@ const globalFlags: ArgsDef = {
   verbose: { type: 'boolean', description: 'Verbose debug output' },
 }
 
-function argsToCitty(args: ArgSpec[]): ArgsDef {
+export function argsToCitty(args: ArgSpec[]): ArgsDef {
   const out: ArgsDef = {}
   for (const a of args) {
     const spec: Record<string, unknown> = {
       type: a.kind,
       description: a.description,
     }
-    if (a.required !== undefined) spec.required = a.required
+    if (a.kind === 'positional') spec.required = a.required ?? false
+    else if (a.required !== undefined) spec.required = a.required
     if (a.default !== undefined) spec.default = a.default
     if (a.enum !== undefined) spec.options = a.enum
     out[a.name] = spec as ArgsDef[string]

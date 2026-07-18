@@ -4,7 +4,7 @@ import { argProviders } from './args'
 import { createLive } from './live'
 import { runModule, scenarios, type ModuleResult } from './module'
 import { pool } from './pool'
-import { startTui } from './tui'
+import { activity, startTui } from './tui'
 
 type Module = (typeof modules)[number]
 
@@ -100,6 +100,14 @@ function printReport(targets: Module[], results: ModuleResult[]): boolean {
     console.log('\nunresolved reads (needs a provider or live data):')
     for (const r of unresolvedReads) console.log(`  - ${r.key}: ${r.detail}`)
   }
+  if (failedReads.length) {
+    console.log('\nfailed reads:')
+    for (const r of failedReads) console.log(`  - ${r.key}: ${r.detail}`)
+  }
+  if (failedScenarios.length) {
+    console.log('\nfailed scenarios:')
+    for (const r of failedScenarios) console.log(`  - ${r.name}: ${r.detail}`)
+  }
   if (unexercised.length) {
     console.log('\nneeds attention (runnable but never exercised):')
     for (const { m, c } of unexercised) console.log(`  - [${c.effect}] ${commandKey(m, c.path)}`)
@@ -119,13 +127,24 @@ async function main() {
   }
 
   const states = targets.map((m) => createLive(m.name))
-  const tui = startTui(states, Date.now())
+  const tty = process.stdout.isTTY === true
+  const tui = tty ? startTui(states, Date.now()) : { stop() {} }
   // finally so an unexpected throw still restores the hidden cursor and stops the timer.
   let results: ModuleResult[]
   try {
-    results = await pool(targets, opts.concurrency, (m, i) =>
-      runModule(m, states[i]!, { readsOnly: opts.readsOnly }),
-    )
+    results = await pool(targets, opts.concurrency, async (m, i) => {
+      try {
+        const r = await runModule(m, states[i]!, { readsOnly: opts.readsOnly })
+        if (!tty) console.log(`${states[i]!.phase === 'skipped' ? '⊘' : states[i]!.outcome === 'fail' ? '✖' : '✔'} ${m.name}  ${activity(states[i]!)}`)
+        return r
+      } catch (err) {
+        states[i]!.phase = 'done'
+        states[i]!.outcome = 'fail'
+        const failureDetail = `harness error: ${err}`.slice(0, 300)
+        if (!tty) console.log(`✖ ${m.name}  ${activity(states[i]!)}`)
+        return { module: m.name, skipped: null, reads: [{ key: m.name, outcome: 'fail' as const, detail: failureDetail }], scenarios: [] }
+      }
+    })
   } finally {
     tui.stop()
   }

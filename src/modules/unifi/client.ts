@@ -330,15 +330,6 @@ export async function listDynamicDns(cfg: UnifiConfig): Promise<unknown[]> {
   return body.data ?? []
 }
 
-export async function listTags(cfg: UnifiConfig): Promise<unknown[]> {
-  const body = await requestJson<{ data: unknown[] }>(
-    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/tag`,
-    { headers: headers(cfg) },
-    { insecureTLS: cfg.insecureTLS },
-  )
-  return body.data ?? []
-}
-
 export async function listSettings(cfg: UnifiConfig): Promise<unknown[]> {
   const body = await requestJson<{ data: unknown[] }>(
     `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/rest/setting`,
@@ -357,25 +348,29 @@ export async function listAllClients(cfg: UnifiConfig): Promise<unknown[]> {
   return body.data ?? []
 }
 
-export async function listEvents(cfg: UnifiConfig, limit?: number): Promise<unknown[]> {
-  const body = limit
-    ? await requestJson<{ data: unknown[] }>(
-        `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/event`,
-        { method: 'POST', headers: { ...headers(cfg), 'Content-Type': 'application/json' }, body: JSON.stringify({ _limit: limit }) },
-        { insecureTLS: cfg.insecureTLS },
-      )
-    : await requestJson<{ data: unknown[] }>(
-        `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/event`,
-        { headers: headers(cfg) },
-        { insecureTLS: cfg.insecureTLS },
-      )
-  return body.data ?? []
-}
+/**
+ * `stat/event` and `stat/alarm` (legacy Network API) were removed on
+ * controllers running Network 10.x/UDM firmware; they now 404. The
+ * replacement is an undocumented v2 endpoint confirmed live against a 10.4.57
+ * controller (see the migration commit for the probe transcript): it's a
+ * POST with a paginated body, filtered by a category segment in the path
+ * ('all' for the full log, 'critical' for alarm-equivalent severity).
+ */
+export type SystemLogCategory = 'all' | 'critical'
 
-export async function listAlarms(cfg: UnifiConfig): Promise<unknown[]> {
+export async function v2SystemLog(
+  cfg: UnifiConfig,
+  category: SystemLogCategory,
+  pageNumber: number,
+  pageSize: number,
+): Promise<unknown[]> {
   const body = await requestJson<{ data: unknown[] }>(
-    `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/alarm`,
-    { headers: headers(cfg) },
+    `${cfg.url}/proxy/network/v2/api/site/${encodeURIComponent(cfg.site)}/system-log/${category}`,
+    {
+      method: 'POST',
+      headers: { ...headers(cfg), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pageNumber, pageSize }),
+    },
     { insecureTLS: cfg.insecureTLS },
   )
   return body.data ?? []
@@ -396,21 +391,6 @@ export async function listGuests(cfg: UnifiConfig): Promise<unknown[]> {
     { headers: headers(cfg) },
     { insecureTLS: cfg.insecureTLS },
   )
-  return body.data ?? []
-}
-
-export async function listSessions(cfg: UnifiConfig, limit?: number): Promise<unknown[]> {
-  const body = limit
-    ? await requestJson<{ data: unknown[] }>(
-        `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/sessions`,
-        { method: 'POST', headers: { ...headers(cfg), 'Content-Type': 'application/json' }, body: JSON.stringify({ _limit: limit }) },
-        { insecureTLS: cfg.insecureTLS },
-      )
-    : await requestJson<{ data: unknown[] }>(
-        `${cfg.url}/proxy/network/api/s/${encodeURIComponent(cfg.site)}/stat/sessions`,
-        { headers: headers(cfg) },
-        { insecureTLS: cfg.insecureTLS },
-      )
   return body.data ?? []
 }
 

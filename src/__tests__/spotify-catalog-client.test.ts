@@ -7,7 +7,9 @@ import {
   normalizeTopTracks,
   normalizeTrackPage,
   shapeAlbum,
+  shapeArtist,
   shapeCategory,
+  shapePlaylist,
   shapeTrack,
 } from '../modules/spotify/client'
 
@@ -28,6 +30,7 @@ describe('get-by-id shaping', () => {
       }),
     ).toEqual({
       kind: 'track',
+      id: 't1',
       uri: 'spotify:track:t1',
       title: 'Light',
       artist: 'John Summit, Hayla',
@@ -42,15 +45,52 @@ describe('get-by-id shaping', () => {
     const out = shapeTrack({ id: 't', name: 'Bare', artists: [{ id: 'a', name: 'X' }] })
     expect(out.album).toBe('')
     expect(out.uri).toBe('spotify:track:t')
+    expect(out.id).toBe('t')
   })
 
   test('shapeAlbum and shapeCategory shape their entities', () => {
     expect(shapeAlbum({ id: 'al', name: 'A', artists: [{ id: 'a', name: 'X' }], total_tracks: 12 })).toMatchObject({
       kind: 'album',
+      id: 'al',
       uri: 'spotify:album:al',
       totalTracks: 12,
     })
     expect(shapeCategory({ id: 'toplists', name: 'Top Lists' })).toEqual({ kind: 'category', id: 'toplists', name: 'Top Lists' })
+  })
+
+  test('shapeArtist echoes id alongside genres/popularity/followers', () => {
+    expect(
+      shapeArtist({ id: 'a1', name: 'John Summit', genres: ['house', 'tech house'], popularity: 78, followers: { total: 1234567 } }),
+    ).toEqual({
+      kind: 'artist',
+      id: 'a1',
+      uri: 'spotify:artist:a1',
+      name: 'John Summit',
+      genres: ['house', 'tech house'],
+      popularity: 78,
+      followers: 1234567,
+    })
+  })
+
+  test('shapePlaylist echoes id alongside owner/track-count/visibility', () => {
+    expect(
+      shapePlaylist({ id: 'pl1', name: "Today's Top Hits", owner: { display_name: 'Spotify', id: 'spotify' }, tracks: { total: 50 }, public: true }),
+    ).toEqual({
+      kind: 'playlist',
+      id: 'pl1',
+      uri: 'spotify:playlist:pl1',
+      title: "Today's Top Hits",
+      owner: 'Spotify',
+      totalTracks: 50,
+      public: true,
+    })
+  })
+
+  test('shape* fns fall back to an empty-string id instead of `undefined` when the raw row has none', () => {
+    expect(shapeTrack({ name: 'No ID' }).id).toBe('')
+    expect(shapeAlbum({ name: 'No ID' }).id).toBe('')
+    expect(shapeArtist({ name: 'No ID' }).id).toBe('')
+    expect(shapePlaylist({ name: 'No ID' }).id).toBe('')
   })
 })
 
