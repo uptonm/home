@@ -43,8 +43,10 @@ export function startTui(states: LiveState[], startedAt: number): { stop: () => 
     const lines = states.map((s) => `  ${symbol(s, frame)} ${s.module.padEnd(width)}  ${activity(s)}`)
     const running = states.filter((s) => RUNNING.includes(s.phase)).length
     const done = states.filter((s) => s.phase === 'done' || s.phase === 'skipped').length
+    const ok = states.filter((s) => s.outcome === 'pass').length
+    const fail = states.filter((s) => s.outcome === 'fail').length
     const elapsed = Math.round((Date.now() - startedAt) / 1000)
-    lines.push(`  running ${running} · done ${done}/${states.length} · ${elapsed}s`)
+    lines.push(`  running ${running} · done ${done}/${states.length} · ✔ ${ok} ✖ ${fail} · ${elapsed}s`)
 
     const up = lastLines ? `\x1b[${lastLines}A` : ''
     const body = lines.map((l) => `\x1b[2K${l}`).join('\n')
