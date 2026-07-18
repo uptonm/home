@@ -176,4 +176,11 @@ export const argProviders: Record<string, Provider> = {
   'graphite stack get': fixed({ branch: fixtures.graphiteTrunk }),
   'graphite branch parent': fixed({ branch: fixtures.graphiteTrunk }),
   'graphite branch children': fixed({ branch: fixtures.graphiteTrunk }),
+  // vercel — get/events chained off deployments list; domains get uses name not id
+  'vercel projects get': firstField('vercel', ['projects', 'list'], 'id', 'project'),
+  'vercel deployments get': firstField('vercel', ['deployments', 'list'], 'id', 'deployment'),
+  'vercel deployments events': firstField('vercel', ['deployments', 'list'], 'id', 'deployment'),
+  'vercel domains get': firstField('vercel', ['domains', 'list'], 'name', 'name'),
+  // discord — get-messages reads from the designated alerts channel
+  'discord get-messages': fixed({ channelId: fixtures.discordAlertsChannelId }),
 }
