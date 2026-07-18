@@ -1,7 +1,17 @@
-# `home`
+<p align="center">
+  <img src="./brand/icon-192.png" width="96" alt="home CLI logo">
+</p>
 
-A monolith CLI that gives you (and your local LLMs) uniform access to your
-homelab services. One binary, one config root, one Claude skill per module.
+<h1 align="center"><code>home</code></h1>
+
+<p align="center"><strong>One CLI for the homelab.</strong></p>
+
+<p align="center">
+  Uniform access to homelab services for you and your local LLMs.<br>
+  One binary, one config root, one agent-ready skill per module.
+</p>
+
+<p align="center"><a href="./brand/README.md">Brand kit</a></p>
 
 Modules:
 

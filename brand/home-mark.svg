@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">home</title>
+  <desc id="description">A house-shaped terminal inside the Uptonm product-family frame.</desc>
+  <rect
+    x="9"
+    y="9"
+    width="494"
+    height="494"
+    rx="99"
+    fill="#12100e"
+    stroke="#d7a94b"
+    stroke-width="14"
+  />
+  <path
+    d="M78 148V78h70"
+    fill="none"
+    stroke="#d7a94b"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="18"
+  />
+  <path d="M112 253 256 126l144 127h-30v129H142V253Z" fill="#f5f1e8" />
+  <path d="m256 126 144 127h-30L256 153 142 253h-30Z" fill="#5fb8cb" />
+  <rect x="168" y="235" width="176" height="108" rx="22" fill="#12100e" />
+  <path
+    d="m202 267 28 22-28 22"
+    fill="none"
+    stroke="#5fb8cb"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="17"
+  />
+  <path d="M256 311h48" stroke="#d7a94b" stroke-linecap="round" stroke-width="16" />
+  <path d="m426 400 18 18-18 18-18-18Z" fill="#d7a94b" />
+</svg>
