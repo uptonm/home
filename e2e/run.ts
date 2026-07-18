@@ -54,7 +54,7 @@ function parseArgs(argv: string[]): Options {
   return { dryRun, readsOnly, moduleFilter, concurrency }
 }
 
-function printPlan(targets: Module[]): void {
+function printPlan(targets: Module[], readsOnly: boolean): void {
   for (const m of targets) {
     const readCmds = m.commands.filter((c) => c.effect === 'read')
     console.log(`\n${m.name}: ${readCmds.length} auto-reads`)
@@ -67,7 +67,7 @@ function printPlan(targets: Module[]): void {
           : 'no args'
       console.log(`  ${key}  [${how}]`)
     }
-    for (const s of scenarios.filter((s) => s.module === m.name)) console.log(`  scenario: ${s.name}`)
+    for (const s of (readsOnly ? [] : scenarios.filter((s) => s.module === m.name))) console.log(`  scenario: ${s.name}`)
   }
 }
 
@@ -112,7 +112,7 @@ async function main() {
   const targets = modules.filter((m) => !opts.moduleFilter || m.name === opts.moduleFilter)
 
   if (opts.dryRun) {
-    printPlan(targets)
+    printPlan(targets, opts.readsOnly)
     return
   }
 
