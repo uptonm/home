@@ -26,8 +26,7 @@ slowness — and the opportunity — lives.
 - A live terminal display (TUI) suitable for a local-only dev gate.
 - Preserve every existing safety property and the final coverage report.
 
-Non-goals: CI integration, mocking, a non-TTY fallback, parallelizing reads
-*within* a module.
+Non-goals: CI integration, mocking, parallelizing reads *within* a module. (Non-TTY fallback added 2026-07-18: plain completion lines per module when not TTY.)
 
 ## Concurrency model
 

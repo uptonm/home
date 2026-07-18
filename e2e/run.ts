@@ -4,7 +4,7 @@ import { argProviders } from './args'
 import { createLive } from './live'
 import { runModule, scenarios, type ModuleResult } from './module'
 import { pool } from './pool'
-import { startTui } from './tui'
+import { activity, startTui } from './tui'
 
 type Module = (typeof modules)[number]
 
@@ -127,13 +127,16 @@ async function main() {
   }
 
   const states = targets.map((m) => createLive(m.name))
-  const tui = startTui(states, Date.now())
+  const tty = process.stdout.isTTY === true
+  const tui = tty ? startTui(states, Date.now()) : { stop() {} }
   // finally so an unexpected throw still restores the hidden cursor and stops the timer.
   let results: ModuleResult[]
   try {
-    results = await pool(targets, opts.concurrency, (m, i) =>
-      runModule(m, states[i]!, { readsOnly: opts.readsOnly }),
-    )
+    results = await pool(targets, opts.concurrency, async (m, i) => {
+      const r = await runModule(m, states[i]!, { readsOnly: opts.readsOnly })
+      if (!tty) console.log(`${states[i]!.phase === 'skipped' ? '⊘' : states[i]!.outcome === 'fail' ? '✖' : '✔'} ${m.name}  ${activity(states[i]!)}`)
+      return r
+    })
   } finally {
     tui.stop()
   }
