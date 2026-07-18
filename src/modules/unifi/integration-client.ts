@@ -157,12 +157,14 @@ export async function integrationListSites(cfg: UnifiConfig): Promise<unknown[]>
 export async function integrationGetDeviceStats(cfg: UnifiConfig, id: string): Promise<unknown | null> {
   const siteId = await resolveIntegrationSiteId(cfg)
   try {
-    const body = await requestJson<{ data: unknown }>(
+    // Unlike list/get endpoints, statistics/latest returns the stats object
+    // directly — there is no `{ data: ... }` envelope (verified live on 10.4.57).
+    const body = await requestJson<unknown>(
       `${integrationBase(cfg)}/sites/${encodeURIComponent(siteId)}/devices/${encodeURIComponent(id)}/statistics/latest`,
       { headers: integrationHeaders(cfg) },
       { insecureTLS: cfg.insecureTLS },
     )
-    return body.data ?? null
+    return body ?? null
   } catch {
     return null
   }
@@ -262,10 +264,42 @@ export async function integrationDeleteVoucher(cfg: UnifiConfig, id: string): Pr
   )
 }
 
+// ── MAC → integration id resolution ────────────────────────────────────────
+// The integration API's `id` is its own UUID — it is NOT the private API's
+// Mongo `_id`. Callers that only have a MAC (or resolved one via the private
+// API) must look it up in the integration device/client list by macAddress.
+
+interface IntegrationRefRow {
+  id: string
+  macAddress?: string
+}
+
+const normalizeMac = (mac: string): string => mac.trim().toLowerCase()
+
+/** Find the integration id of the row whose macAddress matches `mac` (case/whitespace-insensitive). */
+export function matchDeviceByMac(rows: IntegrationRefRow[], mac: string): string | null {
+  const target = normalizeMac(mac)
+  return rows.find((r) => r.macAddress !== undefined && normalizeMac(r.macAddress) === target)?.id ?? null
+}
+
+/** Same matching logic as matchDeviceByMac — integration clients carry the same {id, macAddress} shape. */
+export function matchClientByMac(rows: IntegrationRefRow[], mac: string): string | null {
+  return matchDeviceByMac(rows, mac)
+}
+
+/** Resolve a MAC to its integration API device UUID, scanning the paginated device list. */
+export async function resolveIntegrationDeviceId(cfg: UnifiConfig, mac: string): Promise<string | null> {
+  const rows = (await integrationListDevices(cfg)) as IntegrationRefRow[]
+  return matchDeviceByMac(rows, mac)
+}
+
+/** Resolve a MAC to its integration API client UUID, scanning the paginated client list. */
+export async function resolveIntegrationClientId(cfg: UnifiConfig, mac: string): Promise<string | null> {
+  const rows = (await integrationListClients(cfg)) as IntegrationRefRow[]
+  return matchClientByMac(rows, mac)
+}
+
 // ── Device / client actions (integration-only) ────────────────────────────
-// The integration `id` matches the private API `_id` for both devices and
-// clients, so callers resolve a friendly ref → `_id` via the private list and
-// pass it straight through (same assumption integrationGetDeviceStats relies on).
 
 export async function integrationDeviceAction(
   cfg: UnifiConfig,

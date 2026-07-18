@@ -1,6 +1,6 @@
 import type { CommandSpec } from '../../../core/types'
 import { getDevice, listDevices, readUnifiConfig } from '../client'
-import { integrationDeviceAction, integrationGetDeviceStats } from '../integration-client'
+import { integrationDeviceAction, integrationGetDeviceStats, resolveIntegrationDeviceId } from '../integration-client'
 
 export const devicesList: CommandSpec = {
   path: ['devices', 'list'],
@@ -44,11 +44,9 @@ export const devicesStats: CommandSpec = {
     const cfg = readUnifiConfig(ctx.config)
     const ref = String(ctx.args.ref ?? '')
     if (!ref) return { ok: false, kind: 'user', message: 'ref is required', code: 'missing_arg' }
-    // Resolve MAC → integration device id via private API
-    const devices = (await listDevices(cfg)) as { mac: string; _id: string }[]
-    const device = devices.find((d) => d.mac?.toLowerCase() === ref.toLowerCase().trim())
-    if (!device) return { ok: false, kind: 'user', message: `no device matching ${JSON.stringify(ref)}`, code: 'not_found' }
-    const stats = await integrationGetDeviceStats(cfg, device._id)
+    const deviceId = await resolveIntegrationDeviceId(cfg, ref)
+    if (!deviceId) return { ok: false, kind: 'user', message: `no device matching ${JSON.stringify(ref)}`, code: 'not_found' }
+    const stats = await integrationGetDeviceStats(cfg, deviceId)
     if (!stats) return { ok: false, kind: 'user', message: `stats not available for ${ref}`, code: 'not_found' }
     return { ok: true, data: stats }
   },
@@ -80,14 +78,17 @@ export const devicesRestart: CommandSpec = {
       }
     }
 
-    // Resolve MAC/name → integration device id via the private API (the integration
-    // `id` matches the private `_id`).
+    // Resolve MAC/name → MAC via the private API, then MAC → integration device
+    // UUID via the shared resolver (the integration id is not the private `_id`).
     const ql = ref.toLowerCase()
-    const devices = (await listDevices(cfg)) as Array<{ mac: string; name?: string; _id: string }>
+    const devices = (await listDevices(cfg)) as Array<{ mac: string; name?: string }>
     const device = devices.find((d) => d.mac?.toLowerCase() === ql || d.name?.toLowerCase() === ql)
     if (!device) return { ok: false, kind: 'user', message: `no device matching ${JSON.stringify(ref)}`, code: 'not_found' }
 
-    const result = await integrationDeviceAction(cfg, device._id, 'RESTART')
+    const deviceId = await resolveIntegrationDeviceId(cfg, device.mac)
+    if (!deviceId) return { ok: false, kind: 'user', message: `no integration device matching ${JSON.stringify(ref)}`, code: 'not_found' }
+
+    const result = await integrationDeviceAction(cfg, deviceId, 'RESTART')
     return { ok: true, data: { device: device.name || device.mac, action: 'RESTART', result } }
   },
 }

@@ -1,6 +1,6 @@
 import type { CommandSpec } from '../../../core/types'
 import { blockClient, listClients, readUnifiConfig, reconnectClient, unblockClient } from '../client'
-import { integrationClientAction } from '../integration-client'
+import { integrationClientAction, resolveIntegrationClientId } from '../integration-client'
 
 export const clientsControl: CommandSpec = {
   path: ['client'],
@@ -100,9 +100,10 @@ export const clientsAuthorizeGuest: CommandSpec = {
       }
     }
 
-    // Resolve the client ref to its id (the integration `id` matches the private `_id`).
+    // Resolve the client ref (MAC, hostname, or IP) to a MAC via the private API,
+    // then MAC → integration client UUID via the shared resolver.
     const clients = (await listClients(cfg)) as Array<{
-      _id: string; mac: string; hostname?: string; name?: string; ip?: string; 'user-hostname'?: string
+      mac: string; hostname?: string; name?: string; ip?: string; 'user-hostname'?: string
     }>
     const match = clients.find(
       (c) =>
@@ -122,10 +123,20 @@ export const clientsAuthorizeGuest: CommandSpec = {
       }
     }
 
+    const clientId = await resolveIntegrationClientId(cfg, match.mac)
+    if (!clientId) {
+      return {
+        ok: false,
+        kind: 'user' as const,
+        message: `no integration client matching "${ctx.args.client}" found`,
+        code: 'not_found',
+      }
+    }
+
     const label = match.hostname || match.name || match.ip || match.mac
     const result = await integrationClientAction(
       cfg,
-      match._id,
+      clientId,
       'AUTHORIZE_GUEST_ACCESS',
       minutes !== undefined ? { timeLimitMinutes: minutes } : undefined,
     )

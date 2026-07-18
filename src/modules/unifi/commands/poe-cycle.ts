@@ -1,6 +1,7 @@
 import type { CommandSpec } from '../../../core/types'
+import { UserError } from '../../../core/errors'
 import { listDevices, powerCyclePort, readUnifiConfig } from '../client'
-import { integrationPortAction, withSource } from '../integration-client'
+import { integrationPortAction, resolveIntegrationDeviceId, withSource } from '../integration-client'
 
 export const devicesPoeCycle: CommandSpec = {
   path: ['devices', 'poe-cycle'],
@@ -36,7 +37,7 @@ export const devicesPoeCycle: CommandSpec = {
 
     // Resolve device
     const devices = (await listDevices(cfg)) as Array<{
-      _id: string; mac: string; name?: string; model?: string; type?: string
+      mac: string; name?: string; model?: string; type?: string
     }>
     const device = devices.find(
       (d) =>
@@ -65,10 +66,16 @@ export const devicesPoeCycle: CommandSpec = {
 
     // Prefer the private cmd/devmgr endpoint, fall back to the Integration API
     // POWER_CYCLE action on 401/403/404 (or use it outright when source=integration).
+    // The integration id is resolved from the MAC lazily, only when the fallback
+    // actually runs (it is not the private `_id`).
     const result = await withSource(
       cfg,
       () => powerCyclePort(cfg, device.mac, portNum),
-      () => integrationPortAction(cfg, device._id, portNum, 'POWER_CYCLE'),
+      async () => {
+        const deviceId = await resolveIntegrationDeviceId(cfg, device.mac)
+        if (!deviceId) throw new UserError(`no integration device matching ${JSON.stringify(ctx.args.device)}`, 'not_found')
+        return integrationPortAction(cfg, deviceId, portNum, 'POWER_CYCLE')
+      },
     )
     return {
       ok: true as const,
