@@ -150,4 +150,18 @@ export const argProviders: Record<string, Provider> = {
   'gmail drafts get': firstField('gmail', ['drafts', 'list'], 'id', 'id'),
   'gdrive files get': firstField('gdrive', ['files', 'list'], 'id', 'file'),
   // discord get-messages needs a designated channel fixture — add when configured
+  // github — chained off lists; --state all survives zero open PRs
+  'github prs get': firstField('github', ['prs', 'list'], 'number', 'ref', ['--state', 'all', '--limit', '1']),
+  'github prs checks': firstField('github', ['prs', 'list'], 'number', 'ref', ['--state', 'all', '--limit', '1']),
+  'github prs diff': async () => {
+    const base = await firstField('github', ['prs', 'list'], 'number', 'ref', ['--state', 'all', '--limit', '1'])()
+    return { ...base, 'name-only': 'true' }
+  },
+  'github runs get': firstField('github', ['runs', 'list'], 'id', 'id'),
+  'github issues get': firstField('github', ['issues', 'list'], 'number', 'ref', ['--state', 'all']),
+  'github search code': fixed({ query: 'readGithubConfig', repo: fixtures.githubRepo, limit: '5' }),
+  // graphite — pin reads to trunk so they work from untracked worktree branches
+  'graphite stack get': fixed({ branch: fixtures.graphiteTrunk }),
+  'graphite branch parent': fixed({ branch: fixtures.graphiteTrunk }),
+  'graphite branch children': fixed({ branch: fixtures.graphiteTrunk }),
 }
