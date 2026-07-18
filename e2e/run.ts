@@ -3,6 +3,7 @@ import { commandKey, exercised } from './cli'
 import { argProviders } from './args'
 import { createLive } from './live'
 import { runModule, scenarios, type ModuleResult } from './module'
+import { pool } from './pool'
 import { startTui } from './tui'
 
 type Module = (typeof modules)[number]
@@ -119,10 +120,9 @@ async function main() {
 
   const states = targets.map((m) => createLive(m.name))
   const tui = startTui(states, Date.now())
-  const results: ModuleResult[] = []
-  for (let i = 0; i < targets.length; i++) {
-    results.push(await runModule(targets[i]!, states[i]!, { readsOnly: opts.readsOnly }))
-  }
+  const results = await pool(targets, opts.concurrency, (m, i) =>
+    runModule(m, states[i]!, { readsOnly: opts.readsOnly }),
+  )
   tui.stop()
 
   const failed = printReport(targets, results)
