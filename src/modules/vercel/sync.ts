@@ -7,10 +7,18 @@ import { KEY_PREFIX } from './client'
 
 export { KEY_PREFIX }
 
-/** `HOME__<module>__<field>`. Vercel accepts mixed-case keys, so the field name
- * survives a round trip verbatim — no lossy upper-casing of e.g. `insecureTLS`. */
+/**
+ * `HOME__<module>__<field>`. Vercel env names must match `[A-Za-z_][A-Za-z0-9_]*`,
+ * which forbids the hyphens in kebab-case module names (e.g. `uptime-kuma`) — so
+ * the module segment maps `-` to `_` on encode and back on decode. This is
+ * bijective because module names are kebab-case by CLI convention and never
+ * contain underscores (pinned by a registry test in vercel-sync.test.ts), so a
+ * single `_` in the module segment can never be mistaken for the `__` field
+ * separator. Vercel accepts mixed-case keys, so the field name survives a round
+ * trip verbatim — no lossy upper-casing of e.g. `insecureTLS`.
+ */
 export function encodeKey(module: string, field: string): string {
-  return `${KEY_PREFIX}${module}__${field}`
+  return `${KEY_PREFIX}${module.replace(/-/g, '_')}__${field}`
 }
 
 export interface DecodedKey {
@@ -23,7 +31,7 @@ export function decodeKey(key: string): DecodedKey | null {
   const rest = key.slice(KEY_PREFIX.length)
   const sep = rest.indexOf('__')
   if (sep <= 0) return null
-  const module = rest.slice(0, sep)
+  const module = rest.slice(0, sep).replace(/_/g, '-')
   const field = rest.slice(sep + 2)
   if (!module || !field) return null
   return { module, field }
@@ -51,12 +59,33 @@ export interface LocalEntry {
  * Every syncable value present on this host, secrets included. Reuses
  * `resolveModuleConfig` so config and keyring secrets merge exactly the way a
  * real command sees them.
+ *
+ * A module can have no config file yet still hold state: gmail/gdrive/gcal
+ * persist nothing but a keyring-backed `refreshToken` secret, so
+ * `resolveModuleConfig` (which starts from the config file) returns null for
+ * them. In that case fall back to reading each declared secret field
+ * directly — non-secret fields have no storage without a config file, so they
+ * never contribute.
  */
 export function collectLocal(): LocalEntry[] {
   const out: LocalEntry[] = []
   for (const manifest of syncableModules()) {
     const cfg = resolveModuleConfig(manifest)
-    if (!cfg) continue
+    if (!cfg) {
+      for (const field of syncableFields(manifest)) {
+        if (field.kind !== 'secret') continue
+        const value = getSecret(manifest.name, field.key)
+        if (!value) continue
+        out.push({
+          module: manifest.name,
+          field: field.key,
+          key: encodeKey(manifest.name, field.key),
+          value,
+          secret: true,
+        })
+      }
+      continue
+    }
     for (const field of syncableFields(manifest)) {
       const raw = cfg[field.key]
       if (raw === undefined || raw === '') continue
