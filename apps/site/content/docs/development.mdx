@@ -1,0 +1,82 @@
+---
+title: Development
+description: Work on the Bun monorepo, test the CLI, build the site, and add a module.
+---
+
+## Repository layout
+
+```text
+apps/
+├── home/       # CLI, adapters, tests, E2E harness
+└── site/       # Next.js marketing and Fumadocs site
+packages/
+└── brand/      # source mark and generated web assets
+```
+
+Bun 1.3 or newer is required.
+
+## Install and validate
+
+From the repository root:
+
+```bash
+bun install
+bun run typecheck
+bun run test
+bun run site:lint
+bun run site:build
+```
+
+Run the CLI directly:
+
+```bash
+bun run home:dev -- unifi --help
+```
+
+Run the documentation site:
+
+```bash
+bun run site:dev
+```
+
+## CLI tests
+
+Use `bun run test`, not `bun test` from the repository root.
+
+The CLI workspace runs every test file in its own Bun process because
+`mock.module()` state is process-global and has no teardown. This prevents a
+client mock in one command suite from replacing the real module in another
+suite.
+
+To run one file:
+
+```bash
+bun run --cwd apps/home test src/__tests__/status.test.ts
+```
+
+## Live E2E harness
+
+The offline unit suite never touches the real homelab. The explicit live gate
+does:
+
+```bash
+bun run home:e2e
+bun run home:e2e -- --module sonos
+bun run home:e2e -- --reads-only
+bun run home:e2e -- --dry-run
+```
+
+Unconfigured or unreachable modules are skipped and reported. Destructive
+commands are refused.
+
+## Add a module
+
+1. Create `apps/home/src/modules/<name>/index.ts`.
+2. Export a `ModuleManifest` describing config, commands, status, effects, and
+   skill guidance.
+3. Add the static import to `apps/home/src/registry.ts`.
+4. Add adapter and command tests.
+5. Run `home skill install` and inspect the generated module skill.
+6. Add the module to the documentation inventory.
+
+Static registration keeps the compiled single-binary build predictable.

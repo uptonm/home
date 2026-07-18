@@ -1,34 +1,25 @@
 {
-  "name": "home",
-  "version": "1.1.0",
-  "description": "Monolith CLI for homelab services with auto-generated Claude skills",
-  "type": "module",
+  "name": "home-monorepo",
   "private": true,
-  "engines": {
-    "bun": ">=1.3.0"
-  },
-  "bin": {
-    "home": "./src/index.ts"
-  },
+  "packageManager": "bun@1.3.14",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "bun run src/index.ts",
-    "typecheck": "tsc --noEmit",
-    "test": "bash scripts/test-isolated.sh",
-    "build": "bash scripts/build-local.sh",
-    "build:install": "bash scripts/build-local.sh $HOME/.local/bin/home",
-    "build:linux": "bun build --compile --target=bun-linux-x64-baseline src/index.ts --outfile dist/home-linux-x64",
-    "build:mac": "bun build --compile --target=bun-darwin-arm64 src/index.ts --outfile dist/home-darwin-arm64",
-    "e2e": "bun e2e/run.ts"
-  },
-  "dependencies": {
-    "@napi-rs/keyring": "^1.1.7",
-    "@svrooij/sonos": "^2.5.0",
-    "citty": "^0.1.6",
-    "consola": "^3.4.0",
-    "socket.io-client": "4.8.1"
-  },
-  "devDependencies": {
-    "@types/bun": "latest",
-    "typescript": "^5.7.0"
+    "dev": "bun run site:dev",
+    "home:dev": "bun run --cwd apps/home dev",
+    "home:typecheck": "bun run --cwd apps/home typecheck",
+    "home:test": "bun run --cwd apps/home test",
+    "home:build": "bun run --cwd apps/home build",
+    "home:e2e": "bun run --cwd apps/home e2e",
+    "site:dev": "bun run --cwd apps/site dev",
+    "site:typecheck": "bun run --cwd apps/site typecheck",
+    "site:lint": "bun run --cwd apps/site lint",
+    "site:build": "bun run --cwd apps/site build",
+    "typecheck": "bun run home:typecheck && bun run site:typecheck",
+    "test": "bun run home:test",
+    "build": "bun run home:build && bun run site:build",
+    "ci": "bun run typecheck && bun run test && bun run site:lint && bun run site:build"
   }
 }

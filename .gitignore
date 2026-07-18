@@ -1,9 +1,15 @@
 node_modules/
+**/node_modules/
 dist/
+**/dist/
+**/.next/
+**/.source/
+**/coverage/
 .DS_Store
 *.log
 .env
 .env.local
+**/.env.local
 home-secrets.json
 .vscode/
 .idea/

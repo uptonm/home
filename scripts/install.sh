@@ -29,11 +29,20 @@ detect_target() {
   echo "home-${os}-${arch}"
 }
 
-# The release repo is private, so downloads go through the authenticated gh
-# CLI. curl is kept only as a fallback for the day the repo (or a mirror) is
-# public — an unauthenticated fetch of a private asset just 404s.
+# Release assets are public. Prefer a direct download so a fresh host does not
+# need gh; retain gh as a fallback for proxies or environments where the normal
+# release redirect is unavailable.
 download_asset() {
   local asset="$1" out="$2"
+  local url
+  if [[ "$VERSION" == "latest" ]]; then
+    url="https://github.com/$REPO/releases/latest/download/$asset"
+  else
+    url="https://github.com/$REPO/releases/download/$VERSION/$asset"
+  fi
+  if curl -fsSL "$url" -o "$out"; then
+    return
+  fi
   if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
     if [[ "$VERSION" == "latest" ]]; then
       gh release download --repo "$REPO" --pattern "$asset" --output "$out" --clobber
@@ -42,14 +51,8 @@ download_asset() {
     fi
     return
   fi
-  local url
-  if [[ "$VERSION" == "latest" ]]; then
-    url="https://github.com/$REPO/releases/latest/download/$asset"
-  else
-    url="https://github.com/$REPO/releases/download/$VERSION/$asset"
-  fi
-  echo "gh not available/authenticated — trying unauthenticated $url"
-  curl -fsSL "$url" -o "$out"
+  echo "failed to download $url" >&2
+  return 1
 }
 
 pick_install_dir() {

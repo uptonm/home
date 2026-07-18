@@ -1,0 +1,29 @@
+# home
+
+> One CLI for the homelab.
+
+home is an open-source TypeScript/Bun command-line tool that provides people
+and local agents with a consistent interface to homelab services, home
+automation, media, cloud tools, developer workflow, and operations.
+
+Canonical site: https://home.uptonm.dev
+Source: https://github.com/uptonm/home
+Documentation: https://home.uptonm.dev/docs
+
+## Documentation
+
+- Introduction: https://home.uptonm.dev/docs
+- Getting started: https://home.uptonm.dev/docs/getting-started
+- Configuration and secrets: https://home.uptonm.dev/docs/configuration
+- Modules: https://home.uptonm.dev/docs/modules
+- Agent skills: https://home.uptonm.dev/docs/agent-skills
+- Operations: https://home.uptonm.dev/docs/operations
+- Development: https://home.uptonm.dev/docs/development
+
+## Core contract
+
+- One binary and one config root.
+- Every command supports structured JSON output.
+- Modules generate focused local-agent skills from the runtime command registry.
+- Commands classify effects as read, write, or destructive.
+- Guarded mutations require explicit intent.

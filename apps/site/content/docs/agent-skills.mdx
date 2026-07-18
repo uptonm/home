@@ -1,0 +1,65 @@
+---
+title: Agent skills
+description: How home generates focused local-agent skills from the CLI registry and guards external changes.
+---
+
+## One skill per module
+
+Run:
+
+```bash
+home skill install
+```
+
+`home` writes one focused skill for every module. The skill describes when to
+use that module, how to configure it, the available command tree, the JSON
+contract, and the safety requirements for mutations.
+
+Skills are generated from the same `ModuleManifest` objects that build the
+runtime CLI. A command cannot land in one surface while silently missing from
+the other.
+
+## Why the split matters
+
+A single giant homelab skill would force every interaction to carry irrelevant
+context. Focused skills let an agent load only the service boundary it needs:
+
+- schedule questions load `gcal`
+- network and client questions load `unifi`
+- playback requests load `spotify` and `sonos`
+- operational briefings load `beszel` and `uptime-kuma`
+
+## Machine-readable output
+
+Every command accepts `--json`. Success and error payloads use stable shapes and
+codes, so an agent can distinguish a bad argument, an unreachable service, and
+an unconfigured module.
+
+```bash
+home gcal agenda --days 2 --json
+home github prs list --json
+home beszel alerts list --json
+```
+
+## Effect classification
+
+Every command declares one effect:
+
+| Effect | Meaning |
+| --- | --- |
+| `read` | Observes local or external state |
+| `write` | Changes state and requires an intentional guard where applicable |
+| `destructive` | Can remove or irreversibly alter state |
+
+The live E2E harness can automatically exercise reads, runs writes only through
+snapshot/mutate/assert/restore scenarios, and refuses destructive commands at
+the process-spawn boundary.
+
+## Credentials
+
+Agent prompts never need to contain service credentials. The CLI resolves
+secrets from the local backend and passes only the normalized result back to
+the caller.
+
+See [Configuration and secrets](/docs/configuration) for storage and migration
+details.

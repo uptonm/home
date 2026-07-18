@@ -1,0 +1,69 @@
+---
+title: Operations
+description: Use status, doctor, and cross-module operational overviews to understand the homelab.
+---
+
+## Readiness
+
+Start with the whole registry:
+
+```bash
+home status
+home status --json
+```
+
+Or inspect one service boundary:
+
+```bash
+home unifi status
+home assistant status
+home uptime-kuma status
+```
+
+An unconfigured module is distinct from an unreachable one. That distinction is
+preserved in exit codes and JSON errors.
+
+## Diagnostics
+
+```bash
+home doctor
+```
+
+`doctor` combines module readiness with local dependency, configuration,
+version, and update diagnostics.
+
+## Cross-service overview
+
+```bash
+home overview ops
+home overview ops --json
+```
+
+The overview asks each configured operational adapter for a normalized report,
+then combines infrastructure health, service readiness, active alerts, and
+availability into one response.
+
+It is intentionally read-only. Use the underlying module when you need detail:
+
+```bash
+home unifi devices list --json
+home beszel systems list --json
+home beszel alerts list --json
+home uptime-kuma monitors list --json
+home uptime-kuma certificates list --days 30 --json
+```
+
+## Composing commands
+
+Because every command supports JSON, standard shell tools remain useful:
+
+```bash
+home unifi devices list --json \
+  | jq '.[] | select(.type == "uap")'
+
+home protect events recent --type motion --limit 20 --json \
+  | jq 'map({camera, start})'
+```
+
+The CLI does not require a local agent to be useful; the agent consumes the same
+stable surface that scripts and people do.

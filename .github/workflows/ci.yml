@@ -16,6 +16,8 @@ jobs:
           bun-version: 1.3.14
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
-      # `bun run test`, not `bun test` — the latter bypasses package.json scripts
-      # and runs every file in one process, where mock.module leaks across files.
+      # The home workspace script isolates each file because Bun's
+      # mock.module() state is process-global.
       - run: bun run test
+      - run: bun run site:lint
+      - run: bun run site:build
