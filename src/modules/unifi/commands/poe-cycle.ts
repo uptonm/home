@@ -67,16 +67,29 @@ export const devicesPoeCycle: CommandSpec = {
     // Prefer the private cmd/devmgr endpoint, fall back to the Integration API
     // POWER_CYCLE action on 401/403/404 (or use it outright when source=integration).
     // The integration id is resolved from the MAC lazily, only when the fallback
-    // actually runs (it is not the private `_id`).
-    const result = await withSource(
-      cfg,
-      () => powerCyclePort(cfg, device.mac, portNum),
-      async () => {
-        const deviceId = await resolveIntegrationDeviceId(cfg, device.mac)
-        if (!deviceId) throw new UserError(`no integration device matching ${JSON.stringify(ctx.args.device)}`, 'not_found')
-        return integrationPortAction(cfg, deviceId, portNum, 'POWER_CYCLE')
-      },
-    )
+    // actually runs (it is not the private `_id`). withSource's callbacks must
+    // resolve to a value, not an ok/fail envelope, so an unresolvable id is
+    // signaled via UserError and converted back to the command's usual
+    // { ok: false, kind: 'user' } shape below — otherwise it would bubble past
+    // this function and get reduced to a generic kind:'system' exit by the
+    // top-level runner, inconsistent with every other not_found in this file.
+    let result: unknown
+    try {
+      result = await withSource(
+        cfg,
+        () => powerCyclePort(cfg, device.mac, portNum),
+        async () => {
+          const deviceId = await resolveIntegrationDeviceId(cfg, device.mac)
+          if (!deviceId) throw new UserError(`no integration device matching ${JSON.stringify(ctx.args.device)}`, 'not_found')
+          return integrationPortAction(cfg, deviceId, portNum, 'POWER_CYCLE')
+        },
+      )
+    } catch (err) {
+      if (err instanceof UserError) {
+        return { ok: false as const, kind: 'user' as const, message: err.message, code: err.code }
+      }
+      throw err
+    }
     return {
       ok: true as const,
       data: { device: device.name || device.mac, port: portNum, result },

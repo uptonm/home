@@ -287,16 +287,29 @@ export function matchClientByMac(rows: IntegrationRefRow[], mac: string): string
   return matchDeviceByMac(rows, mac)
 }
 
-/** Resolve a MAC to its integration API device UUID, scanning the paginated device list. */
+/**
+ * Resolve a MAC to its integration API device UUID, scanning the paginated device list.
+ * Mirrors integrationAppInfo/integrationGetDeviceStats: an unreachable integration API
+ * degrades to null rather than throwing, so callers fall through to their existing
+ * user-kind `not_found` handling instead of a raw system error.
+ */
 export async function resolveIntegrationDeviceId(cfg: UnifiConfig, mac: string): Promise<string | null> {
-  const rows = (await integrationListDevices(cfg)) as IntegrationRefRow[]
-  return matchDeviceByMac(rows, mac)
+  try {
+    const rows = (await integrationListDevices(cfg)) as IntegrationRefRow[]
+    return matchDeviceByMac(rows, mac)
+  } catch {
+    return null
+  }
 }
 
-/** Resolve a MAC to its integration API client UUID, scanning the paginated client list. */
+/** Resolve a MAC to its integration API client UUID, scanning the paginated client list (see resolveIntegrationDeviceId). */
 export async function resolveIntegrationClientId(cfg: UnifiConfig, mac: string): Promise<string | null> {
-  const rows = (await integrationListClients(cfg)) as IntegrationRefRow[]
-  return matchClientByMac(rows, mac)
+  try {
+    const rows = (await integrationListClients(cfg)) as IntegrationRefRow[]
+    return matchClientByMac(rows, mac)
+  } catch {
+    return null
+  }
 }
 
 // ── Device / client actions (integration-only) ────────────────────────────

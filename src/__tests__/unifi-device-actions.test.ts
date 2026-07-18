@@ -33,6 +33,9 @@ let deviceAction: { id: string; action: string } | null = null
 let portAction: { id: string; port: number; action: string } | null = null
 let clientAction: { id: string; action: string; extra?: Record<string, unknown> } | null = null
 let privatePowerCycle: { mac: string; port: number } | null = null
+// Forces resolveIntegrationDeviceId to null regardless of the private match found —
+// simulates "private API knows the device, integration API has no counterpart".
+let forceUnresolvableDeviceId = false
 
 // Mock the private client layer for device/client resolution + the private PoE path.
 const realClient = await import('../modules/unifi/client')
@@ -53,6 +56,8 @@ mock.module('../modules/unifi/integration-client', () => ({
   ...realIntegration,
   integrationListDevices: async () => INTEGRATION_DEVICES,
   integrationListClients: async () => INTEGRATION_CLIENTS,
+  resolveIntegrationDeviceId: async (_cfg: unknown, mac: string) =>
+    forceUnresolvableDeviceId ? null : realIntegration.matchDeviceByMac(INTEGRATION_DEVICES, mac),
   integrationDeviceAction: async (_cfg: unknown, id: string, action: string) => {
     deviceAction = { id, action }
     return { transport: 'integration' }
@@ -154,6 +159,24 @@ describe('unifi devices poe-cycle', () => {
     expect(res.ok).toBe(true)
     expect(portAction as unknown).toEqual({ id: 'idev-2', port: 4, action: 'POWER_CYCLE' })
     expect(privatePowerCycle as unknown).toBeNull()
+  })
+
+  test('private match found but integration id unresolvable -> user not_found, not a system exit', async () => {
+    portAction = null
+    forceUnresolvableDeviceId = true
+    try {
+      const res = await devicesPoeCycle.run({
+        ...EMPTY_CTX,
+        config: { source: 'integration' },
+        args: { device: 'Office Switch', port: '4', yes: true },
+      })
+      expect(res.ok).toBe(false)
+      expect((res as { kind?: string }).kind).toBe('user')
+      expect(errCode(res)).toBe('not_found')
+      expect(portAction as unknown).toBeNull()
+    } finally {
+      forceUnresolvableDeviceId = false
+    }
   })
 })
 
