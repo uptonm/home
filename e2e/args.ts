@@ -76,6 +76,25 @@ function spotifyRef(type: 'tracks' | 'albums' | 'artists' | 'playlists'): Provid
 
 const fixed = (values: Record<string, string>): Provider => async () => values
 
+/** Deployment providers must scope to a team project to avoid cross-scope deployments
+ *  returned by `vercel deployments list` (v6 endpoint leak) that fail in `deployments get` (v13 team-scoped).
+ *  Chain: projects list → first project id → deployments list --project <id> → first deployment id. */
+function scopedVercelDeployment(): Provider {
+  return async () => {
+    const projects = await rows('vercel', ['projects', 'list'])
+    if (projects.length === 0) throw new Unresolved('vercel projects list: empty')
+    const projectId = pickField(projects, 'id')
+    if (projectId === null) throw new Unresolved('vercel projects list: no id on any row')
+
+    const deployments = await rows('vercel', ['deployments', 'list'], ['--project', projectId])
+    if (deployments.length === 0) throw new Unresolved(`vercel deployments list --project ${projectId}: empty`)
+    const deploymentId = pickField(deployments, 'id')
+    if (deploymentId === null) throw new Unresolved(`vercel deployments list --project ${projectId}: no id on any row`)
+
+    return { deployment: deploymentId }
+  }
+}
+
 export const argProviders: Record<string, Provider> = {
   // unifi — get/stats chained off their list siblings
   'unifi devices get': firstField('unifi', ['devices', 'list'], 'mac', 'mac'),
@@ -176,10 +195,10 @@ export const argProviders: Record<string, Provider> = {
   'graphite stack get': fixed({ branch: fixtures.graphiteTrunk }),
   'graphite branch parent': fixed({ branch: fixtures.graphiteTrunk }),
   'graphite branch children': fixed({ branch: fixtures.graphiteTrunk }),
-  // vercel — get/events chained off deployments list; domains get uses name not id
+  // vercel — deployments get/events scope to team project to avoid cross-scope leaks from v6 list
   'vercel projects get': firstField('vercel', ['projects', 'list'], 'id', 'project'),
-  'vercel deployments get': firstField('vercel', ['deployments', 'list'], 'id', 'deployment'),
-  'vercel deployments events': firstField('vercel', ['deployments', 'list'], 'id', 'deployment'),
+  'vercel deployments get': scopedVercelDeployment(),
+  'vercel deployments events': scopedVercelDeployment(),
   'vercel domains get': firstField('vercel', ['domains', 'list'], 'name', 'name'),
   // discord — get-messages reads from the designated alerts channel
   'discord get-messages': fixed({ channelId: fixtures.discordAlertsChannelId }),
