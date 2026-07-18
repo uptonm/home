@@ -8,6 +8,7 @@ import {
   generateState,
   getGoogleAccessToken,
   parseAuthRedirect,
+  parsePastedRedirect,
   resetGoogleTokenCache,
   type GoogleOAuthCredentials,
 } from '../core/google-auth'
@@ -80,6 +81,42 @@ describe('parseAuthRedirect', () => {
 
   test('throws when no code is present', () => {
     expect(() => parseAuthRedirect('/?state=abc', 'abc')).toThrow(/no authorization code/)
+  })
+})
+
+describe('parsePastedRedirect', () => {
+  test('accepts a full http redirect URL and validates state', () => {
+    expect(
+      parsePastedRedirect('http://127.0.0.1:40361/?state=abc&iss=https://accounts.google.com&code=4/0Axyz', 'abc'),
+    ).toEqual({ code: '4/0Axyz' })
+  })
+
+  test('accepts a full URL with surrounding whitespace', () => {
+    expect(parsePastedRedirect('  http://127.0.0.1:9/?state=abc&code=4/0Axyz \n', 'abc')).toEqual({ code: '4/0Axyz' })
+  })
+
+  test('rejects a full URL with mismatched state', () => {
+    expect(() => parsePastedRedirect('http://127.0.0.1:9/?state=evil&code=c', 'abc')).toThrow(/state mismatch/)
+  })
+
+  test('surfaces an error param in a pasted URL', () => {
+    expect(() => parsePastedRedirect('http://127.0.0.1:9/?error=access_denied&state=abc', 'abc')).toThrow(
+      /access_denied/,
+    )
+  })
+
+  test('accepts a bare authorization code without state', () => {
+    expect(parsePastedRedirect('4/0AXEQxIAkJeCb9HM5xl7D0-7SxH53t5u', 'abc')).toEqual({
+      code: '4/0AXEQxIAkJeCb9HM5xl7D0-7SxH53t5u',
+    })
+  })
+
+  test('rejects garbage input with a paste-the-url hint', () => {
+    expect(() => parsePastedRedirect('not a code!!', 'abc')).toThrow(/full redirect URL/)
+  })
+
+  test('rejects empty input', () => {
+    expect(() => parsePastedRedirect('   ', 'abc')).toThrow(/full redirect URL/)
   })
 })
 

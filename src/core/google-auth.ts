@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { createServer } from 'node:http'
 import { spawn } from 'node:child_process'
+import { createInterface, type Interface } from 'node:readline'
 import type { AddressInfo } from 'node:net'
 import { request, type HttpOptions } from './http'
 import { NotConfiguredError, SystemError, UserError } from './errors'
@@ -275,6 +276,24 @@ export function parseAuthRedirect(rawUrl: string, expectedState: string): { code
   return { code }
 }
 
+/**
+ * Interpret a line the user pasted into the terminal when the loopback
+ * redirect couldn't reach this machine (browser on another host). Accepts the
+ * full redirect URL from the browser's address bar (state validated, same as
+ * the loopback path) or a bare authorization code. A bare code carries no
+ * state to check — it is useless without the in-process PKCE verifier, and
+ * the user typing it is the consent. Throws `UserError` on anything else.
+ */
+export function parsePastedRedirect(input: string, expectedState: string): { code: string } {
+  const trimmed = input.trim()
+  if (/^https?:\/\//.test(trimmed)) return parseAuthRedirect(trimmed, expectedState)
+  if (/^[\w/-]+$/.test(trimmed) && trimmed.length > 0) return { code: trimmed }
+  throw new UserError(
+    "unrecognized input — paste the full redirect URL from the browser's address bar",
+    'google_paste_unrecognized',
+  )
+}
+
 export interface ExchangeCodeParams {
   clientId: string
   clientSecret: string
@@ -361,6 +380,10 @@ function escapeHtml(s: string): string {
 
 /** Best-effort browser launch; failures are swallowed (the URL is always printed too). */
 function tryOpenBrowser(url: string): void {
+  // Over SSH, xdg-open would at best fail and at worst open a browser on a
+  // forwarded X display the user isn't looking at — the paste fallback is
+  // the real path there.
+  if (process.env.SSH_CONNECTION || process.env.SSH_TTY) return
   const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open'
   try {
     const child = spawn(cmd, [url], { stdio: 'ignore', detached: true, shell: process.platform === 'win32' })
@@ -402,12 +425,25 @@ export function runInstalledAppOAuth(opts: InstalledAppFlowOptions): Promise<Tok
   return new Promise<TokenSet>((resolve, reject) => {
     let redirectUri = ''
     let settled = false
+    let stdinReader: Interface | undefined
     const finish = (fn: () => void) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
       server.close()
+      stdinReader?.close()
       fn()
+    }
+
+    const settleWithCode = async (code: string) => {
+      const tokens = await exchangeCodeForTokens({
+        clientId: opts.clientId,
+        clientSecret: opts.clientSecret,
+        code,
+        redirectUri,
+        codeVerifier: verifier,
+      })
+      return tokens
     }
 
     const server = createServer(async (req, res) => {
@@ -420,13 +456,7 @@ export function runInstalledAppOAuth(opts: InstalledAppFlowOptions): Promise<Tok
       }
       try {
         const { code } = parseAuthRedirect(url, state)
-        const tokens = await exchangeCodeForTokens({
-          clientId: opts.clientId,
-          clientSecret: opts.clientSecret,
-          code,
-          redirectUri,
-          codeVerifier: verifier,
-        })
+        const tokens = await settleWithCode(code)
         res.writeHead(200, { 'Content-Type': 'text/html' })
         res.end(SUCCESS_HTML)
         finish(() => resolve(tokens))
@@ -460,6 +490,30 @@ export function runInstalledAppOAuth(opts: InstalledAppFlowOptions): Promise<Tok
       notify(authUrl)
       notify('')
       notify('Waiting for authorization…')
+      if (process.stdin.isTTY) {
+        notify("If the browser can't reach this machine (e.g. you're on SSH), paste the")
+        notify('full redirect URL from its address bar here and press Enter.')
+        stdinReader = createInterface({ input: process.stdin })
+        stdinReader.on('line', (line) => {
+          if (settled || !line.trim()) return
+          void (async () => {
+            try {
+              const { code } = parsePastedRedirect(line, state)
+              const tokens = await settleWithCode(code)
+              finish(() => resolve(tokens))
+            } catch (err) {
+              // A typo or stale paste shouldn't kill the live flow — report
+              // and keep both paths open. Only a spent code (exchange
+              // failure) ends it: that authorization is gone either way.
+              if (err instanceof UserError) {
+                notify(`✗ ${err.message}`)
+                return
+              }
+              finish(() => reject(err))
+            }
+          })()
+        })
+      }
       if (openBrowser) tryOpenBrowser(authUrl)
     })
   })
