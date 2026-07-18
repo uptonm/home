@@ -58,7 +58,10 @@ export function gtFailure(args: readonly string[], result: ProcessResult): Syste
   if (NOT_REPO_RE.test(combined)) {
     return new UserError(`this command needs a git working tree — run it inside a repository (gt: ${detail})`, 'graphite_not_repo')
   }
-  if (UNTRACKED_RE.test(combined) || NOT_FOUND_RE.test(combined)) {
+  if (UNTRACKED_RE.test(combined)) {
+    return new UserError(`gt: ${detail}`, 'graphite_untracked_branch')
+  }
+  if (NOT_FOUND_RE.test(combined)) {
     return new UserError(`gt: ${detail}`, 'graphite_failed')
   }
   const what = args.slice(0, 2).join(' ')
@@ -431,7 +434,7 @@ export interface GraphiteStatusData {
   version: string
   compatible: boolean
   testedVersion: string
-  repository: { initialized: true; trunk: string } | null
+  repository: { initialized: true; trunk: string | null } | null
 }
 
 /**
@@ -445,7 +448,13 @@ export async function probeGraphite(cfg: GraphiteConfig, run: GtRunner = runProc
   try {
     repository = { initialized: true, trunk: await getTrunk(cfg, run) }
   } catch (err) {
-    if (!(err instanceof UserError) || err.code !== 'graphite_not_repo') throw err
+    if (err instanceof UserError && err.code === 'graphite_untracked_branch') {
+      // gt names the trunk only from a tracked branch; an untracked current
+      // branch means the repo is graphite-initialized but we can't read trunk.
+      repository = { initialized: true, trunk: null }
+    } else if (!(err instanceof UserError) || err.code !== 'graphite_not_repo') {
+      throw err
+    }
   }
   return {
     binaryPath: cfg.binaryPath,
