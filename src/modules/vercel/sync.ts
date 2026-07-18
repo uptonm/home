@@ -7,10 +7,18 @@ import { KEY_PREFIX } from './client'
 
 export { KEY_PREFIX }
 
-/** `HOME__<module>__<field>`. Vercel accepts mixed-case keys, so the field name
- * survives a round trip verbatim — no lossy upper-casing of e.g. `insecureTLS`. */
+/**
+ * `HOME__<module>__<field>`. Vercel env names must match `[A-Za-z_][A-Za-z0-9_]*`,
+ * which forbids the hyphens in kebab-case module names (e.g. `uptime-kuma`) — so
+ * the module segment maps `-` to `_` on encode and back on decode. This is
+ * bijective because module names are kebab-case by CLI convention and never
+ * contain underscores (pinned by a registry test in vercel-sync.test.ts), so a
+ * single `_` in the module segment can never be mistaken for the `__` field
+ * separator. Vercel accepts mixed-case keys, so the field name survives a round
+ * trip verbatim — no lossy upper-casing of e.g. `insecureTLS`.
+ */
 export function encodeKey(module: string, field: string): string {
-  return `${KEY_PREFIX}${module}__${field}`
+  return `${KEY_PREFIX}${module.replace(/-/g, '_')}__${field}`
 }
 
 export interface DecodedKey {
@@ -23,7 +31,7 @@ export function decodeKey(key: string): DecodedKey | null {
   const rest = key.slice(KEY_PREFIX.length)
   const sep = rest.indexOf('__')
   if (sep <= 0) return null
-  const module = rest.slice(0, sep)
+  const module = rest.slice(0, sep).replace(/_/g, '-')
   const field = rest.slice(sep + 2)
   if (!module || !field) return null
   return { module, field }

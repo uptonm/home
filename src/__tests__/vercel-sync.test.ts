@@ -45,6 +45,23 @@ describe('key encoding', () => {
     expect(decodeKey('HOME_UPPER_TEST')).toBeNull()
     expect(decodeKey(`${KEY_PREFIX}nosep`)).toBeNull()
   })
+
+  test('maps hyphens in a kebab-case module name to underscores, staying a legal env name', () => {
+    const key = encodeKey('uptime-kuma', 'statusPageSlug')
+    expect(key).toBe('HOME__uptime_kuma__statusPageSlug')
+    expect(key).toMatch(/^[A-Za-z_][A-Za-z0-9_]*$/)
+  })
+
+  test('decodes an underscored module segment back to its kebab-case name', () => {
+    expect(decodeKey('HOME__uptime_kuma__url')).toEqual({ module: 'uptime-kuma', field: 'url' })
+  })
+
+  test('every registered module name is kebab-case with no underscores, and round-trips through encode/decode', () => {
+    for (const m of modules) {
+      expect(m.name).toMatch(/^[a-z][a-z0-9-]*$/)
+      expect(decodeKey(encodeKey(m.name, 'x'))).toEqual({ module: m.name, field: 'x' })
+    }
+  })
 })
 
 describe('host-local fields are never synced', () => {
