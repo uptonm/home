@@ -25,14 +25,21 @@ async function rows(module: string, path: string[], args: string[] = []): Promis
   return data
 }
 
-function firstField(module: string, listPath: string[], field: string, argName: string): Provider {
+export function pickField(rowsIn: unknown[], field: string): string | null {
+  for (const r of rowsIn) {
+    const v = (r as Record<string, unknown> | null)?.[field]
+    if (v !== undefined && v !== null && v !== '') return String(v)
+  }
+  return null
+}
+
+function firstField(module: string, listPath: string[], field: string, argName: string, listArgs: string[] = []): Provider {
   return async () => {
-    const first = (await rows(module, listPath))[0] as Record<string, unknown> | undefined
-    const v = first?.[field]
-    if (v === undefined || v === null || v === '') {
-      throw new Unresolved(`${[module, ...listPath].join(' ')}: no ${field} on first row`)
-    }
-    return { [argName]: String(v) }
+    const all = await rows(module, listPath, listArgs)
+    if (all.length === 0) throw new Unresolved(`${[module, ...listPath].join(' ')}: list empty`)
+    const v = pickField(all, field)
+    if (v === null) throw new Unresolved(`${[module, ...listPath].join(' ')}: no ${field} on any row`)
+    return { [argName]: v }
   }
 }
 
