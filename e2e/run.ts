@@ -3,6 +3,7 @@ import { commandKey, exercised } from './cli'
 import { argProviders } from './args'
 import { createLive } from './live'
 import { runModule, scenarios, type ModuleResult } from './module'
+import { startTui } from './tui'
 
 type Module = (typeof modules)[number]
 
@@ -116,16 +117,13 @@ async function main() {
     return
   }
 
+  const states = targets.map((m) => createLive(m.name))
+  const tui = startTui(states, Date.now())
   const results: ModuleResult[] = []
-  for (const m of targets) {
-    const live = createLive(m.name)
-    const r = await runModule(m, live, { readsOnly: opts.readsOnly })
-    results.push(r)
-    const line = r.skipped
-      ? `SKIP (${r.skipped.reason})`
-      : `${live.outcome?.toUpperCase()} — ${r.reads.filter((x) => x.outcome === 'pass').length}/${r.reads.length} reads`
-    console.log(`${m.name.padEnd(14)} ${line}`)
+  for (let i = 0; i < targets.length; i++) {
+    results.push(await runModule(targets[i]!, states[i]!, { readsOnly: opts.readsOnly }))
   }
+  tui.stop()
 
   const failed = printReport(targets, results)
   if (failed) process.exit(1)
