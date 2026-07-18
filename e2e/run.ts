@@ -133,9 +133,17 @@ async function main() {
   let results: ModuleResult[]
   try {
     results = await pool(targets, opts.concurrency, async (m, i) => {
-      const r = await runModule(m, states[i]!, { readsOnly: opts.readsOnly })
-      if (!tty) console.log(`${states[i]!.phase === 'skipped' ? '⊘' : states[i]!.outcome === 'fail' ? '✖' : '✔'} ${m.name}  ${activity(states[i]!)}`)
-      return r
+      try {
+        const r = await runModule(m, states[i]!, { readsOnly: opts.readsOnly })
+        if (!tty) console.log(`${states[i]!.phase === 'skipped' ? '⊘' : states[i]!.outcome === 'fail' ? '✖' : '✔'} ${m.name}  ${activity(states[i]!)}`)
+        return r
+      } catch (err) {
+        states[i]!.phase = 'done'
+        states[i]!.outcome = 'fail'
+        const failureDetail = `harness error: ${err}`.slice(0, 300)
+        if (!tty) console.log(`✖ ${m.name}  ${activity(states[i]!)}`)
+        return { module: m.name, skipped: null, reads: [{ key: m.name, outcome: 'fail' as const, detail: failureDetail }], scenarios: [] }
+      }
     })
   } finally {
     tui.stop()
