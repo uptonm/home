@@ -150,6 +150,19 @@ describe('integrationAppInfo', () => {
     expect(result).toEqual({ version: '10.4.57', uuid: '' })
   })
 
+  test('prioritizes applicationVersion over server_version when both present', async () => {
+    const realHttp = await import('../core/http')
+    mock.module('../core/http', () => ({
+      ...realHttp,
+      requestJson: async () => ({ applicationVersion: '10.4.57', server_version: '9.2.3' }),
+    }))
+
+    const { integrationAppInfo } = await import('../modules/unifi/integration-client')
+    const appCfg = { url: 'https://example.test', site: 'default', apiKey: 'k' }
+    const result = await integrationAppInfo(appCfg)
+    expect(result).toEqual({ version: '10.4.57', uuid: '' })
+  })
+
   test('falls back to server_version for older versions', async () => {
     const realHttp = await import('../core/http')
     mock.module('../core/http', () => ({
