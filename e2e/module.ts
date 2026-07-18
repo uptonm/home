@@ -1,6 +1,6 @@
 import type { ArgSpec, CommandSpec } from '../src/core/types'
 import { modules } from '../src/registry'
-import { commandKey, runCli, runStatus } from './cli'
+import { DEFAULT_TIMEOUT_MS, commandKey, runCli, runStatus } from './cli'
 import { Unresolved, argProviders } from './args'
 import { runScenario, type Scenario, type ScenarioResult } from './scenario'
 import { sonosScenarios } from './scenarios/sonos'
@@ -54,11 +54,13 @@ async function autoRead(module: string, cmd: CommandSpec): Promise<ReadResult> {
   }
   const res = await runCli(module, cmd.path, buildArgv(cmd, values))
   if (res.exitCode !== 0) {
-    return {
-      key,
-      outcome: 'fail',
-      detail: `exit ${res.exitCode}: ${res.stderr.trim() || res.stdout.trim()}`.slice(0, 300),
-    }
+    // 143 = SIGTERM from our own timeout kill; the child's own output is
+    // irrelevant noise, so give a detail that explains what actually happened.
+    const detail =
+      res.exitCode === 143
+        ? `read timed out (SIGTERM after ${DEFAULT_TIMEOUT_MS / 1000}s)`
+        : `exit ${res.exitCode}: ${res.stderr.trim() || res.stdout.trim()}`.slice(0, 300)
+    return { key, outcome: 'fail', detail }
   }
   // Exit 0 is not enough: every command runs with --json, so non-JSON stdout
   // means the read regressed even though the process claims success.
