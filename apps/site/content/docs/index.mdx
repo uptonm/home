@@ -1,0 +1,66 @@
+---
+title: Introduction
+description: What home is, how its command surface is organized, and where to go next.
+---
+
+## What home is
+
+`home` is a single TypeScript/Bun CLI for services that would otherwise need
+separate dashboards, API clients, authentication flows, and command
+conventions. It covers homelab infrastructure, home automation, media, cloud
+tools, developer workflow, and operations behind one binary and one config
+root.
+
+The same surface serves two operators:
+
+- **People** get readable terminal output, shell completion, stable errors, and
+  commands grouped by service.
+- **Local agents** get JSON on every command, generated skills derived from the
+  real command registry, and explicit guards around mutations.
+
+## The contract
+
+Every module defines its configuration, readiness checks, commands, arguments,
+effects, and skill guidance in one manifest. Core code turns that manifest into
+the CLI tree and the generated skill. Adapters keep service-specific details
+below that boundary.
+
+```text
+person or local agent
+        │
+        ▼
+home command surface
+human output · --json · stable exit codes
+        │
+        ▼
+module registry
+commands · config · status · skill guidance
+        │
+        ▼
+service adapters
+LAN services · cloud APIs · local developer tools
+```
+
+## Safety model
+
+Reading is broad; changing external state is deliberate. Commands declare
+their effect as `read`, `write`, or `destructive`. Guarded changes require an
+explicit `--yes`, and the live E2E harness refuses destructive commands at its
+single process-spawn boundary.
+
+Credentials remain local. The default secret backend is the OS keyring, with a
+mode-0600 file fallback for headless Linux environments.
+
+## Where to go next
+
+- **[Getting started](/docs/getting-started)** — install the binary and reach a
+  useful first command.
+- **[Configuration](/docs/configuration)** — config roots, secrets, migration,
+  and multi-machine sync.
+- **[Modules](/docs/modules)** — the complete service inventory.
+- **[Agent skills](/docs/agent-skills)** — generate and use one focused skill
+  per module.
+- **[Operations](/docs/operations)** — status, doctor, and cross-service
+  briefings.
+- **[Development](/docs/development)** — work on the Bun monorepo and add a
+  module.

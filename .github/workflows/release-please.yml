@@ -10,13 +10,14 @@ permissions:
 
 jobs:
   # Maintains a rolling release PR from conventional commits. Merging it bumps
-  # package.json + CHANGELOG.md, tags vX.Y.Z, and creates the GitHub Release.
+  # apps/home/package.json + apps/home/CHANGELOG.md, tags home-vX.Y.Z, and
+  # creates the GitHub Release.
   release-please:
     runs-on: ubuntu-latest
     outputs:
-      release_created: ${{ steps.rp.outputs.release_created }}
-      tag_name: ${{ steps.rp.outputs.tag_name }}
-      version: ${{ steps.rp.outputs.version }}
+      release_created: ${{ steps.rp.outputs['apps/home--release_created'] }}
+      tag_name: ${{ steps.rp.outputs['apps/home--tag_name'] }}
+      version: ${{ steps.rp.outputs['apps/home--version'] }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: rp
@@ -55,7 +56,7 @@ jobs:
             --target=${{ matrix.target }} \
             --define "__HOME_VERSION=\"${{ needs.release-please.outputs.version }}\"" \
             --define "__HOME_COMMIT=\"$(git rev-parse --short HEAD)\"" \
-            src/index.ts \
+            apps/home/src/index.ts \
             --outfile dist/${{ matrix.asset }}
       - name: Upload binary to release
         env:

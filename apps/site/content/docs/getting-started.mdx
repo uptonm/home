@@ -1,0 +1,107 @@
+---
+title: Getting started
+description: Install home, initialize the config root, configure modules, and run the first commands.
+---
+
+## Requirements
+
+Prebuilt binaries are published for:
+
+- Linux x86_64 (`bun-linux-x64-baseline`, with no AVX requirement)
+- macOS arm64
+
+The installer writes to `~/.local/bin/home` when that directory is on your
+`PATH`. It can offer `/usr/local/bin/home` on an interactive install when
+needed.
+
+## Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/uptonm/home/main/scripts/install.sh | bash
+```
+
+Confirm the binary is available:
+
+```bash
+home --version
+home --help
+```
+
+## Initialize
+
+Create `~/.config/home/` and choose a secrets backend:
+
+```bash
+home init
+```
+
+Then configure every module interactively:
+
+```bash
+home configure
+```
+
+You can configure only the services you use:
+
+```bash
+home unifi configure
+home protect configure
+home assistant configure
+home sonos configure
+home beszel configure
+```
+
+Sonos can discover players over SSDP multicast without configuration. Configure
+its subnet only when the CLI needs cross-VLAN discovery.
+
+## Check readiness
+
+```bash
+home status
+home doctor
+```
+
+`status` gives a concise readiness view. `doctor` adds configuration,
+dependency, version, and update diagnostics.
+
+Exit codes are stable:
+
+| Code | Meaning |
+| ---: | --- |
+| `0` | Success |
+| `1` | User or input error |
+| `2` | System or service error |
+| `3` | Module not configured |
+
+## Use structured output
+
+Every command accepts `--json`:
+
+```bash
+home unifi devices list --json
+home protect events recent --type motion --limit 5 --json
+home assistant logbook list --since 24h --json
+home sonos players list --json
+```
+
+That output is intended for `jq`, scripts, and local agents. The human-readable
+view and the machine contract come from the same command implementation.
+
+## Install agent skills
+
+```bash
+home skill install
+```
+
+This writes one focused skill per configured module. See
+[Agent skills](/docs/agent-skills) for the contract and safety model.
+
+## Update
+
+```bash
+home upgrade --check
+home upgrade --yes
+```
+
+The CLI checks for releases at most once per day in a detached background
+refresh. It stays silent for `--json`, pipes, and CI.

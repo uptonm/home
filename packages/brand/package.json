@@ -1,0 +1,21 @@
+{
+  "name": "@home/brand",
+  "version": "0.1.0",
+  "private": true,
+  "files": [
+    "*.ico",
+    "*.png",
+    "*.svg",
+    "source/"
+  ],
+  "exports": {
+    "./apple-icon.png": "./apple-icon.png",
+    "./favicon.ico": "./favicon.ico",
+    "./github-social-preview.png": "./github-social-preview.png",
+    "./home-mark.svg": "./home-mark.svg",
+    "./icon-192.png": "./icon-192.png",
+    "./icon-512.png": "./icon-512.png",
+    "./icon.png": "./icon.png",
+    "./og.png": "./og.png"
+  }
+}

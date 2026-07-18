@@ -22,9 +22,10 @@ systems.
 | `github-social-preview.png` | 1280×640 | GitHub repository social preview |
 | `source/social-background.png` | Raster source | Illustration source for the social-card exports |
 
-For a Next.js App Router site, copy `icon.png`, `apple-icon.png`, and
-`favicon.ico` into `src/app/`; copy `icon-192.png`, `icon-512.png`, and
-`og.png` into `public/`.
+The canonical exports live here. The production Next.js site mirrors
+`icon.png`, `apple-icon.png`, and `favicon.ico` into `apps/site/src/app/`,
+and mirrors `icon-192.png`, `icon-512.png`, and `og.png` into
+`apps/site/public/`.
 
 ## Palette
 
@@ -54,7 +55,7 @@ The icon exports are drawn deterministically from the same geometry as
 illustration source:
 
 ```bash
-/path/to/python3 brand/build.py
+/path/to/python3 packages/brand/build.py
 ```
 
 The build requires Pillow. It uses the macOS SF Mono fonts when run from the

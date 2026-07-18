@@ -1,0 +1,91 @@
+---
+title: Configuration and secrets
+description: How home stores module configuration, protects credentials, and moves a setup between hosts.
+---
+
+## Config root
+
+Everything local to `home` lives under:
+
+```text
+~/.config/home/
+├── config.json
+├── modules/
+│   ├── unifi.json
+│   ├── protect.json
+│   └── …
+└── secrets.json   # file backend only
+```
+
+Per-module JSON files hold non-secret values such as service URLs, site IDs,
+TLS choices, and host-local discovery settings.
+
+## Secret backends
+
+The default backend is the OS keyring:
+
+- macOS Keychain on macOS
+- libsecret when it is available on Linux
+- a mode-0600 `secrets.json` fallback on headless Linux
+
+Secrets share one keyring item (`home-cli` / `secrets`) containing one JSON
+blob. This keeps macOS authorization to one grant instead of one prompt per
+module.
+
+## Configure and rotate
+
+```bash
+home unifi configure
+home unifi configure --rotate   # prompt for secrets only
+home unifi configure --force    # prompt for every field
+```
+
+Existing per-secret keyring entries migrate into the shared item the first
+time they are read.
+
+## Export and import
+
+Configuration and credentials move separately:
+
+```bash
+home config export --out ~/home-config.json
+home config import --in ~/home-config.json
+
+home secrets export --out ~/home-secrets.json
+home secrets import --in ~/home-secrets.json
+```
+
+Treat an exported secrets file as sensitive and delete it after the transfer.
+
+## Sync through Vercel
+
+The `vercel` module can use encrypted shared environment variables as an
+explicit cross-machine store:
+
+```bash
+vercel login
+home vercel configure
+
+home vercel config diff
+home vercel config push
+home vercel config pull
+```
+
+Both directions support `--dry-run`. Sync is additive, last-write-wins, and
+never automatic. Host-local values such as a Sonos discovery subnet stay on
+the machine where they were configured.
+
+## macOS development builds
+
+Keychain grants are attached to the exact binary. Rebuilding changes that
+identity, so a locally compiled binary can prompt again even when it is
+codesigned.
+
+During a tight edit loop, run the TypeScript entrypoint through Bun:
+
+```bash
+bun run home:dev -- status
+```
+
+The keychain then sees the stable Bun executable instead of a newly compiled
+binary on every edit.

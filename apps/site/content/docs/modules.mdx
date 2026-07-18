@@ -1,0 +1,70 @@
+---
+title: Modules
+description: The complete inventory of home modules and the job each one owns.
+---
+
+Each module owns one service boundary and exposes its configuration, status,
+commands, effects, and skill guidance through the shared registry.
+
+## Home and network
+
+| Module | Surface |
+| --- | --- |
+| `unifi` | UniFi Network devices, clients, site health, networks, WLANs, firewall rules, reservations, vouchers, PoE cycling, and client control |
+| `protect` | UniFi Protect cameras, PTZ, lights, sensors, door locks, snapshots, events, NVR state, live views, viewers, chimes, and talkback |
+| `assistant` | Home Assistant states, services, automations, scenes, scripts, calendars, templates, history, events, cameras, and logbook |
+
+## Media
+
+| Module | Surface |
+| --- | --- |
+| `spotify` | Catalog search, item lookup, categories, new releases, and children |
+| `sonos` | Discovery, players, playback, volume, grouping, queue, favorites, playlists, library, EQ, alarms, and notifications |
+| `tts` | Text-to-speech MP3 generation through macOS `say` or Linux `espeak-ng` |
+
+`spotify`, `sonos`, and `tts` are designed to compose: find a URI, hand it to
+playback, or synthesize an announcement and send it to a player.
+
+## Google and communication
+
+| Module | Surface |
+| --- | --- |
+| `google` | Shared Google OAuth client and grant lifecycle |
+| `gmail` | Read-only message/thread search, labels, drafts, and mailbox profile |
+| `gcal` | Read-only calendars, events, merged agendas, recurring expansion, and free/busy |
+| `gdrive` | File listing, lookup, download, and export |
+| `discord` | Channel listing, message reads, and guarded bot messages |
+
+Configure the shared Google client once, then authorize Gmail, Calendar, and
+Drive independently.
+
+## Developer workflow
+
+| Module | Surface |
+| --- | --- |
+| `github` | Repositories, pull requests, reviews, checks, diffs, Actions, issues, notifications, releases, and code search through `gh` |
+| `graphite` | Local stack layout, parents, children, restack readiness, and guarded mutations through `gt` |
+| `linear` | Issues, projects, milestones, cycles, teams, assignments, and guarded planning changes |
+| `vercel` | Projects, deployments, build events, domains, and explicit config sync |
+
+## Operations
+
+| Module | Surface |
+| --- | --- |
+| `beszel` | Host/container health, resource pressure, metric history, SMART health, and firing alerts |
+| `uptime-kuma` | Monitor state, latency, certificates, incidents, maintenance windows, status pages, and summaries |
+
+Use `home overview ops` to combine operational signals across the modules that
+are configured on the current host.
+
+## Discover commands
+
+```bash
+home <module> --help
+home <module> status
+home <module> configure
+home <module> skill
+```
+
+Shell completion is generated from the same tree, so newly registered commands
+and flags appear automatically.
