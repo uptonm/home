@@ -394,11 +394,11 @@ describe('stack get (gt info)', () => {
     expect(info.commit).toBe('5cb54f927a28ff36cdbc034407073836d8dab6cd')
   })
 
-  test('untracked branch → graphite_failed with gt text preserved', async () => {
+  test('untracked branch → graphite_untracked_branch with gt text preserved', async () => {
     const { run } = fakeGt(() => result({ exitCode: 1, stderr: REAL_ERR_UNTRACKED }))
     const err = await errorFrom(getBranchInfo(CFG, 'claude/gdrive-module', run))
     expect(err).toBeInstanceOf(UserError)
-    expect(err.code).toBe('graphite_failed')
+    expect(err.code).toBe('graphite_untracked_branch')
     expect(err.message).toContain('untracked branch claude/gdrive-module')
   })
 
@@ -488,6 +488,17 @@ describe('status probe', () => {
       testedVersion: TESTED_GT_VERSION,
       repository: { initialized: true, trunk: 'main' },
     })
+  })
+
+  test('untracked current branch: repository initialized, trunk null, probe still succeeds', async () => {
+    const { run } = fakeGt((argv) =>
+      argv.includes('--version')
+        ? result({ stdout: REAL_VERSION })
+        : result({ exitCode: 1, stderr: REAL_ERR_UNTRACKED }),
+    )
+    const status = await probeGraphite(CFG, run)
+    expect(status.repository).toEqual({ initialized: true, trunk: null })
+    expect(status.version).toBe('1.8.6')
   })
 
   test('outside a repo: repository null, probe still succeeds', async () => {
