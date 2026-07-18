@@ -100,7 +100,7 @@ export const argProviders: Record<string, Provider> = {
   'unifi settings get': firstField('unifi', ['settings', 'list'], 'key', 'key'),
   // protect
   'protect cameras get': firstField('protect', ['cameras', 'list'], 'id', 'id'),
-  'protect events get': firstField('protect', ['events', 'list'], 'id', 'id'),
+  'protect events get': firstField('protect', ['events', 'list'], 'id', 'id', ['--since', '7d', '--limit', '1']),
   'protect lights get': firstField('protect', ['lights', 'list'], 'id', 'ref'),
   'protect sensors get': firstField('protect', ['sensors', 'list'], 'id', 'ref'),
   'protect doorlocks get': firstField('protect', ['doorlocks', 'list'], 'id', 'ref'),
@@ -138,7 +138,7 @@ export const argProviders: Record<string, Provider> = {
   'sonos sleep-timer get': fixed({ room: fixtures.sonosRoom }),
   'sonos eq get': fixed({ room: fixtures.sonosRoom }),
   'sonos group-volume get': fixed({ room: fixtures.sonosRoom }),
-  'sonos playlists get': firstField('sonos', ['playlists', 'list'], 'name', 'name'),
+  'sonos playlists get': firstField('sonos', ['playlists', 'list'], 'title', 'name'),
   'sonos alarms get': firstField('sonos', ['alarms', 'list'], 'id', 'id'),
   'sonos library browse': fixed({ category: 'albums' }),
   'sonos library search': fixed({ category: 'albums', query: 'daft' }),
