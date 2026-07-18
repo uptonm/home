@@ -12,7 +12,6 @@ import {
   getEvent,
   listCalendars,
   queryFreeBusy,
-  readGcalConfig,
   summarizeCalendar,
   summarizeEvent,
   summarizeFreeBusy,
@@ -114,17 +113,6 @@ describe('summarizeFreeBusy', () => {
 
   test('tolerates a response with no calendars map', () => {
     expect(summarizeFreeBusy({})).toEqual([])
-  })
-})
-
-describe('readGcalConfig', () => {
-  test('pulls credentials from module config, coercing missing values to empty', () => {
-    expect(readGcalConfig({ clientId: 'c', clientSecret: 's', refreshToken: 'r' })).toEqual({
-      clientId: 'c',
-      clientSecret: 's',
-      refreshToken: 'r',
-    })
-    expect(readGcalConfig({})).toEqual({ clientId: '', clientSecret: '', refreshToken: '' })
   })
 })
 
@@ -302,35 +290,6 @@ describe('network functions over mocked fetch', () => {
   })
 
   describe('checkGcalStatus error normalization', () => {
-    test('not configured → not_configured without touching the network', async () => {
-      let calls = 0
-      globalThis.fetch = (async (_url: string) => {
-        calls++
-        return tokenResponse()
-      }) as typeof fetch
-
-      const res = await checkGcalStatus({})
-      expect(res.ok).toBe(false)
-      const fail = res as { kind?: string; code?: string; message?: string }
-      expect(fail.kind).toBe('config')
-      expect(fail.code).toBe('not_configured')
-      expect(fail.message).toContain('home gcal configure')
-      expect(calls).toBe(0)
-    })
-
-    test('no refresh token → unauthorized without touching the network', async () => {
-      let calls = 0
-      globalThis.fetch = (async (_url: string) => {
-        calls++
-        return tokenResponse()
-      }) as typeof fetch
-
-      const res = await checkGcalStatus({ clientId: 'c', clientSecret: 's' })
-      expect(res.ok).toBe(false)
-      expect((res as { code?: string }).code).toBe('unauthorized')
-      expect(calls).toBe(0)
-    })
-
     test('working grant → authenticated account from the primary entry', async () => {
       globalThis.fetch = (async (url: string) => {
         if (String(url).includes('oauth2.googleapis.com')) return tokenResponse()

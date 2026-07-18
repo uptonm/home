@@ -1,6 +1,6 @@
-import { authedRequestJson, type GoogleOAuthCredentials } from '../../core/google-auth'
+import { authedRequestJson, requireGoogleCredentials, type GoogleOAuthCredentials } from '../../core/google-auth'
 import { SystemError } from '../../core/errors'
-import type { ModuleConfig, RunResult } from '../../core/types'
+import type { RunResult } from '../../core/types'
 
 /**
  * Google Calendar REST client (read-only). Calendar-list requests hit
@@ -22,14 +22,9 @@ export const GCAL_SCOPES = [GCAL_READONLY_SCOPE]
 /** Secret key under which the OAuth refresh token is persisted (module "gcal"). */
 export const GCAL_REFRESH_TOKEN_KEY = 'refreshToken'
 
-export type GcalConfig = GoogleOAuthCredentials
-
-export function readGcalConfig(cfg: ModuleConfig): GcalConfig {
-  return {
-    clientId: String(cfg.clientId ?? ''),
-    clientSecret: String(cfg.clientSecret ?? ''),
-    refreshToken: String(cfg.refreshToken ?? ''),
-  }
+/** Shared OAuth client + gcal's own refresh token. Throws when either is absent. */
+export function readGcalCredentials(): GoogleOAuthCredentials {
+  return requireGoogleCredentials(GCAL_MODULE)
 }
 
 // --- URL builders (pure) -------------------------------------------------
@@ -281,24 +276,24 @@ export function summarizeFreeBusy(res: FreeBusyResponse): FreeBusyCalendarSummar
 
 // --- API functions -------------------------------------------------------
 
-export function listCalendars(cfg: GcalConfig, opts: CalendarsListOptions = {}): Promise<CalendarsListResponse> {
+export function listCalendars(cfg: GoogleOAuthCredentials, opts: CalendarsListOptions = {}): Promise<CalendarsListResponse> {
   return authedRequestJson<CalendarsListResponse>(cfg, calendarsListUrl(opts))
 }
 
-export function getCalendarListEntry(cfg: GcalConfig, calendarId: string): Promise<CalendarListEntry> {
+export function getCalendarListEntry(cfg: GoogleOAuthCredentials, calendarId: string): Promise<CalendarListEntry> {
   return authedRequestJson<CalendarListEntry>(cfg, calendarListEntryUrl(calendarId))
 }
 
-export function listEvents(cfg: GcalConfig, calendarId: string, opts: EventsListOptions = {}): Promise<EventsListResponse> {
+export function listEvents(cfg: GoogleOAuthCredentials, calendarId: string, opts: EventsListOptions = {}): Promise<EventsListResponse> {
   return authedRequestJson<EventsListResponse>(cfg, eventsListUrl(calendarId, opts))
 }
 
-export function getEvent(cfg: GcalConfig, calendarId: string, eventId: string): Promise<GcalEvent> {
+export function getEvent(cfg: GoogleOAuthCredentials, calendarId: string, eventId: string): Promise<GcalEvent> {
   return authedRequestJson<GcalEvent>(cfg, eventGetUrl(calendarId, eventId))
 }
 
 /** POST in transport only — freeBusy queries availability and mutates nothing. */
-export function queryFreeBusy(cfg: GcalConfig, body: FreeBusyRequestBody): Promise<FreeBusyResponse> {
+export function queryFreeBusy(cfg: GoogleOAuthCredentials, body: FreeBusyRequestBody): Promise<FreeBusyResponse> {
   return authedRequestJson<FreeBusyResponse>(cfg, freeBusyUrl(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -309,32 +304,16 @@ export function queryFreeBusy(cfg: GcalConfig, body: FreeBusyRequestBody): Promi
 // --- Status probe --------------------------------------------------------
 
 /**
- * Readiness check shared by `manifest.status()` and `gcal auth status`: one
- * bounded calendar-list request (the primary entry — its id is the account
- * email). Never throws; every failure mode maps to a stable code:
- *   - `not_configured`  — clientId/clientSecret absent
- *   - `unauthorized`    — no refresh token yet (`auth login` not run)
+ * Readiness check backing `manifest.status()`: one bounded calendar-list
+ * request (the primary entry — its id is the account email) against
+ * already-resolved credentials. Credential resolution (and its
+ * `not_configured` failure) is the caller's job — see `readGcalCredentials`
+ * — so this only classifies network-layer failures once creds are known
+ * good, mapping every failure mode to a stable code:
  *   - `auth_failed`     — Google rejected the stored grant (revoked/expired)
  *   - `upstream_failed` — the Calendar API itself errored or was unreachable
  */
-export async function checkGcalStatus(cfg: ModuleConfig): Promise<RunResult> {
-  const creds = readGcalConfig(cfg)
-  if (!creds.clientId || !creds.clientSecret) {
-    return {
-      ok: false,
-      kind: 'config',
-      message: 'gcal clientId/clientSecret not set — run `home gcal configure` first',
-      code: 'not_configured',
-    }
-  }
-  if (!creds.refreshToken) {
-    return {
-      ok: false,
-      kind: 'config',
-      message: 'gcal is configured but not authorized — run `home gcal auth login`',
-      code: 'unauthorized',
-    }
-  }
+export async function checkGcalStatus(creds: GoogleOAuthCredentials): Promise<RunResult> {
   try {
     const primary = await getCalendarListEntry(creds, 'primary')
     return {

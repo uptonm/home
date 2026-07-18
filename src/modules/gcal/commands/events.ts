@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { getEvent, listEvents, readGcalConfig, summarizeEvent } from '../client'
+import { getEvent, listEvents, readGcalCredentials, summarizeEvent } from '../client'
 import { DEFAULT_EVENTS_MAX, EVENTS_MAX_CAP, optionalString, parseMax, parseTimeBound } from './shared'
 
 export const eventsList: CommandSpec = {
@@ -31,8 +31,8 @@ export const eventsList: CommandSpec = {
     if (to.error) return { ok: false, kind: 'user', message: to.error, code: 'bad_arg' }
 
     const calendarId = optionalString(ctx, 'calendarId') ?? 'primary'
-    const cfg = readGcalConfig(ctx.config)
-    const page = await listEvents(cfg, calendarId, {
+    const creds = readGcalCredentials()
+    const page = await listEvents(creds, calendarId, {
       timeMin: from.value,
       timeMax: to.value,
       q: optionalString(ctx, 'q'),
@@ -70,8 +70,8 @@ export const eventsGet: CommandSpec = {
     const eventId = String(ctx.args.eventId ?? '').trim()
     if (!eventId) return { ok: false, kind: 'user', message: 'eventId is required', code: 'missing_arg' }
 
-    const cfg = readGcalConfig(ctx.config)
-    const data = await getEvent(cfg, calendarId, eventId)
+    const creds = readGcalCredentials()
+    const data = await getEvent(creds, calendarId, eventId)
     return { ok: true, data }
   },
 }

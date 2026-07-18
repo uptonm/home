@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../../../core/types'
-import { listCalendars, listEvents, readGcalConfig, summarizeEvent, type GcalEvent } from '../client'
+import { listCalendars, listEvents, readGcalCredentials, summarizeEvent, type GcalEvent } from '../client'
 import {
   AGENDA_DAYS_CAP,
   CALENDARS_MAX_CAP,
@@ -109,13 +109,13 @@ export const agenda: CommandSpec = {
     if (max.error) return { ok: false, kind: 'user', message: max.error, code: 'bad_arg' }
     if (max.warning && ctx.log) ctx.log.warn(max.warning)
 
-    const cfg = readGcalConfig(ctx.config)
+    const creds = readGcalCredentials()
     const explicitIds = parseCalendarIds(ctx)
     let targets: { id: string; summary?: string }[]
     if (explicitIds) {
       targets = explicitIds.map((id) => ({ id }))
     } else {
-      const page = await listCalendars(cfg, { maxResults: CALENDARS_MAX_CAP })
+      const page = await listCalendars(creds, { maxResults: CALENDARS_MAX_CAP })
       targets = (page.items ?? [])
         .filter((entry) => entry.deleted !== true)
         .map((entry) => ({ id: entry.id, summary: entry.summaryOverride ?? entry.summary }))
@@ -127,7 +127,7 @@ export const agenda: CommandSpec = {
     const timeMax = new Date(now.getTime() + days.value! * DAY_MS).toISOString()
 
     const pages = await Promise.all(
-      targets.map((target) => listEvents(cfg, target.id, { timeMin, timeMax, maxResults: max.value })),
+      targets.map((target) => listEvents(creds, target.id, { timeMin, timeMax, maxResults: max.value })),
     )
     const merged = mergeAgenda(
       targets.map((target, i) => ({

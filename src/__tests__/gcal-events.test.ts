@@ -18,6 +18,7 @@ const realClient = await import('../modules/gcal/client')
 
 mock.module('../modules/gcal/client', () => ({
   ...realClient,
+  readGcalCredentials: () => ({ clientId: 'c', clientSecret: 's', refreshToken: 'r' }),
   listEvents: async (_cfg: unknown, calendarId: string, opts: EventsListOptions = {}) => {
     listCalls.push({ calendarId, opts })
     return listResponse
