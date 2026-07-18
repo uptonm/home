@@ -202,4 +202,33 @@ export const argProviders: Record<string, Provider> = {
   'vercel domains get': firstField('vercel', ['domains', 'list'], 'name', 'name'),
   // discord — get-messages reads from the designated alerts channel
   'discord get-messages': fixed({ channelId: fixtures.discordAlertsChannelId }),
+  // linear — reads only; identifier (UPT-123) preferred over uuid for readable logs
+  'linear issues get': firstFieldIn('linear', ['issues', 'list'], 'issues', 'identifier', 'issue'),
+  'linear issues search': fixed({ query: 'home' }),
+  'linear projects get': firstFieldIn('linear', ['projects', 'list'], 'projects', 'id', 'project'),
+  // beszel — systems list is a bare array; containers/container-metrics need a
+  // system known to be up, since a long-down PVE system would yield stale/empty containers
+  'beszel systems get': firstField('beszel', ['systems', 'list'], 'id', 'system'),
+  'beszel metrics get': firstField('beszel', ['systems', 'list'], 'id', 'system'),
+  'beszel smart get': firstField('beszel', ['systems', 'list'], 'id', 'system'),
+  'beszel containers list': firstField('beszel', ['systems', 'list'], 'id', 'system'),
+  'beszel containers get': beszelContainerRef,
+  'beszel container-metrics get': beszelContainerRef,
+  // uptime-kuma — monitors list wraps as {monitors:[...]}; heartbeats needs the authenticated transport
+  'uptime-kuma monitors get': firstFieldIn('uptime-kuma', ['monitors', 'list'], 'monitors', 'id', 'monitor'),
+  'uptime-kuma heartbeats list': firstFieldIn('uptime-kuma', ['monitors', 'list'], 'monitors', 'id', 'monitor'),
+}
+
+/** beszel containers/container-metrics need a container name from a system that's
+ *  actually up — walking up systems (not just row 0) avoids flaking on the
+ *  long-down PVE host that would otherwise yield stale/empty container sets. */
+async function beszelContainerRef(): Promise<Record<string, string>> {
+  const systems = (await rows('beszel', ['systems', 'list'])) as { id: string; status: string }[]
+  for (const s of systems) {
+    if (s.status !== 'up') continue
+    const data = (await cachedJson('beszel', ['containers', 'list'], [s.id])) as { containers?: { name: string }[] }
+    const name = data.containers?.[0]?.name
+    if (name) return { system: s.id, container: name }
+  }
+  throw new Unresolved('beszel: no up system reporting containers')
 }
