@@ -51,7 +51,8 @@ export const clientsAll: CommandSpec = {
 export const eventsList: CommandSpec = {
   path: ['events', 'list'],
   effect: 'read',
-  description: 'List recent network events (site system log, all categories)',
+  description:
+    'List recent network events (site system log, all categories). Each row\'s msg is the short event title (e.g. "WiFi Client Roamed") — v2 system-log does not provide a rendered message.',
   args: [
     { name: 'limit', kind: 'number', description: 'Max events to return, newest first (default: 50)', required: false },
   ],
@@ -68,7 +69,8 @@ export const eventsList: CommandSpec = {
 export const alarmsList: CommandSpec = {
   path: ['alarms', 'list'],
   effect: 'read',
-  description: 'List recent critical-severity network alarms (site system log, critical category)',
+  description:
+    'List recent critical-severity network alarms (site system log, critical category). Each row\'s msg is the short event title, not a rendered message; rows now also include key.',
   args: [],
   examples: ['home unifi alarms list', 'home unifi alarms list --json'],
   async run(ctx) {
