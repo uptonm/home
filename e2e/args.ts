@@ -180,7 +180,6 @@ export const argProviders: Record<string, Provider> = {
     const now = Date.now()
     return { from: new Date(now).toISOString(), to: new Date(now + 86_400_000).toISOString() }
   },
-  // discord get-messages needs a designated channel fixture — add when configured
   // github — chained off lists; --state all survives zero open PRs
   'github prs get': firstField('github', ['prs', 'list'], 'number', 'ref', ['--state', 'all', '--limit', '1']),
   'github prs checks': firstField('github', ['prs', 'list'], 'number', 'ref', ['--state', 'all', '--limit', '1']),

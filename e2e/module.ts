@@ -64,6 +64,12 @@ async function autoRead(module: string, cmd: CommandSpec): Promise<ReadResult> {
       const detail = `read timed out (SIGTERM after ${DEFAULT_TIMEOUT_MS / 1000}s)`
       return { key, outcome: 'fail', detail }
     }
+    // 137 = SIGKILL escalation: the child ignored our SIGTERM, so cli.ts's
+    // sigkillTimer force-killed it after the kill grace period elapsed.
+    if (res.exitCode === 137) {
+      const detail = 'read timed out (SIGKILL after 35s)'
+      return { key, outcome: 'fail', detail }
+    }
     // Environmental codes (untracked branch, etc.) classify as unresolved, not fail
     const body = res.json as { ok?: unknown; code?: unknown; message?: unknown } | null
     if (body?.ok === false && typeof body.code === 'string' && environmentalCodes[module]?.has(body.code)) {

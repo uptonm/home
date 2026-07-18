@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test'
 import type { HassCalendar } from '../modules/assistant/client'
-import type { RequestInit } from 'undici'
 
 const EMPTY_CTX = {
   config: {},

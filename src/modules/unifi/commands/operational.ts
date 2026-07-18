@@ -70,7 +70,7 @@ export const alarmsList: CommandSpec = {
   path: ['alarms', 'list'],
   effect: 'read',
   description:
-    'List recent critical-severity network alarms (site system log, critical category). Each row\'s msg is the short event title, not a rendered message; rows now also include key.',
+    'List recent critical-severity network alarms (site system log, critical category). Rows include time, key, and msg; msg is the short event title, not a rendered message.',
   args: [],
   examples: ['home unifi alarms list', 'home unifi alarms list --json'],
   async run(ctx) {
