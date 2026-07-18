@@ -100,6 +100,14 @@ function printReport(targets: Module[], results: ModuleResult[]): boolean {
     console.log('\nunresolved reads (needs a provider or live data):')
     for (const r of unresolvedReads) console.log(`  - ${r.key}: ${r.detail}`)
   }
+  if (failedReads.length) {
+    console.log('\nfailed reads:')
+    for (const r of failedReads) console.log(`  - ${r.key}: ${r.detail}`)
+  }
+  if (failedScenarios.length) {
+    console.log('\nfailed scenarios:')
+    for (const r of failedScenarios) console.log(`  - ${r.name}: ${r.detail}`)
+  }
   if (unexercised.length) {
     console.log('\nneeds attention (runnable but never exercised):')
     for (const { m, c } of unexercised) console.log(`  - [${c.effect}] ${commandKey(m, c.path)}`)
