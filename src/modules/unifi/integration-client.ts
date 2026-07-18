@@ -44,12 +44,13 @@ export async function resolveIntegrationSiteId(cfg: UnifiConfig): Promise<string
 /** Probe the integration API — returns version info or null if unreachable. */
 export async function integrationAppInfo(cfg: UnifiConfig): Promise<{ version: string; uuid: string } | null> {
   try {
-    const body = await requestJson<{ server_version: string; uuid: string }>(
+    const body = await requestJson<{ applicationVersion?: string; server_version?: string; uuid?: string }>(
       `${integrationBase(cfg)}/info`,
       { headers: integrationHeaders(cfg) },
       { insecureTLS: cfg.insecureTLS },
     )
-    return body.server_version ? { version: body.server_version, uuid: body.uuid } : null
+    const version = body.applicationVersion ?? body.server_version
+    return version ? { version, uuid: body.uuid ?? '' } : null
   } catch {
     return null
   }

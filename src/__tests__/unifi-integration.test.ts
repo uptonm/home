@@ -131,3 +131,63 @@ describe('integrationGetDeviceStats', () => {
     expect(await integrationGetDeviceStats(statsCfg, 'uuid-1')).toEqual(BARE_STATS)
   })
 })
+
+// ── integrationAppInfo field name support ──────────────────────────────────
+// 10.4.57 returns applicationVersion; older versions use server_version.
+// uuid field is optional in live responses.
+
+describe('integrationAppInfo', () => {
+  test('reads applicationVersion from 10.4.57 /info endpoint', async () => {
+    const realHttp = await import('../core/http')
+    mock.module('../core/http', () => ({
+      ...realHttp,
+      requestJson: async () => ({ applicationVersion: '10.4.57' }),
+    }))
+
+    const { integrationAppInfo } = await import('../modules/unifi/integration-client')
+    const appCfg = { url: 'https://example.test', site: 'default', apiKey: 'k' }
+    const result = await integrationAppInfo(appCfg)
+    expect(result).toEqual({ version: '10.4.57', uuid: '' })
+  })
+
+  test('falls back to server_version for older versions', async () => {
+    const realHttp = await import('../core/http')
+    mock.module('../core/http', () => ({
+      ...realHttp,
+      requestJson: async () => ({ server_version: '9.2.3', uuid: 'some-uuid-1234' }),
+    }))
+
+    const { integrationAppInfo } = await import('../modules/unifi/integration-client')
+    const appCfg = { url: 'https://example.test', site: 'default', apiKey: 'k' }
+    const result = await integrationAppInfo(appCfg)
+    expect(result).toEqual({ version: '9.2.3', uuid: 'some-uuid-1234' })
+  })
+
+  test('returns null when neither version field is present', async () => {
+    const realHttp = await import('../core/http')
+    mock.module('../core/http', () => ({
+      ...realHttp,
+      requestJson: async () => ({ uuid: 'some-uuid' }),
+    }))
+
+    const { integrationAppInfo } = await import('../modules/unifi/integration-client')
+    const appCfg = { url: 'https://example.test', site: 'default', apiKey: 'k' }
+    const result = await integrationAppInfo(appCfg)
+    expect(result).toBeNull()
+  })
+
+  test('returns null when requestJson throws (API unreachable)', async () => {
+    const realHttp = await import('../core/http')
+    mock.module('../core/http', () => ({
+      ...realHttp,
+      requestJson: async () => {
+        throw new Error('connection failed')
+      },
+    }))
+
+    const { integrationAppInfo } = await import('../modules/unifi/integration-client')
+    const appCfg = { url: 'https://example.test', site: 'default', apiKey: 'k' }
+    const result = await integrationAppInfo(appCfg)
+    expect(result).toBeNull()
+  })
+})
