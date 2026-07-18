@@ -2,16 +2,38 @@ import type { CommandSpec } from '../../../core/types'
 import {
   getClientDpi,
   listAllClients,
-  listAlarms,
-  listEvents,
   listGuests,
   listRogueAps,
   listSiteDpi,
   readUnifiConfig,
+  v2SystemLog,
 } from '../client'
 
-interface RawEvent { _id: string; key?: string; msg?: string; [key: string]: unknown }
-interface RawAlarm { _id: string; msg?: string; [key: string]: unknown }
+/**
+ * A row from the v2 system-log endpoint (`system-log/all` or
+ * `system-log/critical`) that now backs both `events list` and `alarms
+ * list`. Unlike the legacy `stat/event`/`stat/alarm` rows, there's no
+ * pre-rendered message string: `message_raw` is a template with
+ * `{PLACEHOLDER}` tokens resolved via `parameters`, so `title_raw` (a short,
+ * already-resolved human label like "WiFi Client Roamed") is the closer
+ * analog to the old `msg` field.
+ */
+interface SystemLogRow {
+  key?: string
+  timestamp?: number
+  title_raw?: string
+  [key: string]: unknown
+}
+
+const DEFAULT_SYSTEM_LOG_PAGE_SIZE = 50
+
+export function mapSystemLogRow(row: SystemLogRow): { time: string; key: string; msg: string } {
+  return {
+    time: typeof row.timestamp === 'number' ? new Date(row.timestamp).toISOString() : '',
+    key: row.key ?? '',
+    msg: row.title_raw ?? '',
+  }
+}
 
 export const clientsAll: CommandSpec = {
   path: ['clients', 'all'],
@@ -29,18 +51,16 @@ export const clientsAll: CommandSpec = {
 export const eventsList: CommandSpec = {
   path: ['events', 'list'],
   effect: 'read',
-  description: 'List recent network events',
+  description: 'List recent network events (site system log, all categories)',
   args: [
-    { name: 'limit', kind: 'number', description: 'Max events to return (default: all)', required: false },
+    { name: 'limit', kind: 'number', description: 'Max events to return, newest first (default: 50)', required: false },
   ],
   examples: ['home unifi events list', 'home unifi events list --limit 20 --json'],
   async run(ctx) {
     const cfg = readUnifiConfig(ctx.config)
     const limit = ctx.args.limit ? Number(ctx.args.limit) : undefined
-    const items = (await listEvents(cfg, limit)) as RawEvent[]
-    const data = items
-      .map((e) => ({ time: (e as any).datetime ?? '', key: e.key ?? '', msg: e.msg ?? '' }))
-      .slice(0, 50)
+    const items = (await v2SystemLog(cfg, 'all', 0, limit ?? DEFAULT_SYSTEM_LOG_PAGE_SIZE)) as SystemLogRow[]
+    const data = items.map(mapSystemLogRow)
     return { ok: true, data }
   },
 }
@@ -48,13 +68,13 @@ export const eventsList: CommandSpec = {
 export const alarmsList: CommandSpec = {
   path: ['alarms', 'list'],
   effect: 'read',
-  description: 'List active and archived network alarms',
+  description: 'List recent critical-severity network alarms (site system log, critical category)',
   args: [],
   examples: ['home unifi alarms list', 'home unifi alarms list --json'],
   async run(ctx) {
     const cfg = readUnifiConfig(ctx.config)
-    const items = (await listAlarms(cfg)) as RawAlarm[]
-    const data = items.map((a) => ({ time: (a as any).datetime ?? '', msg: a.msg ?? '' }))
+    const items = (await v2SystemLog(cfg, 'critical', 0, DEFAULT_SYSTEM_LOG_PAGE_SIZE)) as SystemLogRow[]
+    const data = items.map(mapSystemLogRow)
     return { ok: true, data }
   },
 }
