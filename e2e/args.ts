@@ -59,15 +59,18 @@ function firstFieldIn(module: string, listPath: string[], itemsKey: string, fiel
   }
 }
 
-/** spotify search returns { tracks: [...], albums: [...], ... }; pick first uri of a type. */
+/** spotify search returns { tracks: [...], albums: [...], ... }; pick the first
+ *  match's canonical `id` — not `uri`, which container matches rewrite to a
+ *  playable `spotify:track:<id>` on successful resolution, destroying the
+ *  container reference `album get`/`artist albums`/`playlist tracks` etc. need. */
 function spotifyRef(type: 'tracks' | 'albums' | 'artists' | 'playlists'): Provider {
   return async () => {
     const data = (await cachedJson('spotify', ['search'], ['daft punk'])) as Record<string, unknown>
     const items = data[type]
     const first = Array.isArray(items) ? (items[0] as Record<string, unknown> | undefined) : undefined
-    const uri = first?.uri
-    if (!uri) throw new Unresolved(`spotify search: no ${type}[0].uri`)
-    return { ref: String(uri) }
+    const id = first?.id
+    if (!id) throw new Unresolved(`spotify search: no ${type}[0].id`)
+    return { ref: String(id) }
   }
 }
 
@@ -126,7 +129,7 @@ export const argProviders: Record<string, Provider> = {
   'spotify artist top-tracks': spotifyRef('artists'),
   'spotify playlist get': spotifyRef('playlists'),
   'spotify playlist tracks': spotifyRef('playlists'),
-  'spotify categories get': firstField('spotify', ['categories', 'list'], 'id', 'id'),
+  'spotify categories get': firstFieldIn('spotify', ['categories', 'list'], 'items', 'id', 'id'),
   // sonos
   'sonos players get': fixed({ room: fixtures.sonosRoom }),
   'sonos groups get': fixed({ room: fixtures.sonosRoom }),

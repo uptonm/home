@@ -23,10 +23,14 @@ export type SpotifySearchType = (typeof SPOTIFY_SEARCH_TYPES)[number]
  * matches (album / artist / playlist) the resolver picks a representative
  * track and exposes its title via `trackTitle` so the LLM still has enough
  * context to say "playing OK Computer's first track" instead of just the
- * track name.
+ * track name. Every match also carries `id` — the entity's own canonical
+ * Spotify id, untouched by the playable-uri rewrite — so callers can chain
+ * straight into `album get`/`album tracks`/`artist albums`/`playlist tracks`
+ * etc. instead of losing the container's identity once `uri` becomes a track.
  */
 export interface TrackMatch {
   kind: 'track'
+  id: string
   uri: string
   title: string
   artist: string
@@ -58,6 +62,7 @@ export type ResolverFailureCode =
 
 export interface AlbumMatch {
   kind: 'album'
+  id: string
   uri: string
   title: string
   artist: string
@@ -70,6 +75,7 @@ export interface AlbumMatch {
 
 export interface ArtistMatch {
   kind: 'artist'
+  id: string
   uri: string
   name: string
   genres: string[]
@@ -81,6 +87,7 @@ export interface ArtistMatch {
 
 export interface PlaylistMatch {
   kind: 'playlist'
+  id: string
   uri: string
   title: string
   owner: string
@@ -263,6 +270,7 @@ export function normalizeSearchResponse(raw: RawSearchResponse): SpotifySearchRe
 
   const tracks: TrackMatch[] = trackItems.map((t) => ({
     kind: 'track',
+    id: t.id!,
     uri: `spotify:track:${t.id}`,
     title: t.name ?? '',
     artist: artistName(t.artists),
@@ -274,6 +282,7 @@ export function normalizeSearchResponse(raw: RawSearchResponse): SpotifySearchRe
 
   const albums: AlbumMatch[] = albumItems.map((a) => ({
     kind: 'album',
+    id: a.id!,
     uri: `spotify:album:${a.id}`,
     title: a.name ?? '',
     artist: artistName(a.artists),
@@ -284,6 +293,7 @@ export function normalizeSearchResponse(raw: RawSearchResponse): SpotifySearchRe
 
   const artists: ArtistMatch[] = artistItems.map((a) => ({
     kind: 'artist',
+    id: a.id!,
     uri: `spotify:artist:${a.id}`,
     name: a.name ?? '',
     genres: a.genres ?? [],
@@ -293,6 +303,7 @@ export function normalizeSearchResponse(raw: RawSearchResponse): SpotifySearchRe
 
   const playlists: PlaylistMatch[] = playlistItems.map((p) => ({
     kind: 'playlist',
+    id: p.id!,
     uri: `spotify:playlist:${p.id}`,
     title: p.name ?? '',
     owner: p.owner?.display_name ?? p.owner?.id ?? '',
@@ -525,6 +536,7 @@ interface RawCategoriesPage {
 export function shapeTrack(t: RawTrack): TrackMatch {
   return {
     kind: 'track',
+    id: t.id!,
     uri: `spotify:track:${t.id}`,
     title: t.name ?? '',
     artist: artistName(t.artists),
@@ -538,6 +550,7 @@ export function shapeTrack(t: RawTrack): TrackMatch {
 export function shapeAlbum(a: RawAlbum): AlbumMatch {
   return {
     kind: 'album',
+    id: a.id!,
     uri: `spotify:album:${a.id}`,
     title: a.name ?? '',
     artist: artistName(a.artists),
@@ -550,6 +563,7 @@ export function shapeAlbum(a: RawAlbum): AlbumMatch {
 export function shapeArtist(a: RawArtist): ArtistMatch {
   return {
     kind: 'artist',
+    id: a.id!,
     uri: `spotify:artist:${a.id}`,
     name: a.name ?? '',
     genres: a.genres ?? [],
@@ -561,6 +575,7 @@ export function shapeArtist(a: RawArtist): ArtistMatch {
 export function shapePlaylist(p: RawPlaylist): PlaylistMatch {
   return {
     kind: 'playlist',
+    id: p.id!,
     uri: `spotify:playlist:${p.id}`,
     title: p.name ?? '',
     owner: p.owner?.display_name ?? p.owner?.id ?? '',

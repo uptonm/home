@@ -140,6 +140,7 @@ describe('normalizeSearchResponse', () => {
     const out = normalizeSearchResponse(raw)
     expect(out.tracks[0]).toEqual({
       kind: 'track',
+      id: 'track123',
       uri: 'spotify:track:track123',
       title: 'Light',
       artist: 'John Summit',
@@ -150,6 +151,7 @@ describe('normalizeSearchResponse', () => {
     })
     expect(out.albums[0]).toEqual({
       kind: 'album',
+      id: 'alb1',
       uri: 'spotify:album:alb1',
       title: 'Comfort In Chaos',
       artist: 'John Summit',
@@ -159,6 +161,7 @@ describe('normalizeSearchResponse', () => {
     })
     expect(out.artists[0]).toEqual({
       kind: 'artist',
+      id: 'a1',
       uri: 'spotify:artist:a1',
       name: 'John Summit',
       genres: ['house', 'tech house'],
@@ -167,6 +170,7 @@ describe('normalizeSearchResponse', () => {
     })
     expect(out.playlists[0]).toEqual({
       kind: 'playlist',
+      id: 'pl1',
       uri: 'spotify:playlist:pl1',
       title: 'John Summit Radio',
       owner: 'Spotify',
@@ -178,6 +182,7 @@ describe('normalizeSearchResponse', () => {
   test('emits canonical spotify:artist URIs — sonos owns its own URI shaping', () => {
     const out = normalizeSearchResponse({ artists: { items: [{ id: 'xyz', name: 'X' }] } })
     expect(out.artists[0]!.uri).toBe('spotify:artist:xyz')
+    expect(out.artists[0]!.id).toBe('xyz')
   })
 
   test('joins multiple artist names with comma', () => {
@@ -197,6 +202,7 @@ describe('normalizeSearchResponse', () => {
     })
     expect(out.tracks).toHaveLength(1)
     expect(out.tracks[0]!.uri).toBe('spotify:track:t1')
+    expect(out.tracks[0]!.id).toBe('t1')
   })
 
   test('handles missing top-level sections without throwing', () => {
@@ -326,29 +332,33 @@ describe('getAccessToken', () => {
 describe('withResolvedTrack', () => {
   const album: AlbumMatch = {
     kind: 'album',
+    id: 'alb1',
     uri: 'spotify:album:alb1',
     title: 'Comfort In Chaos',
     artist: 'John Summit',
   }
   const artist: ArtistMatch = {
     kind: 'artist',
+    id: 'a1',
     uri: 'spotify:artist:a1',
     name: 'John Summit',
     genres: ['house'],
   }
   const playlist: PlaylistMatch = {
     kind: 'playlist',
+    id: 'pl1',
     uri: 'spotify:playlist:pl1',
     title: "Today's Top Hits",
     owner: 'Spotify',
   }
 
-  test('rewrites uri to spotify:track:<id> and adds trackTitle on success', () => {
+  test('rewrites uri to spotify:track:<id> and adds trackTitle on success, but keeps the container id intact', () => {
     expect(withResolvedTrack(album, { id: 'track1', title: 'Where You Are' })).toEqual({
       ...album,
       uri: 'spotify:track:track1',
       trackTitle: 'Where You Are',
     })
+    expect(withResolvedTrack(album, { id: 'track1', title: 'Where You Are' }).id).toBe('alb1')
     expect(withResolvedTrack(artist, { id: 'tA', title: 'Light' })).toEqual({
       ...artist,
       uri: 'spotify:track:tA',

@@ -28,6 +28,7 @@ describe('get-by-id shaping', () => {
       }),
     ).toEqual({
       kind: 'track',
+      id: 't1',
       uri: 'spotify:track:t1',
       title: 'Light',
       artist: 'John Summit, Hayla',
@@ -42,11 +43,13 @@ describe('get-by-id shaping', () => {
     const out = shapeTrack({ id: 't', name: 'Bare', artists: [{ id: 'a', name: 'X' }] })
     expect(out.album).toBe('')
     expect(out.uri).toBe('spotify:track:t')
+    expect(out.id).toBe('t')
   })
 
   test('shapeAlbum and shapeCategory shape their entities', () => {
     expect(shapeAlbum({ id: 'al', name: 'A', artists: [{ id: 'a', name: 'X' }], total_tracks: 12 })).toMatchObject({
       kind: 'album',
+      id: 'al',
       uri: 'spotify:album:al',
       totalTracks: 12,
     })
