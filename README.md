@@ -11,21 +11,26 @@ Modules:
 - **`spotify`** — Spotify catalog (search, get by id, browse categories, new releases, children)
 - **`sonos`** — Sonos players (playback, volume, groups, queue, favorites, playlists, library, EQ, alarms, notifications)
 - **`tts`** — text-to-speech to an MP3 (macOS `say` / Linux `espeak-ng`), for hand-off to Sonos notify
-- **`google`** — shared Google OAuth client for `gmail`/`gdrive` (configure once, authorize each; `logout` forgets all grants)
+- **`google`** — shared Google OAuth client for `gmail`/`gcal`/`gdrive` (configure once, authorize each; `logout` forgets all grants)
 - **`gmail`** — Google Gmail (read-only: search messages/threads, list labels/drafts, mailbox profile)
 - **`gcal`** — Google Calendar (read-only: calendars, events with recurring expansion, merged agenda, free/busy)
 - **`gdrive`** — Google Drive (list/get/download/export files)
-- **`linear`** — Linear (issues, projects with milestones, cycles, teams, your assigned work, planning summary; guarded writes with `--yes`)
+- **`discord`** — Discord (list channels, read messages, send a message via bot token)
 - **`vercel`** — Vercel (read-only: projects, deployments, build events, domains) plus cross-machine sync of this CLI's own config
+- **`github`** — GitHub remote state via the `gh` CLI (repos, PRs with reviews/checks/diffs, Actions runs, issues, notifications, releases, code search)
+- **`graphite`** — local Graphite stacked branches via the `gt` CLI (stack layout, parent/children, restack-readiness; guarded mutations with `--yes`)
+- **`linear`** — Linear (issues, projects with milestones, cycles, teams, your assigned work, planning summary; guarded writes with `--yes`)
+- **`beszel`** — Beszel monitoring (host/container status, CPU/memory/disk pressure, metric history, SMART health, firing alerts)
+- **`uptime-kuma`** — Uptime Kuma monitoring (endpoint up/down, latency, TLS cert expiry, incidents, maintenance windows)
 
 `spotify`, `sonos`, and `tts` are designed to pair: search the catalog with
 `spotify` and hand the URI to `sonos play-uri`, or synthesize an announcement
 with `tts` and push it through `sonos notify`.
 
-`gmail` and `gdrive` share one Google OAuth client via the `google` module: run
-`home google configure` once, then `home gmail configure` / `home gdrive configure`
-to authorize each (a browser consent). `home google logout` forgets every grant.
-See `docs/google-setup.md`. (`gcal` still carries its own OAuth client for now.)
+`gmail`, `gcal`, and `gdrive` share one Google OAuth client via the `google`
+module: run `home google configure` once, then `home gmail configure` /
+`home gcal configure` / `home gdrive configure` to authorize each (a browser
+consent). `home google logout` forgets every grant. See `docs/google-setup.md`.
 
 ## Install
 
@@ -275,11 +280,62 @@ Behavior:
 | --- | --- |
 | `home unifi devices list` | All adopted devices (APs, switches, gateway) |
 | `home unifi devices get <mac>` | A single device by MAC address |
-| `home unifi devices poe-cycle <switch> <port>` | Power-cycle a switch port (PoE) — reboot an AP or camera |
+| `home unifi devices stats <mac>` | Latest device stats (CPU, memory, uptime, temps) |
+| `home unifi devices restart <device> --yes` | Reboot a device by MAC or name |
+| `home unifi devices poe-cycle <device> --port <n> --yes` | Power-cycle a switch PoE port — reboot an AP or camera |
 | `home unifi clients list` | Currently-connected clients |
+| `home unifi clients get <mac>` | Full stats for one client by MAC |
 | `home unifi client <block\|unblock\|reconnect> <client>` | Block / unblock / reconnect a client by MAC, hostname, or IP |
+| `home unifi clients authorize-guest <client> [--minutes <n>] --yes` | Authorize a guest client for hotspot access |
+| `home unifi clients all` | All known clients, including offline |
+| `home unifi vouchers list` | Hotspot guest vouchers |
+| `home unifi vouchers get <id>` | One hotspot voucher by id |
+| `home unifi vouchers create [--count <n>] [--minutes <n>] [--name <s>] [--quota <n>] --yes` | Create one or more hotspot guest vouchers |
+| `home unifi vouchers delete <id> --yes` | Delete a hotspot voucher by id |
 | `home unifi site info` | Site identity and raw stats |
 | `home unifi site health` | Per-subsystem health (WAN, LAN, WLAN, WWW) |
+| `home unifi networks list` | Networks/VLANs with subnet and DHCP range |
+| `home unifi networks get <name>` | Full networkconf by name, VLAN id, or _id |
+| `home unifi reservations list` | Fixed-IP reservations, labeled by VLAN |
+| `home unifi reservations get <ref>` | Reservation by MAC, name, hostname, or IP |
+| `home unifi wlans list` | SSIDs with security and mapped VLAN |
+| `home unifi wlans get <ssid>` | Full raw wlanconf for one SSID |
+| `home unifi port-forwards list` | WAN port-forward (NAT) rules |
+| `home unifi port-forwards get <name>` | One portforward rule by name or _id |
+| `home unifi firewall list` | Firewall rules |
+| `home unifi firewall get <id>` | A single firewall rule by id |
+| `home unifi firewall-groups list` | Firewall/IP groups |
+| `home unifi firewall-groups get <name>` | One firewallgroup by name |
+| `home unifi port-profiles list` | Switch port profiles (portconf) |
+| `home unifi port-profiles get <name>` | One portconf profile by name |
+| `home unifi wlan-groups list` | WLAN groups |
+| `home unifi wlan-groups get <name>` | One wlangroup by name |
+| `home unifi user-groups list` | User groups (bandwidth limits) |
+| `home unifi user-groups get <name>` | One usergroup by name |
+| `home unifi radius-profiles list` | RADIUS profiles |
+| `home unifi radius-profiles get <name>` | One radiusprofile by name |
+| `home unifi routes list` | Static routes |
+| `home unifi routes get <name>` | One static route by name |
+| `home unifi dpi-apps list` | DPI application signatures |
+| `home unifi dpi-apps get <name>` | A single DPI app by name |
+| `home unifi dpi-groups list` | DPI group configurations |
+| `home unifi dpi-groups get <name>` | A single DPI group by name |
+| `home unifi radius-accounts list` | RADIUS user accounts |
+| `home unifi radius-accounts get <name>` | A single RADIUS account by name |
+| `home unifi dynamic-dns list` | Dynamic DNS configurations |
+| `home unifi tags list` | Device tags |
+| `home unifi tags get <name>` | A single tag by name |
+| `home unifi settings list` | Site settings (sections with keys) |
+| `home unifi settings get <key>` | A single settings section by key |
+| `home unifi events list [--limit <n>]` | Recent network events |
+| `home unifi alarms list` | Active and archived alarms |
+| `home unifi rogue-aps list` | Neighboring/rogue APs detected |
+| `home unifi guests list` | Guest authorizations |
+| `home unifi sessions list [--limit <n>]` | Historical connect/disconnect sessions |
+| `home unifi dpi-stats site` | Per-application DPI traffic stats for the site |
+| `home unifi dpi-stats client <mac>` | Per-application DPI traffic stats for one client |
+| `home unifi controller info` | Controller version, build, update status, retention, timezone |
+| `home unifi health` | Health rollup: wifi score, device up/down, utilization |
 
 ### `protect`
 
@@ -322,8 +378,8 @@ Behavior:
 | --- | --- |
 | `home assistant states list [--domain <d>]` | Entity states |
 | `home assistant states search <query> [--domain <d>]` | Search entities by name / entity_id substring |
-| `home assistant state get <entity_id> [--watch]` | Single entity (optionally poll for changes) |
-| `home assistant state set <entity_id> <state> [--attributes <json>]` | Set entity state |
+| `home assistant state get <entity_id> [--watch] [--interval <sec>]` | Single entity (optionally poll for changes) |
+| `home assistant state set <entity_id> <state> [--attributes <json>] --confirm` | Override an entity state in the HA state machine (virtual write) |
 | `home assistant light <on\|off\|toggle> <name\|id> [--brightness 0-100] [--color <c>]` | Control a light by name or id |
 | `home assistant switch <on\|off\|toggle> <name\|id>` | Control a switch by name or id |
 | `home assistant climate <name\|id> [--temperature <t>] [--mode <m>]` | Set thermostat temp / HVAC mode |
@@ -331,14 +387,14 @@ Behavior:
 | `home assistant script <name\|id>` | Run a script by name or id |
 | `home assistant automation trigger automation.<id>` | Fire an automation |
 | `home assistant service call <domain>.<service> [--data <json>]` | Call any service |
-| `home assistant services list` | List available services by domain |
-| `home assistant events list` | List the most recent fired events |
+| `home assistant services list [--domain <d>]` | List available services by domain |
+| `home assistant events list` | List event types on the bus and their listener counts |
 | `home assistant history get <entity_id> [--since 1h]` | State history |
 | `home assistant logbook list [--since 1h] [--entity <id>]` | Human-readable events |
 | `home assistant calendars list` | List calendar entities |
 | `home assistant calendars get <entity_id> [--start <iso>] [--end <iso>]` | Calendar events in a window |
-| `home assistant template render <template>` | Render a Jinja2 template server-side |
-| `home assistant camera snapshot <name\|entity_id> [--out path]` | JPEG snapshot from an HA camera |
+| `home assistant template <template>` | Render a Jinja2 template server-side |
+| `home assistant camera snapshot <name\|entity_id> [--out path] [--stdout]` | JPEG snapshot from an HA camera |
 | `home assistant error-log` | Tail the Home Assistant error log (plain text) |
 | `home assistant config get` | Server config (version, components, unit system, location) |
 
@@ -351,7 +407,7 @@ Behavior:
 | `home spotify album get <id\|uri\|url>` | Fetch one album — returns a `spotify:album:` URI |
 | `home spotify album tracks <id\|uri>` | List an album's tracks (paged) |
 | `home spotify artist get <id\|uri\|url>` | Fetch one artist |
-| `home spotify artist albums <id\|uri> [--include-groups <types>]` | List an artist's albums |
+| `home spotify artist albums <id\|uri> [--limit N] [--offset N] [--market <code>]` | List an artist's albums |
 | `home spotify artist top-tracks <id\|uri> [--market <code>]` | An artist's top 10 tracks |
 | `home spotify playlist get <id\|uri\|url>` | Fetch one playlist (metadata + track count) |
 | `home spotify playlist tracks <id\|uri>` | List a playlist's tracks (paged) |
@@ -390,20 +446,20 @@ Behavior:
 | `home sonos notify <room> [--file <path> \| --url <url>] [--volume <v>] [--timeout <s>] [--delete-after]` | One-shot clip/announcement, then restore what was playing |
 | `home sonos spotify-accounts list` | Spotify accounts on the household (the `sn` for `--sn`) |
 | `home sonos play-mode get <room>` | Read play mode (normal, shuffle, repeat, repeat-one, crossfade) |
-| `home sonos play-mode set <room> [--shuffle] [--repeat] [--crossfade]` | Set play mode flags |
+| `home sonos play-mode set <room> [--repeat off\|all\|one] [--shuffle on\|off] [--crossfade on\|off]` | Set play mode (only the flags you pass change) |
 | `home sonos sleep-timer get <room>` | Read sleep timer (remaining seconds or off) |
-| `home sonos sleep-timer set <room> <seconds>` | Start/cancel a sleep timer |
+| `home sonos sleep-timer set <room> <duration>` | Start/cancel a sleep timer (`30m`, `1h`, `90`, `1:30:00`, or `off`/`cancel`) |
 | `home sonos eq get <room>` | Read EQ (bass, treble, loudness) |
-| `home sonos eq set <room> [--bass -10..10] [--treble -10..10] [--loudness on\|off]` | Set EQ |
+| `home sonos eq set <room> [--bass -10..10] [--treble -10..10] [--loudness on\|off] [--balance -100..100] [--night-mode on\|off] [--speech on\|off]` | Set EQ / audio settings (only the flags you pass change) |
 | `home sonos group-volume get <room>` | Get per-member volumes in a group |
 | `home sonos group-volume set <room> <level>` | Set volume on every group member |
 | `home sonos group-mute <room> [--state on\|off\|toggle]` | Mute/unmute an entire group |
 | `home sonos seek <room> <position>` | Seek to a position (seconds, "1:30", or "1:02:03") |
 | `home sonos playlists list` | Sonos playlists (saved queues, SQ:) |
 | `home sonos playlists get <title>` | Show tracks in a Sonos playlist |
-| `home sonos playlists play <room> <title>` | Replace queue with a playlist and start playing |
-| `home sonos library browse [--cat <category>] [--id <container>]` | Browse local music library by category |
-| `home sonos library search <query> [--cat <category>]` | Search the local music library |
+| `home sonos playlists play <title> [room]` | Replace queue with a playlist and start playing |
+| `home sonos library browse <category> [--id <objectID>] [--limit N]` | Browse local music library by category |
+| `home sonos library search <category> <query> [--limit N]` | Search the local music library within a category |
 | `home sonos music-services list` | Available music services (Spotify, Amazon, etc.) |
 | `home sonos alarms list` | All Sonos alarms (household-wide) |
 | `home sonos alarms get <id>` | One alarm by id |
@@ -419,8 +475,9 @@ Behavior:
 
 ### `google`
 
-Holds the one Google OAuth "Desktop app" client that `gmail` and `gdrive` share,
-so the same `clientId`/`clientSecret` isn't pasted per module. No data commands.
+Holds the one Google OAuth "Desktop app" client that `gmail`, `gcal`, and
+`gdrive` share, so the same `clientId`/`clientSecret` isn't pasted per module.
+No data commands.
 Setup: `home google configure` once (see `docs/google-setup.md` for the Console
 walkthrough — the app must be published to Production or its refresh tokens expire
 in 7 days), then authorize each module with `home <module> configure`.
@@ -429,7 +486,7 @@ in 7 days), then authorize each module with `home <module> configure`.
 | --- | --- |
 | `home google configure` | Store the shared OAuth client id/secret |
 | `home google status` | Report whether the client is configured and which modules hold a grant |
-| `home google logout` | Forget every Google module's refresh token (gmail, gdrive); the shared client stays configured |
+| `home google logout` | Forget every Google module's refresh token (gmail, gdrive, gcal); the shared client stays configured |
 
 ### `gmail`
 
@@ -440,22 +497,22 @@ Works on consumer `@gmail.com` and Google Workspace accounts.
 
 | Command | Purpose |
 | --- | --- |
-| `home gmail messages list --q <query> [--hydrate] [--limit N]` | List message ids matching a Gmail search query. `--q` supports Gmail search syntax: `from:`, `subject:`, `is:unread`, `newer_than:`, `has:attachment`, etc. `--hydrate` fetches From/Subject/Date/snippet per message in one call. |
+| `home gmail messages list --q <query> [--hydrate] [--max N]` | List message ids matching a Gmail search query. `--q` supports Gmail search syntax: `from:`, `subject:`, `is:unread`, `newer_than:`, `has:attachment`, etc. `--hydrate` fetches From/Subject/Date/snippet per message in one call. |
 | `home gmail messages get <id>` | Get a single message by id (full headers, body, attachments metadata) |
-| `home gmail threads list --q <query> [--limit N]` | List thread ids matching a Gmail search query |
+| `home gmail threads list --q <query> [--max N]` | List thread ids matching a Gmail search query |
 | `home gmail threads get <id>` | Get a thread and all of its messages by id |
 | `home gmail labels list` | List all labels (system + user labels) |
 | `home gmail labels get <id>` | Get a single label by id (includes message/thread counts) |
-| `home gmail drafts list [--limit N]` | List draft ids (each carries a message id and threadId) |
+| `home gmail drafts list [--max N]` | List draft ids (each carries a message id and threadId) |
 | `home gmail drafts get <id>` | Get a single draft and its message by id |
 | `home gmail profile get` | Mailbox profile: email address, message/thread totals, historyId |
 
 ### `gcal`
 
 Read-only Google Calendar access using the Calendar API and Google OAuth.
-Setup: `home gcal configure` (set clientId/clientSecret — the same OAuth client
-as gmail/gdrive works, with the Calendar API enabled), then `home gcal auth login`
-(opens a browser).
+Setup: `home google configure` (shared OAuth client — see `docs/google-setup.md`,
+with the Calendar API enabled), then `home gcal configure` (opens a browser to
+authorize).
 
 Owns Google Calendar schedule/agenda/availability. Home Assistant calendars are
 a different surface — use `home assistant calendars` for those.
@@ -467,8 +524,6 @@ a different surface — use `home assistant calendars` for those.
 | `home gcal events get <calendarId> <eventId>` | Get a single event by id (full payload) |
 | `home gcal agenda [--days N] [--calendars id,…] [--max N]` | Merged chronological briefing across calendars for the next N days (default 1, max 14). Defaults to every calendar on the account; all-day events sort ahead of timed ones on the same day. `truncated: true` when rows were cut at `--max`. |
 | `home gcal freebusy --from <t> --to <t> [--calendars id,…]` | Busy intervals per calendar over a time range (max 90 days; calendars default `primary`). Per-calendar lookup failures (e.g. notFound) come back as data in `errors[]`, not as a command failure. |
-| `home gcal auth login` | OAuth browser flow — store the refresh token |
-| `home gcal auth status` | Probe the stored credentials with one bounded calendar-list request; reports the authenticated account |
 
 ### `gdrive`
 
@@ -480,9 +535,27 @@ Setup: `home google configure` (shared OAuth client — see `docs/google-setup.m
 | `home gdrive files list [--q <query>] [--limit N]` | List files. `--q` takes the Drive query language: `name contains 'report'`, `mimeType='application/pdf'`, `'<folderId>' in parents`, `modifiedTime > '2024-01-01'`. With no `--q`, lists all live (non-trashed) files. |
 | `home gdrive files get <id\|name>` | Fetch full metadata for one file. Name resolves via a scoped search; ambiguous → lists candidates. |
 | `home gdrive files download <id\|name> [--out <path>] [--stdout]` | Download a binary/uploaded file's bytes. Google-native docs (Docs/Sheets/Slides) cannot be downloaded — use `files export`. |
-| `home gdrive files export <id> [--mime <type>] [--out <path>] [--stdout]` | Export a Google-native doc to another format. `--mime` accepts friendly aliases (`pdf`, `docx`, `xlsx`) or full MIME types. |
+| `home gdrive files export <id\|name> --mime <type> [--out <path>] [--stdout]` | Export a Google-native doc to another format. `--mime` (required) accepts friendly aliases (`pdf`, `docx`, `xlsx`) or full MIME types. |
 
-To sign out of Drive (and Gmail), use `home google logout`.
+To sign out of Drive (and Gmail and Calendar), use `home google logout`.
+
+### `discord`
+
+Read and write Discord messages through a bot user — it lists the text channels
+in a server, reads recent messages from a channel, and posts a message to one.
+Everything runs against the Discord REST API with a bot token; the only writing
+command is `send-message`.
+
+Setup: `home discord configure` (a bot token created at discord.com/developers,
+plus your server's Guild ID — right-click the server and Copy Server ID). The
+bot must be a member of that guild and hold the permissions for the channels it
+reads or posts to.
+
+| Command | Purpose |
+| --- | --- |
+| `home discord list-channels [guildId]` | Text channels (type 0) in the guild — id, name, topic; the positional overrides the configured Guild ID |
+| `home discord get-messages <channelId> [--limit N]` | Recent messages from a channel (id, author username, content, timestamp); `--limit` 1-100, default 25 |
+| `home discord send-message <channelId> <text>` | Post a text message to a channel; returns the created message id, content, and timestamp |
 
 ### `vercel`
 
