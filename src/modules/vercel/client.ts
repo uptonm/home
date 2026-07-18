@@ -75,23 +75,27 @@ export interface SharedEnvSummary {
 
 /**
  * List this CLI's shared environment variables (server-side filtered to
- * `HOME__*`). The endpoint's response is paginated but exposes no request
- * parameter to fetch further pages, so if more than one page of HOME__ keys
- * ever exists we must refuse: treating page one as the full set would make
- * `pull` silently skip keys and `push` try to re-create ones that exist.
+ * `HOME__*`), paging through every result. `pagination.next` is a cursor
+ * echoed back as `until`, uniform with the rest of the Vercel API — see
+ * `listTeams`. A partial list would make `pull` silently skip keys and `push`
+ * try to re-create ones that already exist, so we must exhaust the pages.
  */
 export async function listSharedEnv(cfg: VercelConfig): Promise<SharedEnvSummary[]> {
-  const url = `${API_BASE}/v1/env?slug=${encodeURIComponent(cfg.teamSlug)}&search=${encodeURIComponent(KEY_PREFIX)}`
-  const json = await requestJson<{ data?: SharedEnvSummary[]; pagination?: Pagination }>(url, {
-    headers: authHeaders(),
-  })
-  if (json.pagination?.next != null) {
-    throw new SystemError(
-      'shared environment variable list is paginated beyond one page — refusing to sync from an incomplete list',
-      'vercel_env_paginated',
+  const out: SharedEnvSummary[] = []
+  let until: number | undefined
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const qs = new URLSearchParams({ slug: cfg.teamSlug, search: KEY_PREFIX, limit: '100' })
+    if (until !== undefined) qs.set('until', String(until))
+    const json = await requestJson<{ data?: SharedEnvSummary[]; pagination?: Pagination }>(
+      `${API_BASE}/v1/env?${qs}`,
+      { headers: authHeaders() },
     )
+    out.push(...(json.data ?? []))
+    const next = json.pagination?.next
+    if (next == null) return out
+    until = next
   }
-  return json.data ?? []
+  throw new SystemError(`gave up paging /v1/env after ${MAX_PAGES} pages`, 'vercel_pagination')
 }
 
 /**
