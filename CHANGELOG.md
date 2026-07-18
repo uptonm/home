@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/uptonm/home/compare/home-v1.0.0...home-v1.1.0) (2026-07-18)
+
+
+### Features
+
+* add home branding kit ([#99](https://github.com/uptonm/home/issues/99)) ([8170d85](https://github.com/uptonm/home/commit/8170d85d41a62b4929f72129b0d7b241f13d1bba))
+
 ## [1.0.0](https://github.com/uptonm/home/compare/home-v0.1.0...home-v1.0.0) (2026-07-18)
 
 
