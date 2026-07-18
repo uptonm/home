@@ -6,6 +6,7 @@ import {
   listDeploymentEvents,
   listDeployments,
   listProjects,
+  listSharedEnv,
   normalizeDeploymentState,
   redactToken,
   toIso,
@@ -128,6 +129,35 @@ describe('listProjects pagination', () => {
     expect(projects).toHaveLength(1)
     expect(requests).toHaveLength(1)
     expect(requests[0]!.searchParams.get('limit')).toBe('1')
+  })
+})
+
+describe('listSharedEnv pagination', () => {
+  test('concatenates every page, following pagination.next as until=', async () => {
+    stubFetch((url) => {
+      if (url.searchParams.get('until') === '555') {
+        return jsonResponse({
+          data: [{ id: 'e2', key: 'HOME__gcal__token', type: 'encrypted' }],
+          pagination: { next: null },
+        })
+      }
+      return jsonResponse({
+        data: [{ id: 'e1', key: 'HOME__unifi__url', type: 'encrypted' }],
+        pagination: { next: 555 },
+      })
+    })
+
+    const vars = await listSharedEnv(CFG)
+
+    expect(vars).toEqual([
+      { id: 'e1', key: 'HOME__unifi__url', type: 'encrypted' },
+      { id: 'e2', key: 'HOME__gcal__token', type: 'encrypted' },
+    ])
+    expect(requests).toHaveLength(2)
+    expect(requests.every((u) => u.pathname === '/v1/env' && u.searchParams.get('slug') === 'my-team')).toBe(true)
+    expect(requests.every((u) => u.searchParams.get('search') === 'HOME__')).toBe(true)
+    expect(requests[0]!.searchParams.has('until')).toBe(false)
+    expect(requests[1]!.searchParams.get('until')).toBe('555')
   })
 })
 
