@@ -1,5 +1,6 @@
-import { describe, expect, mock, test } from 'bun:test'
+import { afterEach, describe, expect, mock, test } from 'bun:test'
 import type { HassCalendar } from '../modules/assistant/client'
+import type { RequestInit } from 'undici'
 
 const EMPTY_CTX = {
   config: {},
@@ -23,6 +24,9 @@ const EVENTS = [{ summary: 'Cinema', start: { dateTime: '2026-06-10T19:00:00Z' }
 
 const realClient = await import('../modules/assistant/client')
 
+// Store the real listCalendars before mocking
+const realListCalendars = realClient.listCalendars
+
 // Capture the args getCalendar is called with so we can assert the window.
 let lastGetCalendarArgs: { entity?: string; start?: string; end?: string } = {}
 
@@ -40,6 +44,19 @@ const { calendarsList, calendarsGet, parseCalendarPoint, resolveCalendarWindow }
 )
 
 const NOW = Date.parse('2026-06-05T00:00:00.000Z')
+
+describe('listCalendars', () => {
+  const originalFetch = globalThis.fetch
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  test('returns empty array on 404 (no calendar integration)', async () => {
+    globalThis.fetch = (async (_url: string, _init?: RequestInit) => new Response('', { status: 404 })) as typeof fetch
+    const result = await realListCalendars({ url: 'http://localhost:8123', token: 'token' })
+    expect(result).toEqual([])
+  })
+})
 
 describe('parseCalendarPoint', () => {
   test('returns null for empty', () => {

@@ -1,4 +1,5 @@
 import { request, requestJson } from '../../core/http'
+import { SystemError } from '../../core/errors'
 import type { ModuleConfig } from '../../core/types'
 
 export interface AssistantConfig {
@@ -261,7 +262,21 @@ export interface HassCalendar {
 
 /** List calendar entities. */
 export async function listCalendars(cfg: AssistantConfig): Promise<HassCalendar[]> {
-  return requestJson<HassCalendar[]>(`${cfg.url}/api/calendars`, { headers: headers(cfg) })
+  const res = await request(
+    `${cfg.url}/api/calendars`,
+    { headers: headers(cfg) },
+  )
+  // HA returns 404 here when no calendar integration is loaded — that means
+  // "no calendars", not an error.
+  if (res.status === 404) return []
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new SystemError(
+      `HTTP ${res.status} ${res.statusText} from ${cfg.url}/api/calendars${body ? `: ${body.slice(0, 200)}` : ''}`,
+      `http_${res.status}`,
+    )
+  }
+  return (await res.json()) as HassCalendar[]
 }
 
 /**
