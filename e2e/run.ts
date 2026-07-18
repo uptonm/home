@@ -120,10 +120,15 @@ async function main() {
 
   const states = targets.map((m) => createLive(m.name))
   const tui = startTui(states, Date.now())
-  const results = await pool(targets, opts.concurrency, (m, i) =>
-    runModule(m, states[i]!, { readsOnly: opts.readsOnly }),
-  )
-  tui.stop()
+  // finally so an unexpected throw still restores the hidden cursor and stops the timer.
+  let results: ModuleResult[]
+  try {
+    results = await pool(targets, opts.concurrency, (m, i) =>
+      runModule(m, states[i]!, { readsOnly: opts.readsOnly }),
+    )
+  } finally {
+    tui.stop()
+  }
 
   const failed = printReport(targets, results)
   if (failed) process.exit(1)
