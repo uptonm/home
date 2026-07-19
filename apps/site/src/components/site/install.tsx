@@ -42,7 +42,7 @@ export function Install() {
           {steps.map((step, index) => (
             <li
               key={step.title}
-              className="flex flex-col rounded-xl border border-border/60 bg-card/60 p-5"
+              className="flex min-w-0 flex-col rounded-xl border border-border/60 bg-card/60 p-5"
             >
               <div className="flex items-center justify-between">
                 <div className="flex size-9 items-center justify-center rounded-lg border border-primary/30 bg-primary/[0.08]">

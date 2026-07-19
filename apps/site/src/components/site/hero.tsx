@@ -30,7 +30,7 @@ export function Hero() {
       />
 
       <div className="relative mx-auto grid max-w-6xl items-center gap-14 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-[1.05fr_0.95fr] lg:py-32">
-        <div>
+        <div className="min-w-0">
           <Badge
             variant="outline"
             className="rounded-full border-primary/35 bg-primary/[0.06] px-3 py-1 font-mono text-xs text-primary"
@@ -110,7 +110,7 @@ export function Hero() {
           </div>
         </div>
 
-        <div className="signal-glow overflow-hidden rounded-2xl border border-border/70 bg-card/80 backdrop-blur">
+        <div className="signal-glow min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-card/80 backdrop-blur">
           <div className="flex items-center justify-between border-b border-border/60 bg-muted/30 px-4 py-3">
             <div className="flex items-center gap-2">
               <Terminal className="size-4 text-primary" aria-hidden />
