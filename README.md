@@ -21,6 +21,12 @@
 ## Install
 
 ```bash
+curl -fsSL https://home.uptonm.dev/install.sh | bash
+```
+
+This redirects to the canonical installer, which you can also run directly:
+
+```bash
 curl -fsSL https://raw.githubusercontent.com/uptonm/home/main/scripts/install.sh | bash
 ```
 
