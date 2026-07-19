@@ -3,6 +3,7 @@ import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { siteConfig } from "@/lib/site-config";
+import { CopyCommand } from "./copy-command";
 
 const statusRows = [
   ["unifi", "ready"],
@@ -60,7 +61,14 @@ export function Hero() {
             for you at the terminal and for local agents behind the scenes.
           </p>
 
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-8 max-w-xl">
+            <CopyCommand command={siteConfig.installCommand} />
+            <p className="mt-2 text-xs text-muted-foreground">
+              Click to copy · installs the single binary on macOS and Linux
+            </p>
+          </div>
+
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <Button
               size="lg"
               nativeButton={false}
@@ -69,7 +77,7 @@ export function Hero() {
                 <a href="/docs/getting-started" />
               }
             >
-              Install home
+              Read the docs
               <ArrowRight className="size-4" aria-hidden />
             </Button>
             <Button

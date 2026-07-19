@@ -7,6 +7,7 @@ export const siteConfig = {
     "One command surface for homelab services, operations, and agent-ready skills.",
   url: "https://home.uptonm.dev",
   githubUrl: "https://github.com/uptonm/home",
+  installCommand: "curl -fsSL https://home.uptonm.dev/install.sh | bash",
   author: {
     name: "Mike Upton",
     url: "https://uptonm.dev",
