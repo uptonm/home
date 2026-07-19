@@ -18,6 +18,19 @@ const nextConfig: NextConfig = {
     // Static export-friendly; no remote images are used on the site.
     unoptimized: true,
   },
+  async redirects() {
+    return [
+      {
+        // Short install command: `curl -fsSL home.uptonm.dev/install.sh | bash`.
+        // The canonical installer lives in scripts/install.sh; redirect keeps a
+        // single source of truth. 307 leaves the target repointable later.
+        source: "/install.sh",
+        destination:
+          "https://raw.githubusercontent.com/uptonm/home/main/scripts/install.sh",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default withMDX(nextConfig);

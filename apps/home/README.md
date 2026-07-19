@@ -49,8 +49,11 @@ consent). `home google logout` forgets every grant. See `docs/google-setup.md`.
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/uptonm/home/main/scripts/install.sh | bash
+curl -fsSL https://home.uptonm.dev/install.sh | bash
 ```
+
+(`home.uptonm.dev/install.sh` redirects to `scripts/install.sh`; you can also
+`curl` that raw URL directly.)
 
 The installer picks the right binary for your OS/arch and drops it in
 `~/.local/bin/home` (or `/usr/local/bin/home` with sudo if `~/.local/bin`

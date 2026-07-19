@@ -18,7 +18,7 @@ export const config = {
      * Match all request paths except for static files and Next.js internals.
      * This avoids unnecessary Clerk work for immutable public assets.
      */
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|json|jpe?g|png|gif|svg|webp|ico|ttf|woff2?|map)).*)",
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|json|jpe?g|png|gif|svg|webp|ico|ttf|woff2?|map|sh)).*)",
     "/(api|trpc)(.*)",
   ],
 };

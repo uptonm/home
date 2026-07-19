@@ -5,14 +5,15 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { siteConfig } from "@/lib/site-config";
+import { CopyCommand } from "./copy-command";
 import { SectionHeading } from "./section-heading";
 
 const steps = [
   {
     icon: Download,
     title: "Install the binary",
-    command:
-      "curl -fsSL https://raw.githubusercontent.com/uptonm/home/main/scripts/install.sh | bash",
+    command: siteConfig.installCommand,
   },
   {
     icon: SlidersHorizontal,
@@ -52,9 +53,7 @@ export function Install() {
                 </span>
               </div>
               <h3 className="mt-5 font-semibold">{step.title}</h3>
-              <code className="mt-4 block overflow-x-auto rounded-lg border border-border/60 bg-muted/40 p-3 font-mono text-xs leading-relaxed text-muted-foreground">
-                {step.command}
-              </code>
+              <CopyCommand command={step.command} className="mt-4" />
             </li>
           ))}
         </ol>
