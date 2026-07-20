@@ -169,6 +169,8 @@ Scope constants updated: `GMAIL_MODIFY_SCOPE`, `GMAIL_SETTINGS_BASIC_SCOPE`;
   to `in:trash`) or `--ids`, recovers via `messages.untrash`. Dry-run unless
   `--yes`. See the trash-reversibility decision above.
 - **`labels create --name <name>`** → prints the new label id.
+- **`labels delete <id>`** → deletes a user label (dry-run unless `--yes`; the
+  messages it was on remain). Rounds out the label lifecycle.
 - **`filters list` / `filters create` / `filters delete <id>`** — `create` takes
   criteria flags (`--from`, `--to`, `--subject`, `--query`, `--has-attachment`)
   and action flags (`--add <label>`, `--archive`, `--mark-read`). `create` and
