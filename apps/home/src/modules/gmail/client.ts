@@ -1,4 +1,5 @@
-import { authedRequestJson, requireGoogleCredentials, type GoogleOAuthCredentials } from '../../core/google-auth'
+import { authedRequest, authedRequestJson, requireGoogleCredentials, type GoogleOAuthCredentials } from '../../core/google-auth'
+import { SystemError } from '../../core/errors'
 
 /**
  * Gmail REST client. All requests hit `users/me` (the authenticated user's
@@ -12,9 +13,13 @@ export const GMAIL_MODULE = 'gmail'
 
 export const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me'
 
-/** Read-spine scope: covers messages/threads/labels/drafts list+get. */
+/** Read-spine scope: covers messages/threads/labels/drafts list+get. Kept for reference; superseded by modify. */
 export const GMAIL_READONLY_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly'
-export const GMAIL_SCOPES = [GMAIL_READONLY_SCOPE]
+/** Write spine: read + relabel/archive/trash/create-label. Superset of readonly. */
+export const GMAIL_MODIFY_SCOPE = 'https://www.googleapis.com/auth/gmail.modify'
+/** Settings scope, needed for filters (routing rules) — modify does not cover it. */
+export const GMAIL_SETTINGS_BASIC_SCOPE = 'https://www.googleapis.com/auth/gmail.settings.basic'
+export const GMAIL_SCOPES = [GMAIL_MODIFY_SCOPE, GMAIL_SETTINGS_BASIC_SCOPE]
 
 /** Secret key under which the OAuth refresh token is persisted (module "gmail"). */
 export const GMAIL_REFRESH_TOKEN_KEY = 'refreshToken'
@@ -117,6 +122,28 @@ export function profileUrl(): string {
   return `${GMAIL_API_BASE}/profile`
 }
 
+// --- Write URL builders (pure) -------------------------------------------
+
+export function messagesBatchModifyUrl(): string {
+  return `${GMAIL_API_BASE}/messages/batchModify`
+}
+
+export function messageTrashUrl(id: string): string {
+  return `${GMAIL_API_BASE}/messages/${encodeURIComponent(id)}/trash`
+}
+
+export function messageUntrashUrl(id: string): string {
+  return `${GMAIL_API_BASE}/messages/${encodeURIComponent(id)}/untrash`
+}
+
+export function filtersListUrl(): string {
+  return `${GMAIL_API_BASE}/settings/filters`
+}
+
+export function filterDeleteUrl(id: string): string {
+  return `${GMAIL_API_BASE}/settings/filters/${encodeURIComponent(id)}`
+}
+
 // --- Response shapes -----------------------------------------------------
 
 export interface GmailHeader {
@@ -214,6 +241,45 @@ export interface GmailProfile {
   historyId?: string
 }
 
+// A routing rule: `criteria` matches incoming mail, `action` relabels it. Mirrors
+// the `settings.filters` resource — a subset of its fields, the ones we set.
+export interface GmailFilterCriteria {
+  from?: string
+  to?: string
+  subject?: string
+  query?: string
+  negatedQuery?: string
+  hasAttachment?: boolean
+}
+
+export interface GmailFilterAction {
+  addLabelIds?: string[]
+  removeLabelIds?: string[]
+  forward?: string
+}
+
+export interface GmailFilter {
+  id?: string
+  criteria: GmailFilterCriteria
+  action: GmailFilterAction
+}
+
+export interface FiltersListResponse {
+  filter?: GmailFilter[]
+}
+
+export interface CreateLabelOptions {
+  name: string
+  labelListVisibility?: string
+  messageListVisibility?: string
+}
+
+export interface BatchModifyOptions {
+  ids: string[]
+  addLabelIds?: string[]
+  removeLabelIds?: string[]
+}
+
 // --- Parsers (pure) ------------------------------------------------------
 
 /** Case-insensitive header lookup over a message payload. */
@@ -282,7 +348,18 @@ export async function mapWithConcurrency<I, O>(
   return out
 }
 
+/** Split `items` into groups of at most `size` (order-preserving, last group short). */
+export function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
+  return out
+}
+
 const HYDRATE_CONCURRENCY = 8
+/** `messages.batchModify` accepts at most 1000 ids per call. */
+const BATCH_MODIFY_MAX = 1000
+/** Trash has no batch form; cap in-flight per-message trash calls. */
+const TRASH_CONCURRENCY = 8
 
 // --- API functions -------------------------------------------------------
 
@@ -360,4 +437,94 @@ export function getDraft(cfg: GmailConfig, id: string, opts: { format?: MessageF
 
 export function getProfile(cfg: GmailConfig): Promise<GmailProfile> {
   return authedRequestJson<GmailProfile>(cfg, profileUrl())
+}
+
+// --- Write API functions -------------------------------------------------
+
+/** POST helper for the write endpoints that return 204 No Content (batchModify, delete). */
+async function authedNoContent(cfg: GmailConfig, url: string, method: string, body?: unknown): Promise<void> {
+  const init: RequestInit = { method }
+  if (body !== undefined) {
+    init.headers = { 'Content-Type': 'application/json' }
+    init.body = JSON.stringify(body)
+  }
+  const res = await authedRequest(cfg, url, init)
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new SystemError(
+      `HTTP ${res.status} ${res.statusText} from ${url}${text ? `: ${text.slice(0, 200)}` : ''}`,
+      `http_${res.status}`,
+    )
+  }
+}
+
+/**
+ * Add/remove labels on up to `ids.length` messages via `messages.batchModify`,
+ * chunked at Gmail's 1000-id-per-call limit. This one primitive is archive
+ * (remove INBOX), mark-read (remove UNREAD), and label (add Label_x). Returns
+ * the number of messages acted on; makes no request for an empty id set.
+ */
+export async function batchModifyMessages(cfg: GmailConfig, opts: BatchModifyOptions): Promise<number> {
+  if (opts.ids.length === 0) return 0
+  const body: Record<string, unknown> = {}
+  if (opts.addLabelIds?.length) body.addLabelIds = opts.addLabelIds
+  if (opts.removeLabelIds?.length) body.removeLabelIds = opts.removeLabelIds
+  for (const ids of chunk(opts.ids, BATCH_MODIFY_MAX)) {
+    await authedNoContent(cfg, messagesBatchModifyUrl(), 'POST', { ...body, ids })
+  }
+  return opts.ids.length
+}
+
+/**
+ * Move each message to Trash (recoverable ~30 days). `messages.batchModify`
+ * rejects the TRASH label and there is no batch-trash endpoint, so this maps
+ * per-message `messages.trash` calls under bounded concurrency. Returns the
+ * count trashed.
+ */
+export async function trashMessages(cfg: GmailConfig, ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0
+  await mapWithConcurrency(ids, TRASH_CONCURRENCY, (id) =>
+    authedRequestJson<GmailMessage>(cfg, messageTrashUrl(id), { method: 'POST' }),
+  )
+  return ids.length
+}
+
+/** Restore messages from Trash via per-message `messages.untrash`. Returns the count restored. */
+export async function untrashMessages(cfg: GmailConfig, ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0
+  await mapWithConcurrency(ids, TRASH_CONCURRENCY, (id) =>
+    authedRequestJson<GmailMessage>(cfg, messageUntrashUrl(id), { method: 'POST' }),
+  )
+  return ids.length
+}
+
+/** Delete a user label (removes it from every message; the messages remain). Only user labels are deletable. */
+export function deleteLabel(cfg: GmailConfig, id: string): Promise<void> {
+  return authedNoContent(cfg, labelGetUrl(id), 'DELETE')
+}
+
+/** Create a user label; returns it with its assigned id. */
+export function createLabel(cfg: GmailConfig, opts: CreateLabelOptions): Promise<GmailLabel> {
+  return authedRequestJson<GmailLabel>(cfg, labelsListUrl(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(opts),
+  })
+}
+
+export function listFilters(cfg: GmailConfig): Promise<FiltersListResponse> {
+  return authedRequestJson<FiltersListResponse>(cfg, filtersListUrl())
+}
+
+/** Create a routing rule. Applies to future mail only — Gmail's API does not backfill existing messages. */
+export function createFilter(cfg: GmailConfig, filter: GmailFilter): Promise<GmailFilter> {
+  return authedRequestJson<GmailFilter>(cfg, filtersListUrl(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ criteria: filter.criteria, action: filter.action }),
+  })
+}
+
+export function deleteFilter(cfg: GmailConfig, id: string): Promise<void> {
+  return authedNoContent(cfg, filterDeleteUrl(id), 'DELETE')
 }
