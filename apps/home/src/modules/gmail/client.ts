@@ -132,6 +132,10 @@ export function messageTrashUrl(id: string): string {
   return `${GMAIL_API_BASE}/messages/${encodeURIComponent(id)}/trash`
 }
 
+export function messageUntrashUrl(id: string): string {
+  return `${GMAIL_API_BASE}/messages/${encodeURIComponent(id)}/untrash`
+}
+
 export function filtersListUrl(): string {
   return `${GMAIL_API_BASE}/settings/filters`
 }
@@ -481,6 +485,15 @@ export async function trashMessages(cfg: GmailConfig, ids: string[]): Promise<nu
   if (ids.length === 0) return 0
   await mapWithConcurrency(ids, TRASH_CONCURRENCY, (id) =>
     authedRequestJson<GmailMessage>(cfg, messageTrashUrl(id), { method: 'POST' }),
+  )
+  return ids.length
+}
+
+/** Restore messages from Trash via per-message `messages.untrash`. Returns the count restored. */
+export async function untrashMessages(cfg: GmailConfig, ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0
+  await mapWithConcurrency(ids, TRASH_CONCURRENCY, (id) =>
+    authedRequestJson<GmailMessage>(cfg, messageUntrashUrl(id), { method: 'POST' }),
   )
   return ids.length
 }

@@ -14,8 +14,10 @@ import {
   filtersListUrl,
   listFilters,
   messageTrashUrl,
+  messageUntrashUrl,
   messagesBatchModifyUrl,
   trashMessages,
+  untrashMessages,
   type GmailConfig,
 } from '../modules/gmail/client'
 
@@ -46,6 +48,10 @@ describe('write URL builders', () => {
   test('messageTrashUrl encodes the id', () => {
     expect(messageTrashUrl('m1')).toBe(`${GMAIL_API_BASE}/messages/m1/trash`)
     expect(messageTrashUrl('a/b')).toBe(`${GMAIL_API_BASE}/messages/a%2Fb/trash`)
+  })
+  test('messageUntrashUrl encodes the id', () => {
+    expect(messageUntrashUrl('m1')).toBe(`${GMAIL_API_BASE}/messages/m1/untrash`)
+    expect(messageUntrashUrl('a/b')).toBe(`${GMAIL_API_BASE}/messages/a%2Fb/untrash`)
   })
   test('filters endpoints', () => {
     expect(filtersListUrl()).toBe(`${GMAIL_API_BASE}/settings/filters`)
@@ -117,6 +123,23 @@ describe('network write functions over mocked fetch', () => {
     const affected = await trashMessages(cfg, ['m1', 'm2', 'm3'])
     expect(affected).toBe(3)
     expect(trashed.sort()).toEqual(['m1', 'm2', 'm3'])
+  })
+
+  test('untrashMessages POSTs each id to its untrash endpoint', async () => {
+    const restored: string[] = []
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      const s = String(url)
+      if (s.includes('oauth2.googleapis.com')) return tokenResponse()
+      expect(init?.method).toBe('POST')
+      const u = new URL(s)
+      expect(u.pathname.endsWith('/untrash')).toBe(true)
+      restored.push(u.pathname.split('/').slice(-2, -1)[0]!)
+      return new Response(JSON.stringify({ id: 'x' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }) as typeof fetch
+
+    const affected = await untrashMessages(cfg, ['m1', 'm2'])
+    expect(affected).toBe(2)
+    expect(restored.sort()).toEqual(['m1', 'm2'])
   })
 
   test('createLabel posts the name and returns the created label', async () => {

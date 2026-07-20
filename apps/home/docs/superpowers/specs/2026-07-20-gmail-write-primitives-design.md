@@ -55,6 +55,24 @@ calls, reusing the module's existing `mapWithConcurrency` helper. (The
 implementer should confirm the `batchModify`-rejects-`TRASH` behavior against the
 live API and keep the per-message path regardless — it is the documented one.)
 
+### Trash is reversible from the CLI — `messages untrash`
+
+Trashing removes `INBOX` and adds `TRASH`. Recovery uses the dedicated
+`messages.untrash` endpoint (per-message, bounded concurrency, mirroring
+`trashMessages`). Two consequences shape the `messages untrash` command:
+
+- **Selection must include Trash.** A normal `messages.list` omits trashed
+  messages, so untrash scopes its query to `in:trash` and sets
+  `includeSpamTrash: true`; otherwise the backlog it needs to act on is
+  invisible.
+- **Untrash recovers to All Mail, not the inbox.** Empirically, neither the
+  `untrash` endpoint nor `batchModify` removing `TRASH` restores `INBOX` —
+  Gmail dropped that label on trash and there is no record of the pre-trash
+  state. So untrash means "no longer pending deletion, searchable again," and
+  the command says so; re-inboxing is an explicit `messages modify --add INBOX`.
+  Keeping untrash to one clear job (matching Gmail's own verb) beats guessing
+  at inbox restoration.
+
 ### Backlog vs. future — two mechanisms, both needed
 
 A newly created filter applies only to **future** mail; the Gmail *web UI's*
@@ -147,6 +165,9 @@ Scope constants updated: `GMAIL_MODIFY_SCOPE`, `GMAIL_SETTINGS_BASIC_SCOPE`;
   `--ids a,b,c`; actions `--add`/`--remove <labelIds>` plus sugar `--archive`,
   `--mark-read`, `--trash`. Resolves `--q` to ids by paginating `messages.list`,
   then batches. Dry-run unless `--yes`.
+- **`messages untrash`** — inverse of `--trash`: selection by `--q` (auto-scoped
+  to `in:trash`) or `--ids`, recovers via `messages.untrash`. Dry-run unless
+  `--yes`. See the trash-reversibility decision above.
 - **`labels create --name <name>`** → prints the new label id.
 - **`filters list` / `filters create` / `filters delete <id>`** — `create` takes
   criteria flags (`--from`, `--to`, `--subject`, `--query`, `--has-attachment`)

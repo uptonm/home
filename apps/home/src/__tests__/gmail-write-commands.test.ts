@@ -12,6 +12,7 @@ const CTX = {
 
 let batchCalls: BatchModifyOptions[] = []
 let trashCalls: string[][] = []
+let untrashCalls: string[][] = []
 let labelCalls: CreateLabelOptions[] = []
 let filterCreates: GmailFilter[] = []
 let filterDeletes: string[] = []
@@ -39,6 +40,10 @@ mock.module('../modules/gmail/client', () => ({
     trashCalls.push(ids)
     return ids.length
   },
+  untrashMessages: async (_cfg: unknown, ids: string[]) => {
+    untrashCalls.push(ids)
+    return ids.length
+  },
   createLabel: async (_cfg: unknown, opts: CreateLabelOptions) => {
     labelCalls.push(opts)
     return { id: 'Label_new', name: opts.name, type: 'user' }
@@ -53,13 +58,14 @@ mock.module('../modules/gmail/client', () => ({
   },
 }))
 
-const { messagesModify } = await import('../modules/gmail/commands/messages')
+const { messagesModify, messagesUntrash } = await import('../modules/gmail/commands/messages')
 const { labelsCreate } = await import('../modules/gmail/commands/labels')
 const { filtersList, filtersCreate, filtersDelete } = await import('../modules/gmail/commands/filters')
 
 afterEach(() => {
   batchCalls = []
   trashCalls = []
+  untrashCalls = []
   labelCalls = []
   filterCreates = []
   filterDeletes = []
@@ -109,6 +115,39 @@ describe('gmail messages modify', () => {
     expect(data.matched).toBe(3)
     expect(listPages).toHaveLength(0) // ids given → no list calls
     expect(batchCalls).toHaveLength(0)
+  })
+})
+
+describe('gmail messages untrash', () => {
+  test('requires a selection', async () => {
+    const res = await messagesUntrash.run({ ...CTX, args: {} })
+    expect(res.ok).toBe(false)
+    expect((res as { code?: string }).code).toBe('bad_arg')
+    expect(untrashCalls).toHaveLength(0)
+  })
+
+  test('dry-run scopes the query to Trash and mutates nothing', async () => {
+    const res = await messagesUntrash.run({ ...CTX, args: { q: 'from:linkedin.com' } })
+    expect(res.ok).toBe(true)
+    expect((res as { data: { dryRun: boolean } }).data.dryRun).toBe(true)
+    // query is trash-scoped and collected with includeSpamTrash
+    expect(listPages[0]?.q).toContain('in:trash')
+    expect(listPages[0]?.includeSpamTrash).toBe(true)
+    expect(untrashCalls).toHaveLength(0)
+  })
+
+  test('--yes restores the resolved ids', async () => {
+    const res = await messagesUntrash.run({ ...CTX, args: { q: 'from:linkedin.com', yes: true } })
+    expect(res.ok).toBe(true)
+    expect(untrashCalls).toEqual([['m1', 'm2', 'm3']])
+    expect((res as { data: { affected: number } }).data.affected).toBe(3)
+  })
+
+  test('ids mode restores exactly those ids without listing', async () => {
+    const res = await messagesUntrash.run({ ...CTX, args: { ids: 'a,b', yes: true } })
+    expect(res.ok).toBe(true)
+    expect(listPages).toHaveLength(0)
+    expect(untrashCalls).toEqual([['a', 'b']])
   })
 })
 

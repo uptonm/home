@@ -3,7 +3,7 @@ import { NotConfiguredError } from '../../core/errors'
 import { getGrantedScopes } from '../../core/google-auth'
 import { GMAIL_MODULE, GMAIL_SCOPES, getProfile, readGmailCredentials } from './client'
 import { configureGmail } from './configure'
-import { messagesGet, messagesList, messagesModify } from './commands/messages'
+import { messagesGet, messagesList, messagesModify, messagesUntrash } from './commands/messages'
 import { threadsGet, threadsList } from './commands/threads'
 import { labelsCreate, labelsGet, labelsList } from './commands/labels'
 import { draftsGet, draftsList } from './commands/drafts'
@@ -32,6 +32,7 @@ export const manifest: ModuleManifest = {
     messagesList,
     messagesGet,
     messagesModify,
+    messagesUntrash,
     threadsList,
     threadsGet,
     labelsList,
