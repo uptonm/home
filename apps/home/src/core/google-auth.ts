@@ -79,6 +79,8 @@ export function requireGoogleCredentials(module: string): GoogleOAuthCredentials
 interface CachedToken {
   value: string
   expiresAt: number
+  /** Space-delimited scopes Google reported for this grant, or undefined if it didn't. */
+  scope?: string
 }
 
 // Keyed by refresh token: gmail/gchat will hold *different* refresh tokens
@@ -149,9 +151,24 @@ export async function getGoogleAccessToken(creds: GoogleOAuthCredentials): Promi
   const token: CachedToken = {
     value: json.access_token,
     expiresAt: Date.now() + (json.expires_in ?? 3600) * 1000,
+    scope: json.scope,
   }
   tokenCache.set(creds.refreshToken, token)
   return token.value
+}
+
+/**
+ * The scopes Google actually granted for these credentials, split from the
+ * refresh-grant response, or `null` when Google didn't report them. Triggers a
+ * token refresh only if none is cached — so it's cheap right after any authed
+ * request. Lets a module verify its refresh token still carries the write
+ * scopes it needs, instead of discovering a stale read-only grant via a 403.
+ */
+export async function getGrantedScopes(creds: GoogleOAuthCredentials): Promise<string[] | null> {
+  await getGoogleAccessToken(creds)
+  const scope = tokenCache.get(creds.refreshToken)?.scope
+  if (!scope) return null
+  return scope.split(' ').filter(Boolean)
 }
 
 // ---------------------------------------------------------------------------

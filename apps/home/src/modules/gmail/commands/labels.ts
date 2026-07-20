@@ -1,5 +1,6 @@
 import type { CommandSpec } from '../../../core/types'
-import { getLabel, listLabels, readGmailCredentials } from '../client'
+import { createLabel, getLabel, listLabels, readGmailCredentials } from '../client'
+import { optionalString } from './shared'
 
 export const labelsList: CommandSpec = {
   path: ['labels', 'list'],
@@ -32,6 +33,22 @@ export const labelsGet: CommandSpec = {
 
     const cfg = readGmailCredentials()
     const data = await getLabel(cfg, id)
+    return { ok: true, data }
+  },
+}
+
+export const labelsCreate: CommandSpec = {
+  path: ['labels', 'create'],
+  effect: 'write',
+  description: 'Create a user label. Prints the new label id (needed to apply it via `messages modify --add`).',
+  args: [{ name: 'name', kind: 'string', description: 'Label name (use "/" for nesting, e.g. "Triage/Receipts")', required: true }],
+  examples: ['home gmail labels create --name Newsletters --json', 'home gmail labels create --name "Triage/Receipts" --json'],
+  async run(ctx) {
+    const name = optionalString(ctx, 'name')
+    if (!name) return { ok: false, kind: 'user', message: '--name is required', code: 'missing_arg' }
+
+    const cfg = readGmailCredentials()
+    const data = await createLabel(cfg, { name })
     return { ok: true, data }
   },
 }

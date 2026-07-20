@@ -7,6 +7,7 @@ import {
   generatePkce,
   generateState,
   getGoogleAccessToken,
+  getGrantedScopes,
   parseAuthRedirect,
   parsePastedRedirect,
   resetGoogleTokenCache,
@@ -174,6 +175,52 @@ describe('getGoogleAccessToken', () => {
     expect(await getGoogleAccessToken({ ...creds, refreshToken: 'rB' })).toBe('at-rB')
     expect(await getGoogleAccessToken({ ...creds, refreshToken: 'rA' })).toBe('at-rA') // still cached
     expect(seen).toEqual(['rA', 'rB'])
+  })
+})
+
+describe('getGrantedScopes', () => {
+  const creds: GoogleOAuthCredentials = { clientId: 'cid', clientSecret: 'csec', refreshToken: 'rtok' }
+  const originalFetch = globalThis.fetch
+
+  beforeEach(() => resetGoogleTokenCache())
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    resetGoogleTokenCache()
+  })
+
+  test('returns the space-delimited scopes Google reported on the refresh grant', async () => {
+    globalThis.fetch = (async (_url: string) =>
+      new Response(
+        JSON.stringify({ access_token: 'at', expires_in: 3600, scope: 'https://a/gmail.modify https://a/gmail.settings.basic' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )) as typeof fetch
+
+    expect(await getGrantedScopes(creds)).toEqual(['https://a/gmail.modify', 'https://a/gmail.settings.basic'])
+  })
+
+  test('returns null when Google omits the scope field', async () => {
+    globalThis.fetch = (async (_url: string) =>
+      new Response(JSON.stringify({ access_token: 'at', expires_in: 3600 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })) as typeof fetch
+
+    expect(await getGrantedScopes(creds)).toBeNull()
+  })
+
+  test('reuses the cached grant rather than re-refreshing', async () => {
+    let tokenCalls = 0
+    globalThis.fetch = (async (_url: string) => {
+      tokenCalls++
+      return new Response(JSON.stringify({ access_token: 'at', expires_in: 3600, scope: 'https://a/gmail.modify' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }) as typeof fetch
+
+    await getGoogleAccessToken(creds)
+    expect(await getGrantedScopes(creds)).toEqual(['https://a/gmail.modify'])
+    expect(tokenCalls).toBe(1)
   })
 })
 
