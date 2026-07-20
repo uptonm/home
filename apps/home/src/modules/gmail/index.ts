@@ -5,7 +5,7 @@ import { GMAIL_MODULE, GMAIL_SCOPES, getProfile, readGmailCredentials } from './
 import { configureGmail } from './configure'
 import { messagesGet, messagesList, messagesModify, messagesUntrash } from './commands/messages'
 import { threadsGet, threadsList } from './commands/threads'
-import { labelsCreate, labelsGet, labelsList } from './commands/labels'
+import { labelsCreate, labelsDelete, labelsGet, labelsList } from './commands/labels'
 import { draftsGet, draftsList } from './commands/drafts'
 import { filtersCreate, filtersDelete, filtersList } from './commands/filters'
 import { profileGet } from './commands/profile'
@@ -38,6 +38,7 @@ export const manifest: ModuleManifest = {
     labelsList,
     labelsGet,
     labelsCreate,
+    labelsDelete,
     draftsList,
     draftsGet,
     filtersList,

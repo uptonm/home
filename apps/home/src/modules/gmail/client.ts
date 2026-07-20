@@ -498,6 +498,11 @@ export async function untrashMessages(cfg: GmailConfig, ids: string[]): Promise<
   return ids.length
 }
 
+/** Delete a user label (removes it from every message; the messages remain). Only user labels are deletable. */
+export function deleteLabel(cfg: GmailConfig, id: string): Promise<void> {
+  return authedNoContent(cfg, labelGetUrl(id), 'DELETE')
+}
+
 /** Create a user label; returns it with its assigned id. */
 export function createLabel(cfg: GmailConfig, opts: CreateLabelOptions): Promise<GmailLabel> {
   return authedRequestJson<GmailLabel>(cfg, labelsListUrl(), {

@@ -14,6 +14,7 @@ let batchCalls: BatchModifyOptions[] = []
 let trashCalls: string[][] = []
 let untrashCalls: string[][] = []
 let labelCalls: CreateLabelOptions[] = []
+let labelDeletes: string[] = []
 let filterCreates: GmailFilter[] = []
 let filterDeletes: string[] = []
 let listPages: MessagesListOptions[] = []
@@ -48,6 +49,9 @@ mock.module('../modules/gmail/client', () => ({
     labelCalls.push(opts)
     return { id: 'Label_new', name: opts.name, type: 'user' }
   },
+  deleteLabel: async (_cfg: unknown, id: string) => {
+    labelDeletes.push(id)
+  },
   listFilters: async () => ({ filter: [{ id: 'f1', criteria: { from: 'x@y.com' }, action: {} }] }),
   createFilter: async (_cfg: unknown, f: GmailFilter) => {
     filterCreates.push(f)
@@ -59,7 +63,7 @@ mock.module('../modules/gmail/client', () => ({
 }))
 
 const { messagesModify, messagesUntrash } = await import('../modules/gmail/commands/messages')
-const { labelsCreate } = await import('../modules/gmail/commands/labels')
+const { labelsCreate, labelsDelete } = await import('../modules/gmail/commands/labels')
 const { filtersList, filtersCreate, filtersDelete } = await import('../modules/gmail/commands/filters')
 
 afterEach(() => {
@@ -67,6 +71,7 @@ afterEach(() => {
   trashCalls = []
   untrashCalls = []
   labelCalls = []
+  labelDeletes = []
   filterCreates = []
   filterDeletes = []
   listPages = []
@@ -164,6 +169,28 @@ describe('gmail labels create', () => {
     expect(res.ok).toBe(true)
     expect(labelCalls).toEqual([{ name: 'Newsletters' }])
     expect((res as { data: { id: string } }).data.id).toBe('Label_new')
+  })
+})
+
+describe('gmail labels delete', () => {
+  test('requires an id', async () => {
+    const res = await labelsDelete.run({ ...CTX, args: {} })
+    expect(res.ok).toBe(false)
+    expect((res as { code?: string }).code).toBe('missing_arg')
+    expect(labelDeletes).toHaveLength(0)
+  })
+
+  test('without --yes it previews only', async () => {
+    const res = await labelsDelete.run({ ...CTX, args: { id: 'Label_9' } })
+    expect(res.ok).toBe(true)
+    expect((res as { data: { dryRun: boolean } }).data.dryRun).toBe(true)
+    expect(labelDeletes).toHaveLength(0)
+  })
+
+  test('--yes deletes the label', async () => {
+    const res = await labelsDelete.run({ ...CTX, args: { id: 'Label_9', yes: true } })
+    expect(res.ok).toBe(true)
+    expect(labelDeletes).toEqual(['Label_9'])
   })
 })
 

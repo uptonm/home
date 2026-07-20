@@ -10,6 +10,7 @@ import {
   createFilter,
   createLabel,
   deleteFilter,
+  deleteLabel,
   filterDeleteUrl,
   filtersListUrl,
   listFilters,
@@ -190,6 +191,22 @@ describe('network write functions over mocked fetch', () => {
     const filter = await createFilter(cfg, { criteria: { from: 'news@shop.com' }, action: { removeLabelIds: ['INBOX'], addLabelIds: ['Label_3'] } })
     expect(body).toEqual({ criteria: { from: 'news@shop.com' }, action: { removeLabelIds: ['INBOX'], addLabelIds: ['Label_3'] } })
     expect(filter.id).toBe('f2')
+  })
+
+  test('deleteLabel issues a DELETE to the label id', async () => {
+    let seen = ''
+    let method = ''
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      const s = String(url)
+      if (s.includes('oauth2.googleapis.com')) return tokenResponse()
+      seen = s
+      method = String(init?.method)
+      return new Response(null, { status: 204 })
+    }) as typeof fetch
+
+    await deleteLabel(cfg, 'Label_9')
+    expect(seen).toBe(`${GMAIL_API_BASE}/labels/Label_9`)
+    expect(method).toBe('DELETE')
   })
 
   test('deleteFilter issues a DELETE to the filter id', async () => {
