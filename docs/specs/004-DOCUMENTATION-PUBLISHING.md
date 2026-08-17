@@ -47,6 +47,33 @@ under `src/components/site`. Documentation lives under `/docs`, rendered by a
 catch-all route that uses `generateStaticParams`, so docs pages are static at
 build time.
 
+### Code fences are highlighted by Shiki at build time
+
+`source.config.ts` is `defineConfig({ mdxOptions: {} })`, so fumadocs-mdx's
+defaults apply. Those wire in `rehypeCode`, which highlights MDX fences with
+**Shiki** during the build using `github-light` and `github-dark` with
+`defaultColor: false`. `<pre>` maps to fumadocs' `CodeBlock` / `Pre` through
+`defaultMdxComponents` in `src/mdx-components.tsx`.
+
+Shiki is already in the tree — `shiki@4.3.1` plus its `@shikijs/*` companions —
+arriving transitively through `fumadocs-core` and `fumadocs-ui`. It is not
+listed in `apps/site/package.json` and no file the repo owns imports it.
+Highlighting is entirely server-side: no grammar, theme, or engine reaches the
+browser.
+
+Two unhighlighted code surfaces are hand-rolled and deliberate —
+`src/components/site/operations.tsx` renders a fake terminal as literal
+`<pre><code>` with manually coloured `<span>`s, and
+`src/components/site/copy-command.tsx` renders one copyable `<code>` line.
+
+**Diff rendering is available and unused.** Those same defaults include Shiki's
+`transformerNotationDiff`, and the matching CSS — `.diff.add` / `.diff.remove`,
+their `--color-fd-diff-*` variables, and the `+`/`-` `::before` markers — is
+already loaded via the `fumadocs-ui` preset imported at `src/app/globals.css`.
+Any MDX fence can mark lines with `// [!code ++]` / `// [!code --]` at zero
+additional cost. No page under `content/docs/` does today. Beyond that notation
+the site has no diff feature: nothing parses a patch or renders hunks.
+
 ### Search
 
 Search is real and live. `src/app/api/search/route.ts` is a two-line

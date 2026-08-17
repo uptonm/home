@@ -41,6 +41,22 @@ under the union of every row's keys, and anything else falls to
 prints its patch JSON-escaped with literal `\n`: the patch is one field inside
 an object, so it is re-encoded rather than emitted.
 
+### The CLI relays rendered artifacts it never renders
+
+Two commands return text that some other tool has already formatted, and the
+contract has no way to say so.
+
+`home github prs diff` returns `gh`'s patch. `home graphite stack list` runs
+`gt log short --no-interactive` and returns `{ raw, rawTruncated, branches,
+topology }`, where `raw` is gt's own ASCII graph (`◯ ◉ │ ─ ┴ ┘`), ANSI-stripped
+and capped at 20,000 characters. The graphite module never composes that picture
+and deliberately never interprets it — the glyphs are documented as decorative
+in `src/modules/graphite/client.ts`, and real topology comes from separate
+`gt info` calls as a flat `branches[]` array with a `parent` field.
+
+Both are blobs that must survive untouched. Neither can currently say so, which
+is what the declared shape below fixes.
+
 The separation is structural, not a convention someone remembers to follow:
 `run` has no access to a stdout writer, and `emit` has no access to the module
 that produced the data.
