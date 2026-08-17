@@ -5,9 +5,8 @@ specs/    what is true — source of truth, maintained forever
 plans/    a change that makes a spec true — written once, never removed
 ```
 
-The convention — numbering, frontmatter, the `NEEDS APPROVAL` / `PLANNED` /
-`REMOVING` markers, and why none of them is a `status` field — lives in
-`~/.claude/CLAUDE.md` and is not restated here.
+The convention — numbering, frontmatter, and the `NEEDS APPROVAL` / `PLANNED` /
+`REMOVING` markers — lives in `~/.claude/CLAUDE.md` and is not restated here.
 
-Everything currently in `specs/` and `plans/` is marked `NEEDS APPROVAL`.
-Nothing here has been agreed to or executed.
+`plans/` is currently empty. The specs here describe what is already true, so
+there is nothing outstanding to make true.

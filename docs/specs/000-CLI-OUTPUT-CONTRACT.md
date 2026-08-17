@@ -1,5 +1,5 @@
 ---
-plans: [000-KEEP-PLAIN-OUTPUT]
+plans: []
 ---
 
 # CLI Output Contract
@@ -104,9 +104,13 @@ whole presentation layer is **200 lines**: `src/core/output.ts` (69),
 
 This is a constraint, not an accident. A retained-mode renderer buys frame
 diffing, layout, and redraw, and a process that emits one frame and exits has
-no use for any of the three. The evaluation that established this, and the
-libraries it turned down, are recorded in
-[`000-KEEP-PLAIN-OUTPUT`](../plans/000-KEEP-PLAIN-OUTPUT.md).
+no use for any of the three.
+
+Measured, so it does not have to be re-argued: mounting a 20-row Ink view in a
+compiled binary costs ~139 ms against the current ~44 ms, `import 'ink'` alone
+costs 50–70 ms, and Ink falls back to 80 columns with no controlling terminal —
+wrapping a 200-character line into 80/80/40 exactly when a skill is capturing
+the output.
 
 ## The e2e harness is the one live view, and it is not shipped
 
@@ -133,14 +137,14 @@ conventions (`NO_COLOR`, `CI`).
 
 An environment-variable schema validator has nothing to validate here.
 
-## The contract is enforced by tests
+## The contract is not enforced by tests
 
-> **NEEDS APPROVAL** — [`000-KEEP-PLAIN-OUTPUT`](../plans/000-KEEP-PLAIN-OUTPUT.md)
+`emit()` — the function every command's output passes through — has no direct
+test. Every guarantee above holds by inspection only: that the payload lands on
+stdout and diagnostics on stderr, that `--json` produces one parseable line,
+that the failure shape maps to exit codes `1`/`2`/`3`, and that no ANSI escape
+reaches a non-TTY stdout.
 
-`src/__tests__/output.test.ts` pins the three guarantees directly against
-`emit()`: that the payload lands on stdout and diagnostics on stderr, that
-`--json` produces one parseable line, that the failure shape maps to exit codes
-`1`/`2`/`3`, and that no ANSI escape reaches a non-TTY stdout.
-
-Until then `emit()` — the function every command's output passes through — has
-no direct test, and the guarantees above hold by inspection only.
+This is the largest known gap in the contract. All seventeen installed
+`home-*` skills invoke the CLI in `--json` mode, so a regression in `emit()`
+breaks every skill at once and nothing would catch it.

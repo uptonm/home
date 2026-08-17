@@ -1,5 +1,5 @@
 ---
-plans: [004-DOCS-PUBLISHING-DRIFT-REPAIR]
+plans: []
 ---
 
 # Documentation publishing
@@ -68,9 +68,8 @@ owned by `packages/brand` and mirrored into `src/app` and `public`.
 `public/llms.txt` is a hand-written static file that restates the page list and
 the CLI's core contract.
 
-> **NEEDS APPROVAL** — [`004-DOCS-PUBLISHING-DRIFT-REPAIR`](../plans/004-DOCS-PUBLISHING-DRIFT-REPAIR.md)
-> `llms.txt` is generated from the Fumadocs loader by `fumadocs-core/source/llms`,
-> which is already installed, so the page list has exactly one source.
+It therefore has two sources that drift independently. `fumadocs-core/source/llms`
+can generate it from the Fumadocs loader and is already installed, unused.
 
 ### Deployment
 
@@ -93,9 +92,8 @@ The site has no forms, inputs, labels, selects, or textareas anywhere in
 `src`. Its interactive surface is one theme toggle, one copy-to-clipboard
 button, and a handful of links, across roughly 2,100 lines of TypeScript.
 
-> **NEEDS APPROVAL** — [`004-DOCS-PUBLISHING-DRIFT-REPAIR`](../plans/004-DOCS-PUBLISHING-DRIFT-REPAIR.md)
-> `src/app/not-found.tsx` and `src/app/error.tsx` give the App Router explicit
-> 404 and error boundaries instead of the framework defaults.
+There is no `src/app/not-found.tsx` and no `src/app/error.tsx`, so 404s and
+render errors fall through to the App Router's framework defaults.
 
 ## `docs.uptonm.io` — the personal knowledge base
 
@@ -159,11 +157,9 @@ recent commit, `357667a feat: support top-level symlinked docs mounts`, landed
 build it loaded at start. `/hermes-profile` therefore renders the not-found page
 against a symlink the current code supports.
 
-The repo has no git remote. It exists only on boris.
+A restart is the difference between the two.
 
-> **NEEDS APPROVAL** — [`004-DOCS-PUBLISHING-DRIFT-REPAIR`](../plans/004-DOCS-PUBLISHING-DRIFT-REPAIR.md)
-> The service runs the build on disk, so `/hermes-profile` lists its contents,
-> and the repo has an origin so it survives the loss of the box.
+The repo has no git remote. It exists only on boris.
 
 ## What the two sites share, and what they do not
 
@@ -188,5 +184,5 @@ risks that no check would catch.
 
 The site depends on Fumadocs, shadcn, Base UI, Tailwind, and Biome. It takes no
 component-audit, registry-browsing, or story-authoring dependency, and there is
-no Storybook anywhere in the repo. The reasoning is recorded in
-[`004-DOCS-PUBLISHING-DRIFT-REPAIR`](../plans/004-DOCS-PUBLISHING-DRIFT-REPAIR.md).
+no Storybook anywhere in the repo. `site:lint` (`biome check`) and
+`site:typecheck` (`tsc --noEmit`) are the whole of its static analysis.

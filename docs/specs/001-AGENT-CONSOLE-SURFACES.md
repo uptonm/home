@@ -1,6 +1,5 @@
 ---
-plans:
-  - 001-DECLINE-AGENT-UI-LIBRARIES
+plans: []
 ---
 
 # Hermes agent console surfaces
@@ -149,23 +148,3 @@ reason its context meter is absent.
 **Diffs.** `ThreadEntry` carries a tool result as an opaque `string`. Hermes'
 `patch` tool emits no structured hunk data comparable to Claude Code's
 `structuredPatch`, so a diff component would have to parse prose.
-
-## The standing position on third-party agent-UI component libraries
-
-> **NEEDS APPROVAL** — [`001-DECLINE-AGENT-UI-LIBRARIES`](../plans/001-DECLINE-AGENT-UI-LIBRARIES.md)
-
-None is adopted. Five were evaluated on 2026-08-17 — assistant-ui, tool-ui,
-agent-elements, nexus-ui, simple-ai, all MIT, all license-verified from the
-LICENSE file rather than a badge. The evaluation and its reasoning are in the
-plan; the conclusion is that the blocker is not any library's quality but the
-four constraints above, three of which every candidate violates and the fourth of
-which makes the one genuinely differentiated feature — per-tool cards — non-
-transferable.
-
-The position is a default, not a ban. It is revisited by a new plan, not by
-re-running the evaluation.
-
-> **NEEDS APPROVAL** — [`001-DECLINE-AGENT-UI-LIBRARIES`](../plans/001-DECLINE-AGENT-UI-LIBRARIES.md)
-
-`apps/web` repairs incomplete markdown mid-stream with `remend`, so a code fence
-opened by a delta renders as a code block before its closing fence arrives.

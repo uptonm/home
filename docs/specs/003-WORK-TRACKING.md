@@ -1,6 +1,5 @@
 ---
-plans:
-  - 003-NO-THIRD-PARTY-BOARD
+plans: []
 ---
 
 # Where work is tracked
@@ -13,9 +12,8 @@ running.
 ## The live system: numbered plans, executed as pull requests
 
 Work that is actually moving lives as `docs/specs/` and `docs/plans/` inside the repo it
-changes, under the convention in `~/.claude/CLAUDE.md` and the `NEEDS APPROVAL` extension
-in `docs/README.md`. A plan is picked up, executed on a branch, and lands as a pull
-request; `## Landed` on the plan is the record.
+changes, under the convention in `~/.claude/CLAUDE.md`. A plan is picked up, executed on
+a branch, and lands as a pull request; `## Landed` on the plan is the record.
 
 `uptonm/agents` is where this is densest — fourteen specs, thirty-plus plans, and
 `docs/plans/ORDER.md` holding the execution graph that the numbers do not carry. Pull
@@ -190,21 +188,19 @@ with shadcn 4 in the `base-nova` style on React 19.2.4 and Next 16.2.10;
 Neither carries a Radix package. A component registry built on Radix cannot be dropped into
 either without importing a second, parallel primitive library.
 
-The alternatives that were evaluated, and the evidence against each, are recorded in
-[`003-NO-THIRD-PARTY-BOARD`](../plans/003-NO-THIRD-PARTY-BOARD.md).
+A third-party board would also be blind to the dispatcher: it would carry its own store,
+leaving the queue that actually runs the work unread.
 
 ## The stale cross-cutting queue
 
-> **NEEDS APPROVAL** — [`003-NO-THIRD-PARTY-BOARD`](../plans/003-NO-THIRD-PARTY-BOARD.md)
->
-> `~/docs/plans/master-task-queue.md`, published at `docs.uptonm.io`, no longer advertises
-> Workstream C. That lane — *Mission Control — home.uptonm.io*, whose C1.3 reads "Read
-> `~/.hermes/kanban.db` directly from Next.js API routes (better-sqlite3)" and whose C2 is a
-> four-item "Kanban Board MVP" — is marked superseded, pointing at the board that already
-> ships and at `~/Projects/agents/docs/specs/003-TASK-UI.md` for the one being built.
->
-> It was written 2026-07-18, before the task-backlog kernel had its own UI spec. Every box
-> in it is still unchecked; its C2 duplicates a board that was already serving on port 9119
-> when it was written; and its central architectural instruction is the exact thing
-> `003-TASK-UI` forbids — reading the kernel's database directly rather than over the
-> gateway. Left as it stands it reads as open, approved work.
+`~/docs/plans/master-task-queue.md`, published at `docs.uptonm.io`, still advertises
+Workstream C — *Mission Control — home.uptonm.io*, whose C1.3 reads "Read
+`~/.hermes/kanban.db` directly from Next.js API routes (better-sqlite3)" and whose C2 is a
+four-item "Kanban Board MVP".
+
+It was written 2026-07-18, before the task-backlog kernel had its own UI spec. Every box
+in it is still unchecked; its C2 duplicates a board that was already serving on port 9119
+when it was written; and its central architectural instruction is the exact thing
+`~/Projects/agents/docs/specs/003-TASK-UI.md` forbids — reading the kernel's database
+directly rather than over the gateway. As it stands it reads as open, approved work,
+and it is neither.

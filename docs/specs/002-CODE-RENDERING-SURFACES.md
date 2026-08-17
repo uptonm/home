@@ -1,5 +1,5 @@
 ---
-plans: [002-DECLINE-PIERRE-DIFFS]
+plans: []
 ---
 
 # Code and Diff Rendering Surfaces
@@ -195,17 +195,3 @@ plugin's `dashboard/dist/index.html` as a full SPA build, discovered from
 `~/.hermes/plugins`, sandboxed in an iframe on a null origin. A bundled React
 diff viewer is supported there — in a separate plugin repo, unable to reach the
 transcript DOM.
-
-## Third-party diff and tree renderers
-
-Neither `@pierre/diffs` nor `@pierre/trees` is a dependency of this repo, and
-nothing in it imports either package.
-
-> **NEEDS APPROVAL** — [`002-DECLINE-PIERRE-DIFFS`](../plans/002-DECLINE-PIERRE-DIFFS.md)
->
-> `apps/site` depends on `@pierre/diffs` and `@pierre/trees`, and renders pull
-> request diffs and repository file trees as React components.
->
-> Plan 002 evaluated this and recommends rejecting it. Approving that
-> recommendation means deleting this passage and leaving the plan in place as
-> the record.
