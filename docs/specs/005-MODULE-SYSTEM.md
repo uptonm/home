@@ -1,5 +1,5 @@
 ---
-plans: []
+plans: [006-CONNECTION-LAYER, 007-GOOGLE-CONNECTION-CLEANUP, 008-MODULE-PATHS-AND-ALIASES]
 ---
 
 # Module System
@@ -28,6 +28,11 @@ itself.
 `commands` is the module's own command surface. `status` is an async readiness
 probe taking a resolved config and returning a `RunResult`.
 
+The field count is not stable in either direction:
+[000-CLI-OUTPUT-CONTRACT](000-CLI-OUTPUT-CONTRACT.md) plans an `outputs` thunk
+that dynamically imports the module's `output.ts`, and the connection work below
+adds `connection`, `path`, and `shortPath`.
+
 Two fields are optional and both exist to describe a module that does not fit
 the default shape. `requiresConfig` (`src/core/types.ts:85`) overrides the
 default rule that any non-empty `configSchema` makes configuration mandatory;
@@ -45,6 +50,75 @@ authorization flow those `configure` overrides run is owned by
 manifest into `SKILL.md` is owned by
 [009-SKILL-GENERATION](009-SKILL-GENERATION.md).
 
+## Credentials belong to the manifest that needs them
+
+A manifest owns its own credentials. `unifi` declares `url`, `insecureTLS`, and
+`apiKey`; `linear` declares its token. Nothing is shared, and nothing needs to
+be — with one exception the framework does not model.
+
+Three Google modules authorize against one OAuth client, so `gmail`, `gdrive`,
+and `gcal` each hold their own refresh token while a fourth manifest named
+`google` holds the `clientId` and `clientSecret` they share. That fourth
+manifest has no capability surface of its own: one `logout` command, a `status`
+that reports which of the other three hold a grant, and a hardcoded
+`GOOGLE_API_MODULES = ['gmail','gdrive','gcal']` (`src/modules/google/index.ts:6`)
+naming its own consumers. It is a credential holder wearing a module's shape
+because a credential holder is not something a manifest can be. The flow it
+backs is owned by [007-GOOGLE-AUTHORIZATION](007-GOOGLE-AUTHORIZATION.md).
+
+> **REMOVING** — [`007-GOOGLE-CONNECTION-CLEANUP`](../plans/007-GOOGLE-CONNECTION-CLEANUP.md)
+>
+> The `google` module, its hardcoded consumer list, and the `refreshToken` entry
+> each API module declares but never prompts for are all deleted once a real
+> `google` connection exists. `home logout google` derives the same consumer
+> list from the registry, and one `authorizeGoogleModule` helper replaces the
+> three structurally identical `configure.ts` files.
+
+`unifi` and `protect` reach the same physical console and each declare their own
+`url` and `insecureTLS`, so the controller address is entered twice.
+
+> **PLANNED** — [`006-CONNECTION-LAYER`](../plans/006-CONNECTION-LAYER.md)
+>
+> Credential ownership is a second declaration, separate from the module.
+>
+> ```ts
+> export interface ConnectionManifest {
+>   name: string
+>   description: string
+>   configSchema: ConfigField[]
+>   configure?: () => Promise<void>
+>   status(cfg: ModuleConfig): Promise<RunResult>
+> }
+> ```
+>
+> A **connection** owns the credentials for reaching an external system. A
+> **module** owns a capability surface and names one connection. The rule for
+> dividing them: a connection owns the half common to everything behind it, a
+> module owns its own half. For `google` that is the client versus each grant;
+> for `cloudflare`, one API token and nothing per module.
+>
+> Every module names a connection, including the fifteen whose connection backs
+> only them. A one-to-one connection becomes a shared one when a second module
+> names it, and nothing about the first module moves.
+>
+> A connection is invisible to the CLI. It contributes no command and no path
+> segment. The authenticated client it produces is a plain typed export beside
+> it rather than a manifest field — threading a client type through the registry
+> array would make every consumer generic to no purpose.
+>
+> Connections and modules share one config and secrets namespace keyed by name,
+> so `modules/unifi.json` holds the connection's `url` beside the module's
+> `site` and no stored value moves. Two invariants make that safe, and the
+> registry asserts both: a module's `configSchema` keys are disjoint from its
+> connection's, and a name used by both belongs to a matched pair. Resolving a
+> module's config reads the connection's stored values, then its own, and merges
+> with the module's keys last — so commands still receive one flat `ctx.config`
+> and no command body changes when a field moves up.
+>
+> `unifi` and `protect` stay two connections. They share a host but not an
+> authentication method, and a connection owning only a hostname hands its
+> modules nothing they can use.
+
 ## A command is data with one function attached
 
 `CommandSpec` (`src/core/types.ts:29`) is a `path` (the argv tokens after the
@@ -53,8 +127,9 @@ example invocations, and `run`. `run` receives a `RunContext`
 (`src/core/types.ts:16`) — the parsed args, the three global flag booleans, a
 consola instance, and the resolved config — and returns a `RunResult`. It has no
 writer, no exit code, and no knowledge of who called it; the reasoning behind
-that separation and everything downstream of the returned `RunResult` belongs to
-[000-CLI-OUTPUT-CONTRACT](000-CLI-OUTPUT-CONTRACT.md).
+that separation, the fields `RunResult` carries, and everything downstream of it
+belong to [000-CLI-OUTPUT-CONTRACT](000-CLI-OUTPUT-CONTRACT.md) — including the
+`out` key it plans to add for declaring an output shape.
 
 `ArgSpec` (`src/core/types.ts:5`) declares a name, one of four kinds
 (`positional`, `string`, `boolean`, `number`), a description, and optionally
@@ -107,6 +182,17 @@ which `--help`, completion generation, `home status`, `home doctor`, `home
 configure`, `home skill install`, `home secrets export`, and `home config
 export` all do — costs an array iteration rather than any filesystem work.
 
+> **PLANNED** — [`006-CONNECTION-LAYER`](../plans/006-CONNECTION-LAYER.md)
+>
+> `src/registry.ts` exports a second static array, `connections`, built the same
+> way and for the same compile-time reason.
+>
+> The registry is validated by tests rather than at startup, so a violation
+> fails the build instead of the user's next command: every module's
+> `connection` resolves, module and connection names are each unique, a shared
+> name is a matched pair, and a module's config keys are disjoint from its
+> connection's.
+
 ## Every module gets three commands for free
 
 `buildCommandTree` (`src/core/citty.ts:220`) turns one manifest into one citty
@@ -122,6 +208,17 @@ to ignore every existing value. Every failure it catches is reported as
 back to `configure_failed`.
 
 `status` (`src/core/citty.ts:168`) resolves config and calls `manifest.status`.
+
+> **PLANNED** — [`006-CONNECTION-LAYER`](../plans/006-CONNECTION-LAYER.md)
+>
+> Both walk the chain. `configure` sets the module's connection up first when it
+> has required fields still unset, then configures the module — which removes
+> the present trap where `home gmail configure` fails until the operator knows
+> to run `home google configure` first. `--force` re-prompts at both levels.
+>
+> `status` probes the connection first, and reports a failing connection as a
+> config error naming it and the command that fixes it, without running the
+> module's own probe. A doomed probe produces an error naming the wrong subject.
 
 `skill` (`src/core/citty.ts:207`) rewrites that one module's `SKILL.md`. It is
 the only one of the three that neither reads config nor can fail on a
@@ -181,6 +278,27 @@ depth 2 (227). A depth-3 path would be grouped by its first token and then
 collide with its siblings on the last, silently losing commands rather than
 failing.
 
+A module mounts at its `name`, so the argv token and the registry key are the
+same string and neither can be chosen independently of the other.
+
+> **PLANNED** — [`008-MODULE-PATHS-AND-ALIASES`](../plans/008-MODULE-PATHS-AND-ALIASES.md)
+>
+> A module declares `path: string[]`, where it mounts, and optionally
+> `shortPath: string[]`, a second mount for the same commands. `name`, `path`,
+> and `connection` become three independent things: `cloudflare-dns` is named
+> `cloudflare-dns`, mounts at `['cloudflare','dns']`, and connects via
+> `cloudflare`. `gmail` mounts at `['google','gmail']` with a `shortPath` of
+> `['gmail']`, so both invocations reach the same command definitions.
+>
+> `mountModules` nests each module's tree under its path segments, creating
+> shared intermediate groups — which is what lets `cloudflare dns` and
+> `cloudflare workers` be separate modules with separate skills rather than
+> command groups inside one. `buildCommandTree` keeps its max-depth-2 assumption
+> for a module's *internal* command paths; the module's own depth sits above it.
+>
+> The registry gains a matching invariant: no two modules claim the same mount,
+> counting `shortPath`.
+
 ## Errors carry a code, and a taxonomy that is partly unused
 
 `src/core/errors.ts` defines `HomeError` with a string `code`, and three
@@ -229,6 +347,17 @@ The root state is derived, not stored: any error at all makes the whole report
 `degraded`, otherwise any success makes it `ok`, otherwise `not_configured`
 (`src/core/status.ts:89`).
 
+> **PLANNED** — [`006-CONNECTION-LAYER`](../plans/006-CONNECTION-LAYER.md)
+>
+> `collectStatuses` probes each connection once regardless of how many modules
+> depend on it, then probes only the modules whose connection came back healthy,
+> and groups modules beneath their connection in the report. The counts stay
+> keyed to modules so the summary keeps its present meaning.
+>
+> The board renders a connection header with its modules indented beneath, and
+> collapses a connection whose only module shares its name to a single row — a
+> one-to-one pair is one thing to the reader.
+
 `src/core/status-view.ts` renders that report as the human board — a header line
 with the root state and the three counts, then one aligned row per module
 showing a symbol and one of `ok` / `unreachable` / `not configured`. It takes
@@ -258,7 +387,9 @@ currently shadowed by this.
 `globalFlags` (`src/core/citty.ts:11`) — `--json`, `--quiet`, `--verbose` — is
 merged into every generated leaf and every synthesized configure/status/skill
 command, so the three are genuinely universal below the root. `ctxFromArgs`
-(`src/core/citty.ts:60`) is where they take effect on logging.
+(`src/core/citty.ts:60`) is where they take effect on logging. The set is not
+fixed: [000-CLI-OUTPUT-CONTRACT](000-CLI-OUTPUT-CONTRACT.md) plans a `--format`
+alongside them, and owns whatever the list becomes.
 
 ## Root-level commands
 
@@ -278,6 +409,16 @@ what pulls a pre-consolidation entry into the single item, and without it a
 partly migrated install would export only what had already been consolidated.
 `completions` renders a shell script. `upgrade` replaces the binary from GitHub
 Releases.
+
+> **PLANNED** — [`006-CONNECTION-LAYER`](../plans/006-CONNECTION-LAYER.md)
+>
+> `logout <connection>` forgets a connection's stored credentials and every
+> grant held by the modules that name it, deriving that set from the registry.
+> It refuses without `--yes`, and revokes nothing server-side — re-running a
+> module's `configure` restores access.
+>
+> `configure` walks connections before their modules and configures each
+> connection at most once.
 
 `overview ops` is the one root command that composes modules rather than
 enumerating them. It calls vercel, uptime-kuma, and beszel client code directly
