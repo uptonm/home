@@ -13,6 +13,7 @@ dist/
 home-secrets.json
 .vscode/
 .idea/
+.claude/worktrees/
 *.tsbuildinfo
 .vercel
 .env*
