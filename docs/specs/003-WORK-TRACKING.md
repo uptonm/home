@@ -22,21 +22,24 @@ ordering edge, and the drain 028 dropped`). This repo carries the same conventio
 here begins with this spec.
 
 **Graphite is transport, not a tracker.** `gt` stacks a branch chain and submits it; it
-holds no state once the stack lands. `gt log short` shows `main` alone — no stack is open.
-Nothing is tracked *in* Graphite, and nothing is lost when a stack drains.
+holds no state once the stack lands. Nothing is tracked *in* Graphite, and nothing is lost
+when a stack drains. It is in active use; whether a stack is open in this repo at any
+moment says nothing about that.
 
-## Linear is dormant
+## Linear holds the human backlog
 
-Team `UPT` holds 47 issues: 39 in `Backlog`, 8 `Done`. Every one of the 39 belongs to
-project `Atlas`. Nothing in the team has moved since 2026-05-30 — the newest `updatedAt`
-across all 47 rows.
+Linear is the tracker for human-intended work, and it is in active use. What follows is
+scoped to this repo and this host only, and is not a claim about Linear generally.
 
-`home linear` reads and writes it (`apps/home/src/modules/linear/`). The standalone
+Team `UPT` holds 47 issues: 39 in `Backlog`, 8 `Done`, every one of the 39 under project
+`Atlas` — the project this repo's work moved away from. Nothing in *that team* has moved
+since 2026-05-30.
+
+`home linear` reads and writes Linear (`apps/home/src/modules/linear/`). The standalone
 `linear` CLI that the `linear` skill drives is **not installed on this host** — `which
-linear` finds nothing. Deferred review items are consequently written into pull request
-bodies rather than filed as issues, which is why the team has not moved.
-
-Linear is the place a human backlog would live, holding a stale one.
+linear` finds nothing. Deferred review items originating here are therefore written into
+pull request bodies rather than filed as issues, which is a gap in this box's tooling
+rather than a property of the tracker.
 
 ## The Hermes task backlog is live infrastructure
 

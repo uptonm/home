@@ -4,9 +4,14 @@ plans: []
 
 # Documentation publishing
 
-Two documentation sites exist. They are not duplicates and are not candidates
-for consolidation: they sit on opposite sides of a trust boundary, source
-different content, and serve different readers.
+Two documentation sites exist, and they document two different subjects.
+`home.uptonm.dev` is the manual for the `home` CLI, written for anyone who might
+want to use it. `docs.uptonm.io` documents how this homelab works, written for
+its operator. Neither is a view of the other's content.
+
+That difference in purpose is reinforced by a difference in kind — they sit on
+opposite sides of a trust boundary, source content from different places, and
+serve different readers — which is why consolidation is not on the table.
 
 | | `home.uptonm.dev` | `docs.uptonm.io` |
 | --- | --- | --- |
