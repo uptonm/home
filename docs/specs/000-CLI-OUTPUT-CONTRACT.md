@@ -30,8 +30,14 @@ drops the consola log level to silent.
 A command never prints. `CommandSpec.run` returns a `RunResult`
 (`src/core/types.ts`) — either `{ ok: true, data }` or `{ ok: false, kind,
 message, code }` — and returns it to the framework. `emit()` in
-`src/core/output.ts` is the single funnel through which every byte of stdout
-passes, and the only place `process.exit` is called on a normal path.
+`src/core/output.ts` is the funnel every command's payload passes through, and
+the only place `process.exit` is called on a normal path.
+
+Two paths reach stdout without it. `home config export` with no `--out` writes
+pretty-printed multi-line JSON straight to `process.stdout` and ignores `--json`
+on that path, which its own comment records (`src/commands/config.ts:41`). And
+citty's usage text — printed when a command is invoked with no subcommand —
+goes to stdout directly; see the note on colour below.
 
 What the separation does *not* yet carry is any statement of what `data` is:
 the field is typed `unknown`, so `formatHuman` recovers the shape by inspecting
@@ -170,9 +176,14 @@ const color = process.stdout.isTTY === true && !process.env.NO_COLOR
 ```
 
 There is no `supports-color` dependency and no `FORCE_COLOR` override. Under a
-pipe the output is plain text even when the caller exports `FORCE_COLOR=1` —
-verified: zero escape bytes. The CLI cannot be talked into writing ANSI into a
-capture buffer.
+pipe every payload this CLI renders is plain text even when the caller exports
+`FORCE_COLOR=1` — verified: zero escape bytes.
+
+Citty's own usage output is the exception, and it is not routed through any of
+this. `home tts > out.txt` writes 1922 bytes to stdout containing eight escape
+sequences and exits 1, with only `No command specified.` on stderr. The colour
+rule above governs what the CLI formats; it does not govern what its argument
+parser prints on a usage error.
 
 ## The consumers are agents, and they never see human output
 
@@ -230,10 +241,13 @@ the `home` command.
 ## Configuration does not come from the environment
 
 Module configuration lives in `~/.config/home/modules/<name>.json` (XDG,
-`src/core/paths.ts`), and secrets live in the OS keyring or an encrypted file
-backend (`src/core/secrets.ts`). Validation is per-field, declared on
-`ConfigField` as `validate` and `probe` in each module's `ModuleManifest`, and
-runs interactively during `home <module> configure`.
+`src/core/paths.ts`), and secrets live in the OS keyring or, as a fallback,
+plaintext JSON at mode `0600` (`src/core/secrets.ts:171`). `home secrets export`
+warns that its output is plaintext for the same reason. Validation is per-field,
+declared on `ConfigField` as `validate` and `probe`, and runs interactively
+during `home <module> configure` — though no module declares a `probe` today, so
+that half of the loop is unreached. The storage details are owned by
+[006-CONFIGURATION-AND-SECRETS](006-CONFIGURATION-AND-SECRETS.md).
 
 The CLI reads about a dozen environment variables in total, and none of them
 carry module configuration. They are test seams (`XDG_CONFIG_HOME`,
@@ -263,3 +277,8 @@ Until the above lands, `emit()` has no direct test and every guarantee holds by
 inspection only. That is the largest known gap in the contract: all seventeen
 installed `home-*` skills invoke the CLI in `--json` mode, so a regression in
 `emit()` breaks every skill at once and nothing would catch it.
+
+Inspection is also how the three exceptions above were found rather than caught:
+the `config export` bypass, the ANSI in citty's usage text, and the exit code a
+thrown `NotConfiguredError` actually produces, which is recorded in
+[005-MODULE-SYSTEM](005-MODULE-SYSTEM.md).
