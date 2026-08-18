@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/uptonm/home/compare/home-v1.1.0...home-v1.2.0) (2026-08-18)
+
+
+### Features
+
+* **gmail:** write primitives — bulk triage, filters, scope-aware status ([#106](https://github.com/uptonm/home/issues/106)) ([52127d7](https://github.com/uptonm/home/commit/52127d7fb3aa31c2a4aa18d96b6d071db9f6fbaa))
+* **site:** short install command at home.uptonm.dev/install.sh ([#103](https://github.com/uptonm/home/issues/103)) ([2dea559](https://github.com/uptonm/home/commit/2dea55971dd30c0b83d89e2dfed8cfcb94469f00))
+
 ## [1.1.0](https://github.com/uptonm/home/compare/home-v1.0.0...home-v1.1.0) (2026-07-18)
 
 
